@@ -135,8 +135,8 @@ o original.
 
 **Treino** — cada exercício vira uma tabela: número da série, o que você fez da última
 vez, carga, repetições e o ✓. Tocar no ✓ sem digitar nada repete o desempenho anterior
-e dispara o cronômetro de descanso. Tocar no número da série alterna entre normal,
-aquecimento (A), falha (F) e drop (D); segurar remove a série.
+e dispara o cronômetro de descanso. Tocar no número da série abre o seletor de técnica;
+segurar remove a série.
 
 **Exercícios** — 299 movimentos em português, cobrindo as máquinas de uma academia
 comum (leg press, hack, extensora, flexora, peck deck, crossover, graviton, Smith,
@@ -144,10 +144,16 @@ adutora/abdutora, panturrilheira, cardio) além de barra, halteres, cabos, kettl
 peso corporal. Cada um traz demonstração animada, execução passo a passo, o erro mais
 comum, seus recordes e o histórico.
 
+**Técnicas de execução** — cada série pode ser marcada como normal, aquecimento, falha,
+drop set, rest-pause, bi-set, cluster, isometria, negativa ou parcial. Toque no número
+da série para escolher. Aquecimento é a única que não entra no volume.
+
 **Relatório de fim de treino** — ao concluir, abre um resumo animado: selo de conclusão,
-duração, volume e séries subindo de zero, recordes batidos e a distribuição do esforço
-por grupo muscular. O mesmo relatório, sem a encenação, é o que você vê ao abrir um
-treino pelo histórico.
+duração, volume e séries subindo de zero, recordes batidos, frequência cardíaca e o
+**mapa dos músculos trabalhados sobre uma figura humana** (frente e costas), com cada
+região pintada pela intensidade do esforço. Dá para **compartilhar como imagem**, no
+estilo Strava. O mesmo relatório, sem a encenação, é o que você vê ao abrir um treino
+pelo histórico.
 
 **Progresso** — total de treinos, volume e tempo, o volume das últimas oito semanas e
 todos os treinos concluídos.

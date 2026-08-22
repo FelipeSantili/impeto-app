@@ -8,18 +8,12 @@ import { Rotulo, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { abrirMenu, type OpcaoMenu } from '@/components/folha';
 import { POR_ID } from '@/data/exercicios';
+import { TECNICAS, tecnicaDe } from '@/data/tecnicas';
 import { MEDIDA_LABEL, type Medida } from '@/data/types';
 import { color, radius, sp, type } from '@/design/tokens';
 import { fmtNumero } from '@/lib/metricas';
 import { useDescanso } from '@/store/descanso';
-import { useTreino, type ExercicioTreino, type Serie, type TipoSerie } from '@/store/treino';
-
-const MARCA: Record<TipoSerie, { texto: string; cor: string } | null> = {
-  normal: null,
-  aquecimento: { texto: 'A', cor: '#F5B942' },
-  falha: { texto: 'F', cor: color.danger },
-  drop: { texto: 'D', cor: '#4FD1C5' },
-};
+import { useTreino, type ExercicioTreino, type Serie } from '@/store/treino';
 
 const OPCOES_DESCANSO = [0, 45, 60, 90, 120, 150, 180, 240];
 
@@ -178,12 +172,25 @@ function LinhaSerie({
 }) {
   const editarSerie = useTreino((s) => s.editarSerie);
   const alternarFeita = useTreino((s) => s.alternarFeita);
-  const ciclarTipo = useTreino((s) => s.ciclarTipo);
+  const definirTipo = useTreino((s) => s.definirTipo);
   const removerSerie = useTreino((s) => s.removerSerie);
   const iniciarDescanso = useDescanso((s) => s.iniciar);
 
-  const marca = MARCA[serie.tipo];
+  const tecnica = tecnicaDe(serie.tipo);
   const feita = serie.feita;
+
+  /** Dez técnicas não cabem num toque cíclico — a folha lista todas com explicação. */
+  function escolherTecnica() {
+    abrirMenu({
+      titulo: `Série ${numero}`,
+      subtitulo: 'Como você vai executar',
+      opcoes: TECNICAS.map((t) => ({
+        texto: t.tipo === tecnica.tipo ? `${t.nome}  ·  atual` : t.nome,
+        icone: t.tipo === tecnica.tipo ? ('checkmark-circle' as const) : ('ellipse-outline' as const),
+        onPress: () => definirTipo(uid, serie.id, t.tipo),
+      })),
+    });
+  }
 
   const dicaPeso = anterior?.peso != null ? fmtNumero(anterior.peso) : '—';
   const dicaReps = anterior?.reps != null ? fmtNumero(anterior.reps) : '—';
@@ -209,7 +216,7 @@ function LinhaSerie({
       <Pressable
         onPress={() => {
           Haptics.selectionAsync();
-          ciclarTipo(uid, serie.id);
+          escolherTecnica();
         }}
         onLongPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -219,8 +226,8 @@ function LinhaSerie({
         hitSlop={6}
         style={{ width: 30, alignItems: 'center' }}
       >
-        <Tx v="smallMed" tab cor={marca ? marca.cor : color.textDim}>
-          {marca ? marca.texto : numero}
+        <Tx v="smallMed" tab cor={tecnica.sigla ? tecnica.cor : color.textDim}>
+          {tecnica.sigla ?? numero}
         </Tx>
       </Pressable>
 

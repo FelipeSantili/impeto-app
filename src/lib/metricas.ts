@@ -1,10 +1,11 @@
 import { POR_ID } from '@/data/exercicios';
+import { tecnicaDe } from '@/data/tecnicas';
 import type { Grupo, Medida } from '@/data/types';
 import type { ExercicioTreino, Serie, Sessao } from '@/store/treino';
 
-/** Só séries de trabalho entram no volume — aquecimento não conta. */
+/** Só séries de trabalho entram no volume — o catálogo diz quais contam. */
 function contaVolume(s: Serie): boolean {
-  return s.feita && s.tipo !== 'aquecimento';
+  return s.feita && tecnicaDe(s.tipo).contaVolume;
 }
 
 export function volumeSerie(s: Serie, medida: Medida): number {

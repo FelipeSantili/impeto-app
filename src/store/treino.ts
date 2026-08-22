@@ -3,7 +3,17 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { POR_ID } from '@/data/exercicios';
 
-export type TipoSerie = 'normal' | 'aquecimento' | 'falha' | 'drop';
+export type TipoSerie =
+  | 'normal'
+  | 'aquecimento'
+  | 'falha'
+  | 'drop'
+  | 'rest_pause'
+  | 'bi_set'
+  | 'isometrica'
+  | 'negativa'
+  | 'parcial'
+  | 'cluster';
 
 export interface Serie {
   id: string;
@@ -76,7 +86,7 @@ interface Estado {
   removerSerie: (uid: string, serieId: string) => void;
   editarSerie: (uid: string, serieId: string, campo: 'peso' | 'reps', valor: number | null) => void;
   alternarFeita: (uid: string, serieId: string) => boolean;
-  ciclarTipo: (uid: string, serieId: string) => void;
+  definirTipo: (uid: string, serieId: string, tipo: TipoSerie) => void;
 
   salvarRotina: (nome: string, itens: Rotina['itens'], id?: string) => string;
   apagarRotina: (id: string) => void;
@@ -281,19 +291,13 @@ export const useTreino = create<Estado>()(
         return virouFeita;
       },
 
-      ciclarTipo: (alvo, serieId) => {
-        const ordem: TipoSerie[] = ['normal', 'aquecimento', 'falha', 'drop'];
+      definirTipo: (alvo, serieId, tipo) =>
         set((s) =>
           mapAtiva(s, alvo, (e) => ({
             ...e,
-            series: e.series.map((x) =>
-              x.id === serieId
-                ? { ...x, tipo: ordem[(ordem.indexOf(x.tipo) + 1) % ordem.length] }
-                : x,
-            ),
+            series: e.series.map((x) => (x.id === serieId ? { ...x, tipo } : x)),
           })),
-        );
-      },
+        ),
 
       salvarRotina: (nome, itens, id) => {
         const rid = id ?? uid();

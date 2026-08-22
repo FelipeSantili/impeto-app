@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BarraAnimada, Contador, EntradaCartao, SeloConcluido } from '@/components/animado';
 import { Botao, BotaoIcone, Rotulo, Tx, Vazio } from '@/components/base';
+import { CartaoCompartilhar } from '@/components/cartao-compartilhar';
 import { Brilho } from '@/components/decor';
 import { Miniatura } from '@/components/demo';
+import { MapaMuscular } from '@/components/mapa-muscular';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
 import { POR_ID } from '@/data/exercicios';
+import { tecnicaDe } from '@/data/tecnicas';
 import { GRUPO_LABEL, MEDIDA_LABEL } from '@/data/types';
 import { color, radius, shadow, sp } from '@/design/tokens';
 import {
@@ -26,6 +29,7 @@ import {
   volumeSessao,
   type Recorde,
 } from '@/lib/metricas';
+import { compartilharView } from '@/lib/compartilhar';
 import { lerCardio } from '@/lib/saude';
 import { useTreino } from '@/store/treino';
 
@@ -52,6 +56,9 @@ export default function RelatorioSessao() {
   const apagarSessao = useTreino((s) => s.apagarSessao);
   const salvarRotina = useTreino((s) => s.salvarRotina);
   const anexarCardio = useTreino((s) => s.anexarCardio);
+
+  const refCartao = useRef<View | null>(null);
+  const [compartilhando, setCompartilhando] = useState(false);
 
   const sessao = historico.find((s) => s.id === id);
 
@@ -84,6 +91,20 @@ export default function RelatorioSessao() {
       vivo = false;
     };
   }, [sessao, anexarCardio]);
+
+  async function compartilhar() {
+    setCompartilhando(true);
+    const r = await compartilharView(refCartao);
+    setCompartilhando(false);
+    if (!r.ok && r.erro) {
+      abrirConfirmacao({
+        titulo: 'Não deu certo',
+        descricao: r.erro,
+        confirmar: 'Entendi',
+        onConfirmar: () => {},
+      });
+    }
+  }
 
   function sair() {
     if (festa) router.replace('/');
@@ -295,6 +316,11 @@ export default function RelatorioSessao() {
               </Tx>
             </View>
 
+            {/* O corpo primeiro: dá a leitura imediata de onde o treino pegou. */}
+            <View style={estilos.blocoCorpo}>
+              <MapaMuscular musculos={musculos} atraso={festa ? 1500 : 150} largura={100} />
+            </View>
+
             <View style={estilos.blocoMusculos}>
               {musculos.map((m, i) => {
                 const atraso = (festa ? 1500 : 200) + i * 110;
@@ -367,13 +393,7 @@ export default function RelatorioSessao() {
                     {e.series.map((s, idx) => (
                       <View key={s.id} style={estilos.linha}>
                         <Tx v="small" tab cor={color.textGhost} style={{ width: 24 }}>
-                          {s.tipo === 'aquecimento'
-                            ? 'A'
-                            : s.tipo === 'falha'
-                              ? 'F'
-                              : s.tipo === 'drop'
-                                ? 'D'
-                                : idx + 1}
+                          {tecnicaDe(s.tipo).sigla ?? idx + 1}
                         </Tx>
                         <Tx v="smallMed" tab style={{ flex: 1 }}>
                           {fmtNumero(s.peso) || '—'}{' '}
@@ -396,14 +416,31 @@ export default function RelatorioSessao() {
         </View>
       </ScrollView>
 
-      {festa ? (
-        <Animated.View
-          entering={FadeInDown.delay(1900).duration(400)}
-          style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }, shadow.soft]}
-        >
+      {/*
+        O cartão vive fora da tela só para ser capturado. `position: absolute`
+        com deslocamento negativo o mantém montado e medido, sem aparecer.
+      */}
+      <View style={estilos.fora} pointerEvents="none">
+        <CartaoCompartilhar sessao={sessao} refCaptura={refCartao} />
+      </View>
+
+      <Animated.View
+        entering={FadeInDown.delay(festa ? 1900 : 0).duration(400)}
+        style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }, shadow.soft]}
+      >
+        <Botao
+          titulo="Compartilhar"
+          tom="contorno"
+          icone="share-outline"
+          grande
+          carregando={compartilhando}
+          onPress={compartilhar}
+          style={{ flex: 1 }}
+        />
+        {festa ? (
           <Botao titulo="Concluir" grande onPress={() => router.replace('/')} style={{ flex: 1 }} />
-        </Animated.View>
-      ) : null}
+        ) : null}
+      </Animated.View>
     </View>
   );
 }
@@ -506,6 +543,15 @@ const estilos = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: sp.md,
   },
+  blocoCorpo: {
+    paddingVertical: sp.xl,
+    borderRadius: radius.xl,
+    backgroundColor: color.bgSoft,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: color.line,
+    marginBottom: sp.sm,
+  },
+  fora: { position: 'absolute', left: -10000, top: 0 },
   blocoMusculos: {
     padding: sp.lg,
     borderRadius: radius.xl,
@@ -539,6 +585,7 @@ const estilos = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: 'row',
+    gap: sp.sm,
     paddingHorizontal: sp.xl,
     paddingTop: sp.md,
     backgroundColor: color.bg,
