@@ -1,0 +1,55 @@
+# O que NÃO sobe para a build da EAS.
+#
+# Quando este arquivo existe ele substitui o .gitignore no envio, então precisa
+# repetir tudo o que estava lá — e não só as exclusões novas.
+
+# ─── Ferramentas locais, nada disso é código do app ───────────────────────────
+# .claude/skills são symlinks para .agents/skills. O clone temporário da EAS
+# roda no Windows, onde criar symlink exige privilégio, e o upload falha com
+# EPERM antes mesmo de compilar. Nenhum dos dois entra no APK de qualquer forma.
+.agents/
+.claude/
+.impeccable/
+.vscode/
+
+# ─── dependências ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ─── Expo ─────────────────────────────────────────────────────────────────────
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# ─── nativo ───────────────────────────────────────────────────────────────────
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# ─── Metro ────────────────────────────────────────────────────────────────────
+.metro-health-check*
+
+# ─── depuração ────────────────────────────────────────────────────────────────
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# ─── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+*.pem
+
+# ─── env local ────────────────────────────────────────────────────────────────
+.env*.local
+
+# ─── typescript ───────────────────────────────────────────────────────────────
+*.tsbuildinfo
+
+example
+
+# ─── pastas nativas geradas ───────────────────────────────────────────────────
+/ios
+/android
