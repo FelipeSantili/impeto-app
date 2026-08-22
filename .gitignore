@@ -41,3 +41,12 @@ example
 # generated native folders
 /ios
 /android
+
+# Skills de design instaladas localmente.
+# .agents/ é o conteúdo; .claude/skills/ são symlinks de caminho ABSOLUTO para
+# ele — num clone eles chegariam quebrados, e foi o que derrubou o upload da
+# build da EAS. skills-lock.json fica versionado: é ele que diz qual skill veio
+# de onde e com qual hash, então a instalação continua reproduzível.
+.agents/
+.claude/skills/
+.impeccable/config.local.json
