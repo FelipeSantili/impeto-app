@@ -20,9 +20,13 @@ throughout. Source is Portuguese-named (`src/design`, `src/components`, `src/sto
 
 ## Users
 
-One primary user: the app's owner, an individual lifter training at a commercial gym.
-There is no second audience, no account system, no multi-user story, and no plan of
-record to distribute it.
+Primary user: the app's owner, an individual lifter training at a commercial gym.
+There is no account system and no multi-user data model.
+
+**Updated:** the owner now expects other people to use the app, and has said so
+explicitly when asking for a light theme: they prefer dark, but "tem usuários que
+preferem o claro". Distribution is still by APK, with no store listing and no
+accounts — but design decisions may no longer assume a single pair of eyes.
 
 The usage scene is confirmed and bimodal: **ambient light varies a lot** between a
 bright, fluorescent-lit gym floor and low-light late-evening sessions. The app must stay
@@ -97,6 +101,8 @@ Two mechanisms are specific to it and not copyable as a checklist:
 - **A lightning bolt is the app mark**, on the launcher icon and signing the share card.
   The user confirmed it may be redrawn, but the bolt remains the mark.
 - **Portuguese throughout**, in the interface and in the source.
+- **Both a light and a dark theme are required**, with the choice exposed to the
+  user (system / light / dark, defaulting to system). The owner prefers dark.
 - **Purple is explicitly released.** It was pinned earlier in the project and is now
   unpinned by the user, who asked for whatever produces the best result. Nothing else in
   the visual system is binding: the user confirmed flow, screens, muscle map and icon are

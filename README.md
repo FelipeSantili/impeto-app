@@ -22,6 +22,15 @@ Se a rede da casa bloquear a conexão, use o túnel:
 npx expo start --tunnel
 ```
 
+## Tema
+
+Claro e escuro, escolhidos em **Ajustes › Aparência**: Sistema (padrão), Claro ou
+Escuro. "Sistema" acompanha o aparelho e muda sozinho de dia para noite.
+
+Claro é o caderno — papel, tinta grafite, caneta azul e vermelha. Escuro é o
+quadro da academia — ardósia e giz. Não é uma inversão: é outro objeto do mesmo
+lugar, e os papéis das cores não mudam entre os dois.
+
 ## Conexões
 
 Tudo em **Ajustes** (engrenagem no canto superior do Início).
@@ -198,10 +207,12 @@ src/
     glifos.tsx    as 26 marcas desenhadas do app (não há biblioteca de ícones)
     demo · folha · descanso · animado · mapa-muscular · cartao-compartilhar
   data/           catálogo, modelos prontos, tipos e execução por família de movimento
-  design/tokens.ts  contrato de direção, cores, tipografia, marcas, espaçamento
+  design/
+    tokens.ts   contrato de direção, as DUAS paletas, tipografia, marcas
+    tema.tsx    TemaProvider, usarPaleta e criarEstilos (folhas por tema)
   lib/            metricas, saude (Health Connect), backup, atualizacao, compartilhar
   store/          estado persistido (zustand + AsyncStorage): treino, cinta,
-                  descanso, selecao, atualizacao
+                  descanso, selecao, atualizacao, tema
 ```
 
 ## Dados dos exercícios
