@@ -2,11 +2,11 @@
   "expo": {
     "name": "Ímpeto",
     "slug": "forja",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "impeto",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#E8E7E2",
     "ios": {
       "supportsTablet": true,
@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
@@ -42,7 +42,13 @@
           "backgroundColor": "#E8E7E2",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 120,
-          "resizeMode": "contain"
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#1B1D1C",
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 120,
+            "resizeMode": "contain"
+          }
         }
       ],
       [

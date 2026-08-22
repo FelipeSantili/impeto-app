@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Botao,
@@ -18,7 +18,8 @@ import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
 import { MODELO_POR_ID } from '@/data/modelos';
 import { EQUIP_LABEL } from '@/data/types';
-import { color, margem, sp } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp } from '@/design/tokens';
 import { useTreino } from '@/store/treino';
 
 function fmtDescanso(seg: number) {
@@ -27,6 +28,8 @@ function fmtDescanso(seg: number) {
 
 /** Detalhe de um modelo pronto: sequência completa + salvar / iniciar. */
 export default function DetalheModelo() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const entrada = MODELO_POR_ID[id ?? ''];
@@ -37,7 +40,7 @@ export default function DetalheModelo() {
 
   if (!entrada) {
     return (
-      <View style={{ flex: 1, backgroundColor: color.papel, paddingTop: insets.top + sp.sm }}>
+      <View style={{ flex: 1, backgroundColor: c.fundo, paddingTop: insets.top + sp.sm }}>
         <View style={estilos.topo}>
           <BotaoGlifo glifo="voltar" acessivel="Voltar" onPress={() => router.back()} />
         </View>
@@ -78,13 +81,13 @@ export default function DetalheModelo() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.papel }}>
+    <View style={{ flex: 1, backgroundColor: c.fundo }}>
       <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
         <View style={{ marginLeft: -sp.sm }}>
           <BotaoGlifo glifo="voltar" acessivel="Voltar" onPress={() => router.back()} />
         </View>
         <View style={{ flex: 1 }} />
-        <Rotulo cor={color.tintaFraca}>
+        <Rotulo cor={c.tintaFraca}>
           {programa.nome} · {programa.freq}
         </Rotulo>
       </View>
@@ -95,20 +98,20 @@ export default function DetalheModelo() {
       >
         <View style={{ paddingHorizontal: margem.pagina, paddingBottom: sp.lg }}>
           <Tx v="display">{modelo.nome}</Tx>
-          <Tx v="body" cor={color.tintaMid} style={{ marginTop: sp.xs }}>
+          <Tx v="body" cor={c.tintaMid} style={{ marginTop: sp.xs }}>
             {modelo.foco}
           </Tx>
         </View>
-        <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+        <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
 
         <CabecaColuna>
-          <Rotulo cor={color.tintaMid} style={{ width: margem.calha }}>
+          <Rotulo cor={c.tintaMid} style={{ width: margem.calha }}>
             Nº
           </Rotulo>
-          <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+          <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
             Sequência
           </Rotulo>
-          <Rotulo cor={color.tintaMid} style={{ width: 86, textAlign: 'right' }}>
+          <Rotulo cor={c.tintaMid} style={{ width: 86, textAlign: 'right' }}>
             {modelo.itens.length} ex · {series} sér
           </Rotulo>
         </CabecaColuna>
@@ -120,12 +123,12 @@ export default function DetalheModelo() {
               <Pressavel
                 onPress={() => router.push(`/exercicio/${item.exId}`)}
                 escala={0.995}
-                fundoPressionado={color.papelBaixo}
+                fundoPressionado={c.fundoBaixo}
                 accessibilityRole="button"
                 accessibilityLabel={ex?.nome ?? item.exId}
                 style={estilos.linha}
               >
-                <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+                <Tx v="numero" tab cor={c.tintaFantasma} style={{ width: margem.calha }}>
                   {i + 1}
                 </Tx>
                 <Miniatura ex={ex} tamanho={40} />
@@ -133,15 +136,15 @@ export default function DetalheModelo() {
                   <Tx v="bodyMed" numberOfLines={1}>
                     {ex?.nome ?? item.exId}
                   </Tx>
-                  <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+                  <Tx v="small" cor={c.tintaFraca} numberOfLines={1}>
                     {ex ? EQUIP_LABEL[ex.equip] : ''} · descanso {fmtDescanso(item.descanso)}
                   </Tx>
                 </View>
                 <Tx v="numero" tab style={{ width: 46, textAlign: 'right' }}>
                   {item.series}
-                  <Tx v="small" cor={color.tintaFraca}> sér</Tx>
+                  <Tx v="small" cor={c.tintaFraca}> sér</Tx>
                 </Tx>
-                <Glifo nome="avancar" tamanho={13} cor={color.tintaFantasma} />
+                <Glifo nome="avancar" tamanho={13} cor={c.tintaFantasma} />
               </Pressavel>
               <Regua />
             </View>
@@ -150,7 +153,7 @@ export default function DetalheModelo() {
       </ScrollView>
 
       <View style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>
-        <Regua peso="forte" cor={color.tinta} />
+        <Regua peso="forte" cor={c.tinta} />
         <View style={estilos.rodapeCorpo}>
           <Botao titulo="Salvar rotina" tom="contorno" grande onPress={usarModelo} style={{ flex: 1 }} />
           <Botao titulo="Iniciar agora" glifo="play" grande onPress={iniciarAgora} style={{ flex: 1 }} />
@@ -160,7 +163,7 @@ export default function DetalheModelo() {
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -180,7 +183,7 @@ const estilos = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: color.papel,
+    backgroundColor: c.fundo,
   },
   rodapeCorpo: {
     flexDirection: 'row',
@@ -188,4 +191,4 @@ const estilos = StyleSheet.create({
     paddingHorizontal: margem.pagina,
     paddingTop: sp.md,
   },
-});
+}));

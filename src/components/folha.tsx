@@ -4,7 +4,8 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-nati
 import { create } from 'zustand';
 import { Botao, Pressavel, Regua, Rotulo, Tx } from '@/components/base';
 import { Glifo, type NomeGlifo } from '@/components/glifos';
-import { color, margem, radius, shadow, sp, traco, type } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, radius, sombraFolha, sp, traco, type } from '@/design/tokens';
 
 export interface OpcaoMenu {
   texto: string;
@@ -66,6 +67,8 @@ export const abrirPrompt = (c: ConfigPrompt) => useFolha.setState({ prompt: c })
 export const abrirConfirmacao = (c: ConfigConfirma) => useFolha.setState({ confirma: c });
 
 export function Folhas() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const { menu, prompt, confirma, fechar } = useFolha();
   const visivel = !!(menu || prompt || confirma);
 
@@ -93,7 +96,7 @@ export function Folhas() {
             exiting={SlideOutDown.duration(170)}
             style={estilos.folha}
           >
-            <Regua peso="forte" cor={color.tinta} />
+            <Regua peso="forte" cor={c.tinta} />
             <View style={estilos.conteudo}>
               {menu ? <CorpoMenu config={menu} fechar={fechar} /> : null}
               {prompt ? <CorpoPrompt config={prompt} fechar={fechar} /> : null}
@@ -108,13 +111,15 @@ export function Folhas() {
 
 /** Cabeçalho da folha: alinhado à esquerda, como todo cabeçalho do app. */
 function Titulo({ titulo, sub }: { titulo: string; sub?: string }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <View style={estilos.cabecalho}>
       <Tx v="title" numberOfLines={2}>
         {titulo}
       </Tx>
       {sub ? (
-        <Tx v="small" cor={color.tintaFraca} style={{ marginTop: 2 }}>
+        <Tx v="small" cor={c.tintaFraca} style={{ marginTop: 2 }}>
           {sub}
         </Tx>
       ) : null}
@@ -123,10 +128,12 @@ function Titulo({ titulo, sub }: { titulo: string; sub?: string }) {
 }
 
 function CorpoMenu({ config, fechar }: { config: ConfigMenu; fechar: () => void }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <>
       {config.titulo ? <Titulo titulo={config.titulo} sub={config.subtitulo} /> : null}
-      <Regua peso="normal" cor={color.reguaMid} />
+      <Regua peso="normal" cor={c.reguaMid} />
 
       <View>
         {config.opcoes.map((o, i) => (
@@ -135,7 +142,7 @@ function CorpoMenu({ config, fechar }: { config: ConfigMenu; fechar: () => void 
             <Pressavel
               haptico="leve"
               escala={0.995}
-              fundoPressionado={color.papelBaixo}
+              fundoPressionado={c.fundoBaixo}
               onPress={() => {
                 fechar();
                 // Deixa a folha sair de cena antes de a ação abrir outra tela.
@@ -148,11 +155,11 @@ function CorpoMenu({ config, fechar }: { config: ConfigMenu; fechar: () => void 
                   <Glifo
                     nome={o.glifo}
                     tamanho={17}
-                    cor={o.destrutiva ? color.vermelho : color.tintaMid}
+                    cor={o.destrutiva ? c.vermelho : c.tintaMid}
                   />
                 ) : null}
               </View>
-              <Tx v="bodyMed" cor={o.destrutiva ? color.vermelho : color.tinta}>
+              <Tx v="bodyMed" cor={o.destrutiva ? c.vermelho : c.tinta}>
                 {o.texto}
               </Tx>
             </Pressavel>
@@ -160,13 +167,15 @@ function CorpoMenu({ config, fechar }: { config: ConfigMenu; fechar: () => void 
         ))}
       </View>
 
-      <Regua peso="normal" cor={color.reguaMid} />
+      <Regua peso="normal" cor={c.reguaMid} />
       <Botao titulo="Cancelar" tom="texto" onPress={fechar} style={{ marginTop: sp.md }} />
     </>
   );
 }
 
 function CorpoPrompt({ config, fechar }: { config: ConfigPrompt; fechar: () => void }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const [valor, setValor] = useState(config.valor ?? '');
   useEffect(() => setValor(config.valor ?? ''), [config]);
 
@@ -178,14 +187,14 @@ function CorpoPrompt({ config, fechar }: { config: ConfigPrompt; fechar: () => v
   return (
     <>
       <Titulo titulo={config.titulo} sub={config.descricao} />
-      <Rotulo cor={color.tintaFraca} style={{ marginBottom: sp.xs }}>
+      <Rotulo cor={c.tintaFraca} style={{ marginBottom: sp.xs }}>
         Nome
       </Rotulo>
       <TextInput
         value={valor}
         onChangeText={setValor}
         placeholder={config.placeholder}
-        placeholderTextColor={color.tintaFantasma}
+        placeholderTextColor={c.tintaFantasma}
         style={estilos.campo}
         autoFocus
         selectTextOnFocus
@@ -206,6 +215,7 @@ function CorpoPrompt({ config, fechar }: { config: ConfigPrompt; fechar: () => v
 }
 
 function CorpoConfirma({ config, fechar }: { config: ConfigConfirma; fechar: () => void }) {
+  const estilos = usarEstilos();
   return (
     <>
       <Titulo titulo={config.titulo} sub={config.descricao} />
@@ -226,15 +236,15 @@ function CorpoConfirma({ config, fechar }: { config: ConfigConfirma; fechar: () 
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   raiz: { flex: 1, justifyContent: 'flex-end' },
   // Escurece o que está atrás com o cinza do papel, não com preto puro.
   fundo: { flex: 1, backgroundColor: 'rgba(30,32,28,0.42)' },
   folha: {
-    backgroundColor: color.papelAlto,
+    backgroundColor: c.fundoAlto,
     borderTopLeftRadius: radius.folha,
     borderTopRightRadius: radius.folha,
-    ...shadow.folha,
+    ...sombraFolha(c),
   },
   conteudo: {
     paddingHorizontal: margem.pagina,
@@ -253,13 +263,13 @@ const estilos = StyleSheet.create({
   opcaoGlifo: { width: 20, alignItems: 'center' },
   campo: {
     ...type.body,
-    color: color.azul,
+    color: c.azul,
     height: 50,
-    backgroundColor: color.papel,
+    backgroundColor: c.fundo,
     borderWidth: traco.normal,
-    borderColor: color.reguaForte,
+    borderColor: c.reguaForte,
     borderRadius: radius.sm,
     paddingHorizontal: sp.md,
   },
   duplo: { flexDirection: 'row', gap: sp.sm, marginTop: sp.xl },
-});
+}));

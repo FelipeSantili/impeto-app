@@ -1,12 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BotaoGlifo, Carimbo, Pressavel, Regua, Rotulo, Secao, Tx } from '@/components/base';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
 import { Glifo, type NomeGlifo } from '@/components/glifos';
-import { color, margem, sp } from '@/design/tokens';
+import { criarEstilos, usarPaleta, usarTema, type Preferencia } from '@/design/tema';
+import { margem, radius, sp, traco } from '@/design/tokens';
 import { exportar, importar } from '@/lib/backup';
 import {
   abrirAjustesSaude,
@@ -25,6 +26,8 @@ const TEXTO_SAUDE: Record<StatusSaude, string> = {
 };
 
 export default function Ajustes() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
   const [saude, setSaude] = useState<StatusSaude | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -107,7 +110,7 @@ export default function Ajustes() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.papel }}>
+    <View style={{ flex: 1, backgroundColor: c.fundo }}>
       <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
         <View style={{ marginLeft: -sp.sm }}>
           <BotaoGlifo glifo="voltar" acessivel="Voltar" onPress={() => router.back()} />
@@ -116,13 +119,17 @@ export default function Ajustes() {
           Ajustes
         </Tx>
       </View>
-      <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+      <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + sp.h2 }}
         showsVerticalScrollIndicator={false}
       >
-        <Secao titulo="Conexões" espaco={sp.xxl}>
+        <Secao titulo="Aparência" espaco={sp.xxl}>
+          <SeletorTema />
+        </Secao>
+
+        <Secao titulo="Conexões">
           <Linha
             glifo="coracao"
             titulo="Health Connect"
@@ -159,15 +166,15 @@ export default function Ajustes() {
                     haptico="selecao"
                     onPress={() => cinta.conectar(d.id)}
                     escala={0.995}
-                    fundo={color.papelAlto}
-                    fundoPressionado={color.papelBaixo}
+                    fundo={c.fundoAlto}
+                    fundoPressionado={c.fundoBaixo}
                     style={estilos.dispositivo}
                   >
-                    <Glifo nome="pulso" tamanho={15} cor={color.azul} />
+                    <Glifo nome="pulso" tamanho={15} cor={c.azul} />
                     <Tx v="smallMed" style={{ flex: 1 }} numberOfLines={1}>
                       {d.nome}
                     </Tx>
-                    <Rotulo cor={color.azul}>Conectar</Rotulo>
+                    <Rotulo cor={c.azul}>Conectar</Rotulo>
                   </Pressavel>
                   <Regua />
                 </View>
@@ -175,7 +182,7 @@ export default function Ajustes() {
             : null}
 
           {Platform.OS === 'android' ? (
-            <Tx v="small" cor={color.tintaFraca} style={estilos.nota}>
+            <Tx v="small" cor={c.tintaFraca} style={estilos.nota}>
               O Redmi Watch fala um protocolo próprio e não aparece na busca de cintas. Os dados
               dele chegam pelo Health Connect, depois que o Mi Fitness sincroniza.
             </Tx>
@@ -197,7 +204,7 @@ export default function Ajustes() {
             carregando={ocupado}
             onPress={aoImportar}
           />
-          <Tx v="small" cor={color.tintaFraca} style={estilos.nota}>
+          <Tx v="small" cor={c.tintaFraca} style={estilos.nota}>
             Seus dados ficam só neste aparelho. O backup é um arquivo que você guarda onde quiser.
           </Tx>
         </Secao>
@@ -224,6 +231,61 @@ export default function Ajustes() {
 }
 
 /**
+ * Escolha do tema.
+ *
+ * Três caixas de formulário lado a lado, no mesmo desenho dos filtros da lista
+ * de exercícios: a marcada é preenchida a tinta. Não é um interruptor
+ * sol/lua — esse é o par de ícones mais gerado que existe, e além disso um
+ * interruptor de duas posições não sabe dizer "siga o sistema".
+ *
+ * "Sistema" é o padrão: acompanha o aparelho e muda sozinho de dia para noite.
+ */
+function SeletorTema() {
+  const { preferencia, definir, escuro, paleta: c } = usarTema();
+  const estilos = usarEstilos();
+
+  const opcoes: { valor: Preferencia; nome: string }[] = [
+    { valor: 'sistema', nome: 'Sistema' },
+    { valor: 'claro', nome: 'Claro' },
+    { valor: 'escuro', nome: 'Escuro' },
+  ];
+
+  return (
+    <View>
+      <View style={estilos.tema}>
+        {opcoes.map((o) => {
+          const ativo = preferencia === o.valor;
+          return (
+            <Pressavel
+              key={o.valor}
+              haptico="selecao"
+              onPress={() => definir(o.valor)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: ativo }}
+              accessibilityLabel={o.nome}
+              style={[
+                estilos.temaOpcao,
+                { borderColor: ativo ? c.tinta : c.reguaMid },
+                ativo ? { backgroundColor: c.tinta } : null,
+              ]}
+            >
+              <Rotulo cor={ativo ? c.fundo : c.tintaMid}>{o.nome}</Rotulo>
+            </Pressavel>
+          );
+        })}
+      </View>
+      <Tx v="small" cor={c.tintaFraca} style={estilos.nota}>
+        {preferencia === 'sistema'
+          ? `Seguindo o aparelho — agora está ${escuro ? 'escuro' : 'claro'}.`
+          : escuro
+            ? 'Ardósia e giz, como o quadro da academia.'
+            : 'Papel e tinta, como o caderno de treino.'}
+      </Tx>
+    </View>
+  );
+}
+
+/**
  * Linha de ajuste.
  *
  * A marca deixou de morar num círculo tingido: fica solta na calha, no mesmo
@@ -245,35 +307,37 @@ function Linha({
   carregando?: boolean;
   onPress: () => void;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <View>
       <Pressavel
         onPress={onPress}
         disabled={carregando}
         escala={0.995}
-        fundoPressionado={color.papelBaixo}
+        fundoPressionado={c.fundoBaixo}
         accessibilityRole="button"
         accessibilityLabel={titulo}
         style={estilos.linha}
       >
         <View style={estilos.calha}>
-          <Glifo nome={glifo} tamanho={18} cor={ativo ? color.azul : color.tintaMid} />
+          <Glifo nome={glifo} tamanho={18} cor={ativo ? c.azul : c.tintaMid} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
             <Tx v="bodyMed" numberOfLines={1}>
               {titulo}
             </Tx>
-            {ativo ? <Carimbo texto="Ativo" cor={color.azul} /> : null}
+            {ativo ? <Carimbo texto="Ativo" cor={c.azul} /> : null}
           </View>
-          <Tx v="small" cor={color.tintaFraca} numberOfLines={2}>
+          <Tx v="small" cor={c.tintaFraca} numberOfLines={2}>
             {subtitulo}
           </Tx>
         </View>
         {carregando ? (
-          <ActivityIndicator size="small" color={color.tintaMid} />
+          <ActivityIndicator size="small" color={c.tintaMid} />
         ) : (
-          <Glifo nome="avancar" tamanho={13} cor={color.tintaFantasma} />
+          <Glifo nome="avancar" tamanho={13} cor={c.tintaFantasma} />
         )}
       </Pressavel>
       <Regua />
@@ -281,7 +345,7 @@ function Linha({
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -304,7 +368,21 @@ const estilos = StyleSheet.create({
     paddingVertical: sp.md,
     paddingLeft: margem.pagina + margem.calha,
     paddingRight: margem.pagina,
-    backgroundColor: color.papelAlto,
+    backgroundColor: c.fundoAlto,
   },
   nota: { paddingHorizontal: margem.pagina, paddingTop: sp.md },
-});
+  tema: {
+    flexDirection: 'row',
+    gap: sp.sm,
+    paddingHorizontal: margem.pagina,
+    paddingTop: sp.lg,
+  },
+  temaOpcao: {
+    flex: 1,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: traco.normal,
+    borderRadius: radius.sm,
+  },
+}));

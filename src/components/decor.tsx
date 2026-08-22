@@ -6,7 +6,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { color, traco } from '@/design/tokens';
+import { usarPaleta } from '@/design/tema';
+import { traco } from '@/design/tokens';
 
 /**
  * Régua de progresso.
@@ -19,7 +20,7 @@ import { color, traco } from '@/design/tokens';
  */
 export function ReguaProgresso({
   fracao,
-  cor = color.tinta,
+  cor,
   altura = 2,
   animar = false,
 }: {
@@ -28,6 +29,7 @@ export function ReguaProgresso({
   altura?: number;
   animar?: boolean;
 }) {
+  const c = usarPaleta();
   const alvo = Math.max(0, Math.min(1, fracao));
   const p = useSharedValue(animar ? 0 : alvo);
 
@@ -44,7 +46,7 @@ export function ReguaProgresso({
   const estilo = useAnimatedStyle(() => ({ width: `${p.get() * 100}%` }));
 
   return (
-    <View style={{ height: altura, backgroundColor: color.regua, overflow: 'hidden' }}>
+    <View style={{ height: altura, backgroundColor: c.regua, overflow: 'hidden' }}>
       <Animated.View style={[{ height: altura, backgroundColor: cor }, estilo]} />
     </View>
   );
@@ -52,13 +54,14 @@ export function ReguaProgresso({
 
 /** Moldura de prancha: o quadro impresso onde a demonstração vive. */
 export function Prancha({ children, style }: { children?: React.ReactNode; style?: object }) {
+  const c = usarPaleta();
   return (
     <View
       style={[
         {
-          backgroundColor: color.papelAlto,
+          backgroundColor: c.fundoAlto,
           borderWidth: traco.normal,
-          borderColor: color.reguaMid,
+          borderColor: c.reguaMid,
           overflow: 'hidden',
         },
         style,

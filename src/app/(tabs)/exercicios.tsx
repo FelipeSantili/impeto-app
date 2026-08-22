@@ -3,9 +3,11 @@ import { View } from 'react-native';
 import { Regua, Rotulo, Tela, Tx } from '@/components/base';
 import { ListaExercicios } from '@/components/lista-exercicios';
 import { EXERCICIOS } from '@/data/exercicios';
-import { color, margem, sp } from '@/design/tokens';
+import { usarPaleta } from '@/design/tema';
+import { margem, sp } from '@/design/tokens';
 
 export default function Exercicios() {
+  const c = usarPaleta();
   return (
     <Tela>
       <ListaExercicios
@@ -16,10 +18,10 @@ export default function Exercicios() {
                 <Tx v="title" style={{ flex: 1 }}>
                   Exercícios
                 </Tx>
-                <Rotulo cor={color.tintaFraca}>{EXERCICIOS.length} no catálogo</Rotulo>
+                <Rotulo cor={c.tintaFraca}>{EXERCICIOS.length} no catálogo</Rotulo>
               </View>
             </View>
-            <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+            <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
           </View>
         }
         rodape={150}

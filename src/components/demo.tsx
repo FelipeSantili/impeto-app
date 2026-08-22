@@ -15,7 +15,8 @@ import Animated, {
 import { Glifo } from '@/components/glifos';
 import { quadroUrl } from '@/data/exercicios';
 import type { Exercicio } from '@/data/types';
-import { color, radius, traco } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { radius, traco } from '@/design/tokens';
 
 const HOLD = 780;
 const FADE = 300;
@@ -39,6 +40,8 @@ export function Demo({
   animar?: boolean;
   raio?: number;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const p = useSharedValue(0);
   const reduzido = useReducedMotion();
   const inicio = quadroUrl(ex, 0);
@@ -69,7 +72,7 @@ export function Demo({
   if (!inicio) {
     return (
       <View style={[estilos.prancha, { borderRadius: raio }, style]}>
-        <Glifo nome="halter" tamanho={28} cor={color.tintaFantasma} />
+        <Glifo nome="halter" tamanho={28} cor={c.tintaFantasma} />
       </View>
     );
   }
@@ -100,6 +103,8 @@ export function Demo({
 
 /** Miniatura estática das listas — não anima, para a rolagem ficar leve. */
 export function Miniatura({ ex, tamanho = 44 }: { ex: Exercicio | undefined; tamanho?: number }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const uri = quadroUrl(ex, 0);
   return (
     <View style={[estilos.prancha, { width: tamanho, height: tamanho, borderRadius: radius.sm }]}>
@@ -112,19 +117,19 @@ export function Miniatura({ ex, tamanho = 44 }: { ex: Exercicio | undefined; tam
           cachePolicy="memory-disk"
         />
       ) : (
-        <Glifo nome="halter" tamanho={tamanho * 0.44} cor={color.tintaFantasma} />
+        <Glifo nome="halter" tamanho={tamanho * 0.44} cor={c.tintaFantasma} />
       )}
     </View>
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   prancha: {
-    backgroundColor: color.papelAlto,
+    backgroundColor: c.fundoAlto,
     borderWidth: traco.normal,
-    borderColor: color.reguaMid,
+    borderColor: c.reguaMid,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

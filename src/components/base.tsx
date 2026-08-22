@@ -6,7 +6,6 @@ import {
   type PressableProps,
   ScrollView,
   type StyleProp,
-  StyleSheet,
   Text,
   type TextProps,
   type TextStyle,
@@ -22,15 +21,16 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Glifo, type NomeGlifo } from '@/components/glifos';
-import { color, margem, motion, radius, sp, traco, type as typeScale } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, motion, radius, sp, traco, type as typeScale, type Paleta } from '@/design/tokens';
 
 /**
- * Vocabulário do caderno.
+ * Vocabulário do registro.
  *
  * Não existe `Cartao` aqui, e isso é deliberado: cartão é o recipiente
  * preguiçoso, e empilhar cartões foi o que deu ao app a cara genérica. Uma
- * página de livro-caixa separa por RÉGUA e por espaço. As peças abaixo são
- * seção, linha, cabeçalho de coluna e régua — nada flutua, nada tem sombra.
+ * página separa por RÉGUA e por espaço. As peças abaixo são seção, linha,
+ * cabeçalho de coluna e régua — nada flutua, nada tem sombra.
  */
 
 // ───────────────────────────────  Texto  ───────────────────────────────
@@ -47,16 +47,8 @@ interface TxProps extends TextProps {
   alta?: boolean;
 }
 
-export function Tx({
-  v = 'body',
-  cor = color.tinta,
-  center,
-  right,
-  tab,
-  alta,
-  style,
-  ...rest
-}: TxProps) {
+export function Tx({ v = 'body', cor, center, right, tab, alta, style, ...rest }: TxProps) {
+  const c = usarPaleta();
   return (
     <Text
       // Boa parte da interface tem altura fixa (linhas de série, colunas).
@@ -65,7 +57,7 @@ export function Tx({
       {...rest}
       style={[
         typeScale[v],
-        { color: cor },
+        { color: cor ?? c.tinta },
         center && { textAlign: 'center' },
         right && { textAlign: 'right' },
         tab && { fontVariant: ['tabular-nums'] },
@@ -82,18 +74,19 @@ export function Tx({
  */
 export function Rotulo({
   children,
-  cor = color.tintaFraca,
+  cor,
   style,
 }: {
   children: ReactNode;
   cor?: string;
   style?: StyleProp<TextStyle>;
 }) {
+  const c = usarPaleta();
   return (
     <Text
       numberOfLines={1}
       maxFontSizeMultiplier={1.3}
-      style={[typeScale.carimbo, { color: cor, textTransform: 'uppercase' }, style]}
+      style={[typeScale.carimbo, { color: cor ?? c.tintaFraca, textTransform: 'uppercase' }, style]}
     >
       {children}
     </Text>
@@ -102,9 +95,10 @@ export function Rotulo({
 
 /** Pontilhado de campo não preenchido. Decoração — nunca carrega significado. */
 export function Pontilhado({ largura = 34 }: { largura?: number }) {
+  const c = usarPaleta();
   return (
     <Text
-      style={[typeScale.numero, { color: color.tintaFantasma, width: largura, textAlign: 'center' }]}
+      style={[typeScale.numero, { color: c.tintaFantasma, width: largura, textAlign: 'center' }]}
       numberOfLines={1}
     >
       ·····
@@ -241,15 +235,16 @@ interface BotaoProps extends Omit<PressableProps, 'style' | 'children'> {
   style?: StyleProp<ViewStyle>;
 }
 
-const TONS: Record<Tom, { fundo: string; tinta: string; borda?: string }> = {
-  // A ação primária é uma BARRA CHEIA de tinta azul, retangular. É a massa de
-  // tinta que impede a página de ficar mole — e o único preenchimento saturado
-  // da tela.
-  tinta: { fundo: color.azul, tinta: color.azulTexto },
-  contorno: { fundo: 'transparent', tinta: color.tinta, borda: color.reguaForte },
-  texto: { fundo: 'transparent', tinta: color.tintaMid },
-  perigo: { fundo: 'transparent', tinta: color.vermelho, borda: color.vermelhoLinha },
-};
+function tons(c: Paleta): Record<Tom, { fundo: string; tinta: string; borda?: string }> {
+  return {
+    // A ação primária é uma BARRA CHEIA, retangular. É a massa que impede a
+    // página de ficar mole — e o único preenchimento saturado da tela.
+    tinta: { fundo: c.azul, tinta: c.azulTexto },
+    contorno: { fundo: 'transparent', tinta: c.tinta, borda: c.reguaForte },
+    texto: { fundo: 'transparent', tinta: c.tintaMid },
+    perigo: { fundo: 'transparent', tinta: c.vermelho, borda: c.vermelhoLinha },
+  };
+}
 
 export function Botao({
   titulo,
@@ -262,7 +257,9 @@ export function Botao({
   disabled,
   ...rest
 }: BotaoProps) {
-  const t = TONS[tom];
+  const c = usarPaleta();
+  const estilos = usarEstilos();
+  const t = tons(c)[tom];
   return (
     <Pressavel
       {...rest}
@@ -320,7 +317,7 @@ export function Botao({
 export function BotaoGlifo({
   glifo,
   onPress,
-  cor = color.tintaMid,
+  cor,
   tamanho = 40,
   disabled,
   haptico,
@@ -334,6 +331,7 @@ export function BotaoGlifo({
   haptico?: Haptico;
   acessivel?: string;
 }) {
+  const c = usarPaleta();
   return (
     <Pressavel
       disabled={disabled}
@@ -351,7 +349,7 @@ export function BotaoGlifo({
         justifyContent: 'center',
       }}
     >
-      <Glifo nome={glifo} tamanho={Math.round(tamanho * 0.52)} cor={cor} />
+      <Glifo nome={glifo} tamanho={Math.round(tamanho * 0.52)} cor={cor ?? c.tintaMid} />
     </Pressavel>
   );
 }
@@ -366,6 +364,8 @@ export function Chip({
   ativo?: boolean;
   onPress?: () => void;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <Pressavel
       haptico="selecao"
@@ -375,8 +375,8 @@ export function Chip({
       style={[
         estilos.chip,
         {
-          backgroundColor: ativo ? color.tinta : 'transparent',
-          borderColor: ativo ? color.tinta : color.reguaMid,
+          backgroundColor: ativo ? c.tinta : 'transparent',
+          borderColor: ativo ? c.tinta : c.reguaMid,
         },
       ]}
     >
@@ -385,7 +385,7 @@ export function Chip({
         maxFontSizeMultiplier={1.25}
         style={[
           typeScale.coluna,
-          { color: ativo ? color.papel : color.tintaMid, textTransform: 'uppercase' },
+          { color: ativo ? c.fundo : c.tintaMid, textTransform: 'uppercase' },
         ]}
       >
         {texto}
@@ -410,7 +410,8 @@ export function Tela({
   contentStyle?: StyleProp<ViewStyle>;
 }) {
   const insets = useSafeAreaInsets();
-  const base: ViewStyle = { flex: 1, backgroundColor: color.papel };
+  const c = usarPaleta();
+  const base: ViewStyle = { flex: 1, backgroundColor: c.fundo };
   const pad: ViewStyle = { paddingTop: padTopo ? insets.top + sp.sm : 0 };
 
   if (scroll) {
@@ -439,13 +440,14 @@ export function Regua({
   cor?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const c = usarPaleta();
   const forte = peso === 'forte';
   return (
     <View
       style={[
         {
           height: traco[peso],
-          backgroundColor: cor ?? (forte ? color.reguaForte : color.regua),
+          backgroundColor: cor ?? (forte ? c.reguaForte : c.regua),
         },
         style,
       ]}
@@ -472,11 +474,13 @@ export function Secao({
   style?: StyleProp<ViewStyle>;
   espaco?: number;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <View style={[{ marginTop: espaco }, style]}>
       {titulo || direita ? (
         <View style={estilos.secaoTopo}>
-          {titulo ? <Rotulo cor={color.tintaMid}>{titulo}</Rotulo> : <View />}
+          {titulo ? <Rotulo cor={c.tintaMid}>{titulo}</Rotulo> : <View />}
           {direita}
         </View>
       ) : null}
@@ -514,7 +518,9 @@ export function Linha({
   style?: StyleProp<ViewStyle>;
   acessivel?: string;
 }) {
-  const repouso = ativa ? color.azulSuave : feita ? color.papelAlto : undefined;
+  const c = usarPaleta();
+  const estilos = usarEstilos();
+  const repouso = ativa ? c.azulSuave : feita ? c.fundoAlto : undefined;
 
   const conteudo = (
     <>
@@ -544,7 +550,7 @@ export function Linha({
       accessibilityRole="button"
       accessibilityLabel={acessivel}
       fundo={repouso}
-      fundoPressionado={color.papelBaixo}
+      fundoPressionado={c.fundoBaixo}
       escala={0.995}
       style={[estilos.linha, style]}
     >
@@ -558,10 +564,12 @@ export function Linha({
  * É o que transforma uma lista de valores em uma tabela lida de relance.
  */
 export function CabecaColuna({ children }: { children: ReactNode }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <View>
       <View style={estilos.cabecaColuna}>{children}</View>
-      <Regua peso="normal" cor={color.reguaMid} />
+      <Regua peso="normal" cor={c.reguaMid} />
     </View>
   );
 }
@@ -586,6 +594,8 @@ export function Cabecalho({
   direita?: ReactNode;
   semRegua?: boolean;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <View>
       <View style={estilos.cabecalho}>
@@ -597,7 +607,7 @@ export function Cabecalho({
             </Tx>
           ) : null}
         </View>
-        {meta ? <Rotulo cor={color.tintaFraca}>{meta}</Rotulo> : null}
+        {meta ? <Rotulo cor={c.tintaFraca}>{meta}</Rotulo> : null}
         {direita}
       </View>
       {semRegua ? null : <Regua peso="forte" style={{ marginHorizontal: margem.pagina }} />}
@@ -619,14 +629,16 @@ export function Vazio({
   texto?: string;
   acao?: ReactNode;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <View style={estilos.vazio}>
-      <Regua peso="normal" cor={color.reguaMid} style={{ width: 28 }} />
+      <Regua peso="normal" cor={c.reguaMid} style={{ width: 28 }} />
       <Tx v="heading" style={{ marginTop: sp.lg }}>
         {titulo}
       </Tx>
       {texto ? (
-        <Tx v="small" cor={color.tintaFraca} style={{ marginTop: sp.xs, maxWidth: 300 }}>
+        <Tx v="small" cor={c.tintaFraca} style={{ marginTop: sp.xs, maxWidth: 300 }}>
           {texto}
         </Tx>
       ) : null}
@@ -635,14 +647,17 @@ export function Vazio({
   );
 }
 
-/** Carimbo vermelho: recorde, alerta, correção. */
-export function Carimbo({ texto, cor = color.vermelho }: { texto: string; cor?: string }) {
+/** Carimbo: recorde, alerta, correção. */
+export function Carimbo({ texto, cor }: { texto: string; cor?: string }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
+  const tom = cor ?? c.vermelho;
   return (
-    <View style={[estilos.carimbo, { borderColor: cor }]}>
+    <View style={[estilos.carimbo, { borderColor: tom }]}>
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={1.2}
-        style={[typeScale.carimbo, { color: cor, fontSize: 10, textTransform: 'uppercase' }]}
+        style={[typeScale.carimbo, { color: tom, fontSize: 10, textTransform: 'uppercase' }]}
       >
         {texto}
       </Text>
@@ -650,7 +665,7 @@ export function Carimbo({ texto, cor = color.vermelho }: { texto: string; cor?: 
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   botao: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -687,7 +702,7 @@ const estilos = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 3,
-    backgroundColor: color.tinta,
+    backgroundColor: c.tinta,
   },
   calha: { width: margem.calha, justifyContent: 'center' },
   linhaDireita: { alignItems: 'flex-end', justifyContent: 'center' },
@@ -696,7 +711,7 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     height: 26,
     paddingHorizontal: margem.pagina,
-    backgroundColor: color.papelBaixo,
+    backgroundColor: c.fundoBaixo,
   },
   cabecalho: {
     flexDirection: 'row',
@@ -717,4 +732,4 @@ const estilos = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-});
+}));

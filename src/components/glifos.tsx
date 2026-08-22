@@ -1,5 +1,6 @@
 import Svg, { Circle, Path, Polygon } from 'react-native-svg';
-import { color } from '@/design/tokens';
+import { usarPaleta } from '@/design/tema';
+
 
 /**
  * Marcas desenhadas do Ímpeto.
@@ -103,7 +104,7 @@ function preenchidas(nome: NomeGlifo, cor: string) {
 }
 
 /** Círculos de contorno que acompanham alguns traçados. */
-function circulos(nome: NomeGlifo, cor: string, largura: number) {
+function circulos(nome: NomeGlifo, cor: string, largura: number, fundo: string) {
   const comum = { stroke: cor, strokeWidth: largura, fill: 'none' as const };
   switch (nome) {
     case 'busca':
@@ -123,9 +124,9 @@ function circulos(nome: NomeGlifo, cor: string, largura: number) {
       // Botões deslizantes: a marca de "ajustar" sem recorrer à engrenagem.
       return (
         <>
-          <Circle cx={9} cy={7} r={2.5} {...comum} fill={color.papel} />
-          <Circle cx={15.5} cy={12} r={2.5} {...comum} fill={color.papel} />
-          <Circle cx={7.5} cy={17} r={2.5} {...comum} fill={color.papel} />
+          <Circle cx={9} cy={7} r={2.5} {...comum} fill={fundo} />
+          <Circle cx={15.5} cy={12} r={2.5} {...comum} fill={fundo} />
+          <Circle cx={7.5} cy={17} r={2.5} {...comum} fill={fundo} />
         </>
       );
     default:
@@ -136,12 +137,15 @@ function circulos(nome: NomeGlifo, cor: string, largura: number) {
 export function Glifo({
   nome,
   tamanho = 20,
-  cor = color.tinta,
+  cor,
 }: {
   nome: NomeGlifo;
   tamanho?: number;
   cor?: string;
 }) {
+  const c = usarPaleta();
+  const tom = cor ?? c.tinta;
+
   // Espessura ótica: cresce menos que o glifo, senão marca grande fica pesada
   // e marca pequena somem. 1,6 a 20px é a referência.
   const largura = Math.max(1.15, 1.6 * (20 / tamanho) ** 0.35);
@@ -152,15 +156,17 @@ export function Glifo({
         <Path
           key={d}
           d={d}
-          stroke={cor}
+          stroke={tom}
           strokeWidth={largura}
           strokeLinecap="butt"
           strokeLinejoin="miter"
           fill="none"
         />
       ))}
-      {circulos(nome, cor, largura)}
-      {preenchidas(nome, cor)}
+      {/* O miolo dos botões deslizantes é vazado na cor do fundo, então ele
+          precisa saber qual fundo está valendo. */}
+      {circulos(nome, tom, largura, c.fundo)}
+      {preenchidas(nome, tom)}
     </Svg>
   );
 }

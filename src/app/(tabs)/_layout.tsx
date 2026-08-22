@@ -1,11 +1,13 @@
 import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
 import { View } from 'react-native';
 import { Aba, Doca } from '@/components/barra-abas';
-import { color } from '@/design/tokens';
+import { usarPaleta } from '@/design/tema';
+
 
 export default function LayoutAbas() {
+  const c = usarPaleta();
   return (
-    <View style={{ flex: 1, backgroundColor: color.papel }}>
+    <View style={{ flex: 1, backgroundColor: c.fundo }}>
       <Tabs>
         <TabSlot />
         <TabList asChild>

@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Botao, BotaoGlifo, Regua, Rotulo, Tx } from '@/components/base';
 import { ListaExercicios } from '@/components/lista-exercicios';
-import { color, margem, sp } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp } from '@/design/tokens';
 import { useSelecao } from '@/store/selecao';
 import { useTreino } from '@/store/treino';
 
@@ -16,6 +17,8 @@ import { useTreino } from '@/store/treino';
  * devolve a seleção pela rota de edição de rotina.
  */
 export default function Selecionar() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
   const { destino } = useLocalSearchParams<{ destino?: string }>();
   const addExercicios = useTreino((s) => s.addExercicios);
@@ -36,7 +39,7 @@ export default function Selecionar() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.papel, paddingTop: insets.top + sp.xs }}>
+    <View style={{ flex: 1, backgroundColor: c.fundo, paddingTop: insets.top + sp.xs }}>
       <ListaExercicios
         selecionados={conjunto}
         onPress={(ex) => alternar(ex.id)}
@@ -51,10 +54,10 @@ export default function Selecionar() {
                 Adicionar
               </Tx>
               {marcados.length > 0 ? (
-                <Rotulo cor={color.azul}>{marcados.length} marcados</Rotulo>
+                <Rotulo cor={c.azul}>{marcados.length} marcados</Rotulo>
               ) : null}
             </View>
-            <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+            <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
           </View>
         }
       />
@@ -65,7 +68,7 @@ export default function Selecionar() {
           exiting={FadeOut.duration(140)}
           style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}
         >
-          <Regua peso="forte" cor={color.tinta} />
+          <Regua peso="forte" cor={c.tinta} />
           <View style={estilos.rodapeCorpo}>
             <Botao
               titulo={`Adicionar ${marcados.length}`}
@@ -80,7 +83,7 @@ export default function Selecionar() {
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -93,7 +96,7 @@ const estilos = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: color.papel,
+    backgroundColor: c.fundo,
   },
   rodapeCorpo: { flexDirection: 'row', paddingHorizontal: margem.pagina, paddingTop: sp.md },
-});
+}));

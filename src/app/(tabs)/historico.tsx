@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { SectionList, StyleSheet, View } from 'react-native';
+import { SectionList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CabecaColuna, Pressavel, Regua, Rotulo, Tx, Vazio } from '@/components/base';
 import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
 import { GRUPO_LABEL } from '@/data/types';
-import { color, margem, sp } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp } from '@/design/tokens';
 import {
   duracaoMs,
   fmtData,
@@ -42,6 +43,8 @@ const MESES = [
  * significar alguma coisa.
  */
 export default function Historico() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
   const historico = useTreino((s) => s.historico);
 
@@ -71,7 +74,7 @@ export default function Historico() {
   }, [historico]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.papel, paddingTop: insets.top + sp.sm }}>
+    <View style={{ flex: 1, backgroundColor: c.fundo, paddingTop: insets.top + sp.sm }}>
       <SectionList
         sections={secoes}
         keyExtractor={(s) => s.id}
@@ -83,18 +86,18 @@ export default function Historico() {
             <View style={estilos.cabecalho}>
               <Tx v="title">Progresso</Tx>
             </View>
-            <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+            <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
 
             {historico.length > 0 ? (
               <>
                 <CabecaColuna>
-                  <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+                  <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
                     Treinos
                   </Rotulo>
-                  <Rotulo cor={color.tintaMid} style={{ flex: 1.3 }}>
+                  <Rotulo cor={c.tintaMid} style={{ flex: 1.3 }}>
                     Volume
                   </Rotulo>
-                  <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+                  <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
                     Tempo
                   </Rotulo>
                 </CabecaColuna>
@@ -119,7 +122,7 @@ export default function Historico() {
         }
         renderSectionHeader={({ section }) => (
           <View style={estilos.secao}>
-            <Rotulo cor={color.tintaMid}>{section.title}</Rotulo>
+            <Rotulo cor={c.tintaMid}>{section.title}</Rotulo>
             <Regua peso="forte" style={{ marginTop: sp.xs }} />
           </View>
         )}
@@ -143,6 +146,8 @@ export default function Historico() {
  * por preenchimento, não por cor — a mesma regra da tabela de séries.
  */
 function GraficoVolume() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const historico = useTreino((s) => s.historico);
   const semanas = useMemo(() => volumePorSemana(historico, 8), [historico]);
   const pico = Math.max(...semanas.map((s) => s.volume), 1);
@@ -150,8 +155,8 @@ function GraficoVolume() {
   return (
     <View style={estilos.grafico}>
       <View style={estilos.cabecalhoGrafico}>
-        <Rotulo cor={color.tintaMid}>Volume por semana</Rotulo>
-        <Rotulo cor={color.tintaFraca}>Pico {fmtVolume(pico)}</Rotulo>
+        <Rotulo cor={c.tintaMid}>Volume por semana</Rotulo>
+        <Rotulo cor={c.tintaFraca}>Pico {fmtVolume(pico)}</Rotulo>
       </View>
 
       <View style={estilos.barras}>
@@ -170,7 +175,7 @@ function GraficoVolume() {
                       // Semanas passadas cheias em tinta fraca, a corrente em
                       // azul. Vazadas com contorno liam como caixa vazia, não
                       // como barra.
-                      backgroundColor: atual ? color.azul : color.reguaForte,
+                      backgroundColor: atual ? c.azul : c.reguaForte,
                     },
                   ]}
                 />
@@ -181,11 +186,11 @@ function GraficoVolume() {
       </View>
       {/* A linha de base vem imediatamente sob as barras — se os rótulos
           ficarem no meio, a barra perde de onde cresce e vira enfeite. */}
-      <Regua peso="normal" cor={color.tinta} />
+      <Regua peso="normal" cor={c.tinta} />
       <View style={estilos.rotulosBarras}>
         {semanas.map((s, i) => (
           <View key={s.inicio} style={estilos.colunaBarra}>
-            <Rotulo cor={i === semanas.length - 1 ? color.tinta : color.tintaFraca}>
+            <Rotulo cor={i === semanas.length - 1 ? c.tinta : c.tintaFraca}>
               {new Date(s.inicio).getDate()}
             </Rotulo>
           </View>
@@ -196,6 +201,8 @@ function GraficoVolume() {
 }
 
 function LinhaSessao({ sessao }: { sessao: Sessao }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const grupos = [
     ...new Set(sessao.exercicios.map((e) => POR_ID[e.exId]?.grupo).filter(Boolean)),
   ].map((g) => GRUPO_LABEL[g!]);
@@ -205,7 +212,7 @@ function LinhaSessao({ sessao }: { sessao: Sessao }) {
       <Pressavel
         onPress={() => router.push(`/sessao/${sessao.id}`)}
         escala={0.995}
-        fundoPressionado={color.papelBaixo}
+        fundoPressionado={c.fundoBaixo}
         accessibilityRole="button"
         accessibilityLabel={sessao.nome}
         style={estilos.linha}
@@ -214,7 +221,7 @@ function LinhaSessao({ sessao }: { sessao: Sessao }) {
           <Tx v="bodyMed" numberOfLines={1}>
             {sessao.nome}
           </Tx>
-          <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+          <Tx v="small" cor={c.tintaFraca} numberOfLines={1}>
             {fmtData(sessao.fim ?? sessao.inicio)}
             {grupos.length ? ` · ${grupos.slice(0, 3).join(', ')}` : ''}
           </Tx>
@@ -223,18 +230,18 @@ function LinhaSessao({ sessao }: { sessao: Sessao }) {
           <Tx v="numero" tab>
             {fmtVolume(volumeSessao(sessao))}
           </Tx>
-          <Tx v="small" tab cor={color.tintaFraca}>
+          <Tx v="small" tab cor={c.tintaFraca}>
             {seriesFeitas(sessao)} séries · {fmtDuracaoCurta(duracaoMs(sessao))}
           </Tx>
         </View>
-        <Glifo nome="avancar" tamanho={13} cor={color.tintaFantasma} />
+        <Glifo nome="avancar" tamanho={13} cor={c.tintaFantasma} />
       </Pressavel>
       <Regua />
     </View>
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos(() => ({
   cabecalho: { paddingHorizontal: margem.pagina, paddingBottom: sp.md },
   totais: {
     flexDirection: 'row',
@@ -261,4 +268,4 @@ const estilos = StyleSheet.create({
     paddingVertical: sp.md,
     paddingHorizontal: margem.pagina,
   },
-});
+}));

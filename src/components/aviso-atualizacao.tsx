@@ -1,10 +1,11 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Botao, Carimbo, Pressavel, Regua, Tx } from '@/components/base';
 import { abrirConfirmacao } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
-import { color, margem, sp } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp } from '@/design/tokens';
 import { useAtualizacao } from '@/store/atualizacao';
 import { useTreino } from '@/store/treino';
 
@@ -19,6 +20,8 @@ import { useTreino } from '@/store/treino';
  * flutuando neste app.
  */
 export function AvisoAtualizacao() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
   const estado = useAtualizacao((s) => s.estado);
   const adiada = useAtualizacao((s) => s.adiada);
@@ -54,7 +57,7 @@ export function AvisoAtualizacao() {
       <View style={estilos.corpo}>
         <View style={{ flex: 1, gap: sp.xs }}>
           <Carimbo texto="Nova versão" />
-          <Tx v="small" cor={color.tintaMid}>
+          <Tx v="small" cor={c.tintaMid}>
             {estado === 'aplicando' ? 'Reiniciando…' : 'Pronta. Atualize quando quiser.'}
           </Tx>
         </View>
@@ -73,21 +76,21 @@ export function AvisoAtualizacao() {
           accessibilityLabel="Dispensar aviso"
           style={{ padding: sp.xs }}
         >
-          <Glifo nome="fechar" tamanho={15} cor={color.tintaFraca} />
+          <Glifo nome="fechar" tamanho={15} cor={c.tintaFraca} />
         </Pressavel>
       </View>
-      <Regua peso="forte" cor={color.tinta} />
+      <Regua peso="forte" cor={c.tinta} />
     </Animated.View>
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   faixa: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
-    backgroundColor: color.papelAlto,
+    backgroundColor: c.fundoAlto,
     zIndex: 50,
   },
   corpo: {
@@ -97,4 +100,4 @@ const estilos = StyleSheet.create({
     paddingHorizontal: margem.pagina,
     paddingBottom: sp.md,
   },
-});
+}));

@@ -1,7 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect } from 'react';
 import {
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -19,7 +18,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { color, radius, traco, type as typeScale } from '@/design/tokens';
+import { criarEstilos } from '@/design/tema';
+import { radius, traco, type as typeScale } from '@/design/tokens';
 
 const CampoAnimado = Animated.createAnimatedComponent(TextInput);
 const SAIDA = Easing.bezier(0.23, 1, 0.32, 1);
@@ -48,6 +48,7 @@ export function Contador({
   sufixo?: string;
   style?: StyleProp<TextStyle>;
 }) {
+  const estilos = usarEstilos();
   const p = useSharedValue(0);
   const reduzido = useReducedMotion();
 
@@ -82,7 +83,7 @@ export function Contador({
 export function BarraAnimada({
   fracao,
   atraso = 0,
-  cor = color.azul,
+  cor,
   altura = 10,
 }: {
   fracao: number;
@@ -90,6 +91,7 @@ export function BarraAnimada({
   cor?: string;
   altura?: number;
 }) {
+  const estilos = usarEstilos();
   const p = useSharedValue(0);
   const reduzido = useReducedMotion();
   const alvo = Math.max(0, Math.min(1, fracao));
@@ -130,7 +132,7 @@ export function BarraAnimada({
 export function CarimboConcluido({
   texto = 'Concluído',
   detalhe,
-  cor = color.vermelho,
+  cor,
   atraso = 120,
 }: {
   texto?: string;
@@ -138,6 +140,7 @@ export function CarimboConcluido({
   cor?: string;
   atraso?: number;
 }) {
+  const estilos = usarEstilos();
   const p = useSharedValue(0);
   const reduzido = useReducedMotion();
 
@@ -225,10 +228,10 @@ export function Entrada({
   return <Animated.View style={[estilo, style]}>{children}</Animated.View>;
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   contador: {
     ...typeScale.numeroG,
-    color: color.tinta,
+    color: c.tinta,
     padding: 0,
     margin: 0,
     textAlign: 'left',
@@ -236,7 +239,7 @@ const estilos = StyleSheet.create({
   },
   trilho: {
     flex: 1,
-    backgroundColor: color.papelBaixo,
+    backgroundColor: c.fundoBaixo,
     overflow: 'hidden',
   },
   carimbo: {
@@ -255,4 +258,4 @@ const estilos = StyleSheet.create({
   },
   carimboTexto: { fontSize: 17, letterSpacing: 2.6 },
   carimboDetalhe: { fontSize: 10, letterSpacing: 1.6 },
-});
+}));

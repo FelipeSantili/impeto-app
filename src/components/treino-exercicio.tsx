@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { memo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { CabecaColuna, Pressavel, Regua, Rotulo, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
@@ -10,7 +10,8 @@ import { abrirMenu, type OpcaoMenu } from '@/components/folha';
 import { POR_ID } from '@/data/exercicios';
 import { TECNICAS, tecnicaDe } from '@/data/tecnicas';
 import { MEDIDA_LABEL, type Medida } from '@/data/types';
-import { color, margem, radius, sp, traco, type } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, radius, sp, traco, type } from '@/design/tokens';
 import { fmtNumero } from '@/lib/metricas';
 import { useDescanso } from '@/store/descanso';
 import { useTreino, type ExercicioTreino, type Serie } from '@/store/treino';
@@ -44,6 +45,8 @@ function BlocoExercicioBase({
   total: number;
   anterior: Serie[] | null;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const ex = POR_ID[item.exId];
   const medida: Medida = ex?.medida ?? 'peso_rep';
   const rotulos = MEDIDA_LABEL[medida];
@@ -107,13 +110,13 @@ function BlocoExercicioBase({
             <Tx v="heading" numberOfLines={1}>
               {ex?.nome ?? 'Exercício'}
             </Tx>
-            <Tx v="small" cor={color.tintaFraca}>
+            <Tx v="small" cor={c.tintaFraca}>
               {item.descanso > 0 ? `Descanso ${fmtDescanso(item.descanso)}` : 'Sem cronômetro'}
             </Tx>
           </View>
         </Pressavel>
         <Pressavel onPress={menu} hitSlop={12} style={estilos.menu} accessibilityLabel="Opções do exercício">
-          <Glifo nome="reticencias" tamanho={16} cor={color.tintaMid} />
+          <Glifo nome="reticencias" tamanho={16} cor={c.tintaMid} />
         </Pressavel>
       </View>
 
@@ -122,23 +125,23 @@ function BlocoExercicioBase({
           value={item.nota ?? ''}
           onChangeText={(t) => setNota(item.uid, t)}
           placeholder="Anotação (pino, altura do banco, pegada…)"
-          placeholderTextColor={color.tintaFantasma}
+          placeholderTextColor={c.tintaFantasma}
           style={estilos.nota}
           multiline
         />
       ) : null}
 
       <CabecaColuna>
-        <Rotulo cor={color.tintaMid} style={{ width: COL.serie }}>
+        <Rotulo cor={c.tintaMid} style={{ width: COL.serie }}>
           Sér
         </Rotulo>
-        <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+        <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
           Anterior
         </Rotulo>
-        <Rotulo cor={color.tintaMid} style={{ width: COL.valor, textAlign: 'center' }}>
+        <Rotulo cor={c.tintaMid} style={{ width: COL.valor, textAlign: 'center' }}>
           {rotulos.a}
         </Rotulo>
-        <Rotulo cor={color.tintaMid} style={{ width: COL.valor, textAlign: 'center' }}>
+        <Rotulo cor={c.tintaMid} style={{ width: COL.valor, textAlign: 'center' }}>
           {rotulos.b}
         </Rotulo>
         <View style={{ width: COL.check }} />
@@ -160,12 +163,12 @@ function BlocoExercicioBase({
       <Pressavel
         haptico="leve"
         onPress={() => addSerie(item.uid)}
-        fundoPressionado={color.papelBaixo}
+        fundoPressionado={c.fundoBaixo}
         escala={0.995}
         style={estilos.addSerie}
       >
-        <Glifo nome="mais" tamanho={13} cor={color.tintaMid} />
-        <Rotulo cor={color.tintaMid}>Adicionar série</Rotulo>
+        <Glifo nome="mais" tamanho={13} cor={c.tintaMid} />
+        <Rotulo cor={c.tintaMid}>Adicionar série</Rotulo>
       </Pressavel>
     </Animated.View>
   );
@@ -188,6 +191,8 @@ function LinhaSerie({
   ativa: boolean;
   anterior: Serie | null;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const editarSerie = useTreino((s) => s.editarSerie);
   const alternarFeita = useTreino((s) => s.alternarFeita);
   const definirTipo = useTreino((s) => s.definirTipo);
@@ -257,7 +262,7 @@ function LinhaSerie({
         accessibilityLabel={`Série ${numero}, ${tecnica.nome}. Toque para mudar a técnica.`}
         style={{ width: COL.serie }}
       >
-        <Tx v="numero" tab cor={aquecimento ? color.tintaFraca : color.tinta}>
+        <Tx v="numero" tab cor={aquecimento ? c.tintaFraca : c.tinta}>
           {aquecimento ? `(${numero})` : numero}
         </Tx>
         {tecnica.sigla && !aquecimento ? (
@@ -267,7 +272,7 @@ function LinhaSerie({
         ) : null}
       </Pressavel>
 
-      <Tx v="small" tab cor={color.tintaFraca} style={{ flex: 1 }} numberOfLines={1}>
+      <Tx v="small" tab cor={c.tintaFraca} style={{ flex: 1 }} numberOfLines={1}>
         {dicaPeso && dicaReps ? `${dicaPeso} × ${dicaReps}` : '—'}
       </Tx>
 
@@ -293,7 +298,7 @@ function LinhaSerie({
         accessibilityLabel={`Concluir série ${numero}`}
         style={[estilos.check, feita && estilos.checkFeito]}
       >
-        <Glifo nome="confere" tamanho={15} cor={feita ? color.azulTexto : color.tintaFantasma} />
+        <Glifo nome="confere" tamanho={15} cor={feita ? c.azulTexto : c.tintaFantasma} />
       </Pressavel>
     </Animated.View>
   );
@@ -319,6 +324,8 @@ function CampoNumero({
   inteiro?: boolean;
   onChange: (v: number | null) => void;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   // O texto local preserva estados intermediários ("12." enquanto digita) que
   // um número puro descartaria.
   const [texto, setTexto] = useState<string | null>(null);
@@ -338,7 +345,7 @@ function CampoNumero({
       }}
       onBlur={() => setTexto(null)}
       placeholder={dica ?? '·····'}
-      placeholderTextColor={color.tintaFantasma}
+      placeholderTextColor={c.tintaFantasma}
       keyboardType={inteiro ? 'number-pad' : 'decimal-pad'}
       selectTextOnFocus
       // A célula tem altura fixa: a fonte não pode crescer a ponto de cortar.
@@ -348,7 +355,7 @@ function CampoNumero({
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   bloco: { marginBottom: sp.h1 },
   cabecalho: {
     flexDirection: 'row',
@@ -360,10 +367,10 @@ const estilos = StyleSheet.create({
   menu: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   nota: {
     ...type.small,
-    color: color.azul,
-    backgroundColor: color.papelAlto,
+    color: c.azul,
+    backgroundColor: c.fundoAlto,
     borderLeftWidth: 2,
-    borderLeftColor: color.azulLinha,
+    borderLeftColor: c.azulLinha,
     paddingHorizontal: sp.md,
     paddingVertical: sp.sm,
     marginHorizontal: margem.pagina,
@@ -376,34 +383,34 @@ const estilos = StyleSheet.create({
     height: 48,
     paddingHorizontal: margem.pagina,
     borderBottomWidth: traco.fina,
-    borderBottomColor: color.regua,
+    borderBottomColor: c.regua,
   },
-  linhaFeita: { backgroundColor: color.papelAlto },
-  linhaAtiva: { backgroundColor: color.azulSuave },
+  linhaFeita: { backgroundColor: c.fundoAlto },
+  linhaAtiva: { backgroundColor: c.azulSuave },
   barraAtiva: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
     width: 3,
-    backgroundColor: color.tinta,
+    backgroundColor: c.tinta,
   },
   sigla: {
     ...type.carimbo,
     fontSize: 9,
     letterSpacing: 0.8,
-    color: color.vermelho,
+    color: c.vermelho,
     marginTop: -2,
   },
   campo: {
     width: COL.valor,
     height: 34,
-    color: color.azul,
+    color: c.azul,
     textAlign: 'center',
     ...type.numero,
     padding: 0,
     borderBottomWidth: traco.normal,
-    borderBottomColor: color.reguaMid,
+    borderBottomColor: c.reguaMid,
   },
   campoFeito: { borderBottomColor: 'transparent' },
   check: {
@@ -412,11 +419,11 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: traco.normal,
-    borderColor: color.reguaMid,
+    borderColor: c.reguaMid,
     borderRadius: radius.sm,
     marginLeft: sp.xs,
   },
-  checkFeito: { backgroundColor: color.azul, borderColor: color.azul },
+  checkFeito: { backgroundColor: c.azul, borderColor: c.azul },
   addSerie: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -424,4 +431,4 @@ const estilos = StyleSheet.create({
     height: 46,
     paddingHorizontal: margem.pagina,
   },
-});
+}));

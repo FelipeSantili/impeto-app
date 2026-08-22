@@ -4,7 +4,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   TextInput,
   View,
 } from 'react-native';
@@ -24,13 +23,16 @@ import { Miniatura } from '@/components/demo';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
-import { color, margem, radius, sp, traco, type } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, radius, sp, traco, type } from '@/design/tokens';
 import { useSelecao } from '@/store/selecao';
 import { useTreino, type Rotina } from '@/store/treino';
 
 type Item = Rotina['itens'][number];
 
 export default function EditorRotina() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const nova = id === 'nova';
@@ -102,20 +104,20 @@ export default function EditorRotina() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: color.papel }}
+      style={{ flex: 1, backgroundColor: c.fundo }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
         <View style={{ marginLeft: -sp.sm }}>
           <BotaoGlifo glifo="fechar" acessivel="Fechar" onPress={() => router.back()} />
         </View>
-        <Rotulo cor={color.tintaFraca} style={{ flex: 1 }}>
+        <Rotulo cor={c.tintaFraca} style={{ flex: 1 }}>
           {nova ? 'Nova rotina' : 'Editar rotina'}
         </Rotulo>
         {existente ? (
           <BotaoGlifo
             glifo="lixo"
-            cor={color.vermelho}
+            cor={c.vermelho}
             acessivel="Apagar rotina"
             onPress={() =>
               abrirConfirmacao({
@@ -140,18 +142,18 @@ export default function EditorRotina() {
       >
         {/* Campo de formulário com rótulo carimbado e régua embaixo. */}
         <View style={estilos.campoNome}>
-          <Rotulo cor={color.tintaFraca}>Nome</Rotulo>
+          <Rotulo cor={c.tintaFraca}>Nome</Rotulo>
           <TextInput
             value={nome}
             onChangeText={setNome}
             placeholder="Rotina sem nome"
-            placeholderTextColor={color.tintaFantasma}
+            placeholderTextColor={c.tintaFantasma}
             style={estilos.nome}
             returnKeyType="done"
             maxFontSizeMultiplier={1.3}
           />
         </View>
-        <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+        <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
 
         {itens.length === 0 ? (
           <Vazio
@@ -168,13 +170,13 @@ export default function EditorRotina() {
         ) : (
           <>
             <CabecaColuna>
-              <Rotulo cor={color.tintaMid} style={{ width: margem.calha }}>
+              <Rotulo cor={c.tintaMid} style={{ width: margem.calha }}>
                 Nº
               </Rotulo>
-              <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+              <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
                 Exercício
               </Rotulo>
-              <Rotulo cor={color.tintaMid} style={{ width: 96, textAlign: 'center' }}>
+              <Rotulo cor={c.tintaMid} style={{ width: 96, textAlign: 'center' }}>
                 Séries
               </Rotulo>
               <View style={{ width: 30 }} />
@@ -188,7 +190,7 @@ export default function EditorRotina() {
                   layout={LinearTransition.springify().damping(18)}
                 >
                   <View style={estilos.item}>
-                    <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+                    <Tx v="numero" tab cor={c.tintaFantasma} style={{ width: margem.calha }}>
                       {i + 1}
                     </Tx>
                     <Miniatura ex={ex} tamanho={36} />
@@ -207,7 +209,7 @@ export default function EditorRotina() {
                         accessibilityLabel="Menos uma série"
                         style={estilos.passo}
                       >
-                        <Glifo nome="menos" tamanho={13} cor={color.tintaMid} />
+                        <Glifo nome="menos" tamanho={13} cor={c.tintaMid} />
                       </Pressavel>
                       <Tx v="numero" tab center style={{ width: 26 }}>
                         {it.series}
@@ -219,7 +221,7 @@ export default function EditorRotina() {
                         accessibilityLabel="Mais uma série"
                         style={estilos.passo}
                       >
-                        <Glifo nome="mais" tamanho={13} cor={color.tintaMid} />
+                        <Glifo nome="mais" tamanho={13} cor={c.tintaMid} />
                       </Pressavel>
                     </View>
 
@@ -229,7 +231,7 @@ export default function EditorRotina() {
                       accessibilityLabel="Opções do exercício"
                       style={{ width: 30, alignItems: 'flex-end' }}
                     >
-                      <Glifo nome="reticencias" tamanho={15} cor={color.tintaFraca} />
+                      <Glifo nome="reticencias" tamanho={15} cor={c.tintaFraca} />
                     </Pressavel>
                   </View>
                   <Regua />
@@ -241,10 +243,10 @@ export default function EditorRotina() {
               onPress={() => router.push('/selecionar?destino=rotina')}
               haptico="leve"
               escala={0.995}
-              fundoPressionado={color.papelBaixo}
+              fundoPressionado={c.fundoBaixo}
               style={estilos.add}
             >
-              <Glifo nome="mais" tamanho={16} cor={color.tinta} />
+              <Glifo nome="mais" tamanho={16} cor={c.tinta} />
               <Tx v="bodyMed">Adicionar exercício</Tx>
             </Pressavel>
             <Regua />
@@ -253,7 +255,7 @@ export default function EditorRotina() {
       </ScrollView>
 
       <View style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>
-        <Regua peso="forte" cor={color.tinta} />
+        <Regua peso="forte" cor={c.tinta} />
         <View style={estilos.rodapeCorpo}>
           <Botao
             titulo="Salvar rotina"
@@ -268,7 +270,7 @@ export default function EditorRotina() {
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -277,7 +279,7 @@ const estilos = StyleSheet.create({
     paddingBottom: sp.sm,
   },
   campoNome: { paddingHorizontal: margem.pagina, paddingBottom: sp.sm },
-  nome: { ...type.display, color: color.tinta, padding: 0, marginTop: sp.xs },
+  nome: { ...type.display, color: c.tinta, padding: 0, marginTop: sp.xs },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -289,7 +291,7 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: traco.normal,
-    borderColor: color.reguaMid,
+    borderColor: c.reguaMid,
     borderRadius: radius.sm,
     height: 34,
   },
@@ -307,7 +309,7 @@ const estilos = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: color.papel,
+    backgroundColor: c.fundo,
   },
   rodapeCorpo: { flexDirection: 'row', paddingHorizontal: margem.pagina, paddingTop: sp.md },
-});
+}));

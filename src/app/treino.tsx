@@ -1,12 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   TextInput,
   View,
 } from 'react-native';
@@ -25,7 +24,8 @@ import { TiraDescanso } from '@/components/descanso';
 import { abrirConfirmacao, abrirMenu, abrirPrompt } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
 import { BlocoExercicio } from '@/components/treino-exercicio';
-import { color, margem, sp, type } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp, type } from '@/design/tokens';
 import { fmtDuracao, fmtVolume, ultimaExecucao, volumeSessao } from '@/lib/metricas';
 import { useCinta } from '@/store/cinta';
 import { useDescanso } from '@/store/descanso';
@@ -41,6 +41,8 @@ import { useTreino } from '@/store/treino';
  * série e outra.
  */
 export default function TreinoAtivo() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   useKeepAwake();
   const insets = useSafeAreaInsets();
 
@@ -59,9 +61,21 @@ export default function TreinoAtivo() {
     return () => clearInterval(t);
   }, []);
 
-  // Sem treino aberto não há tela: pode ter sido finalizado em outro caminho.
+  /*
+   * Guarda contra a própria saída desta tela.
+   *
+   * Concluir o treino zera `ativa` E navega para o relatório. Só que esta tela
+   * continua montada durante a transição: ela re-renderiza com `ativa === null`
+   * e, sem esta trava, o efeito abaixo dispara `router.back()` e derruba o
+   * relatório que acabou de abrir — o treino "termina" e não aparece nada.
+   */
+  const saindo = useRef(false);
+
+  // Sem treino aberto não há tela: pode ter sido finalizado em outro caminho
+  // (outra aba, atualização aplicada). Mas se quem está saindo somos nós, a
+  // navegação já foi decidida.
   useEffect(() => {
-    if (!ativa && router.canGoBack()) router.back();
+    if (!ativa && !saindo.current && router.canGoBack()) router.back();
   }, [ativa]);
 
   if (!ativa) return null;
@@ -97,6 +111,10 @@ export default function TreinoAtivo() {
               }
             : undefined;
 
+        // Antes de zerar `ativa`: a partir daqui a saída é nossa, e o efeito
+        // de guarda não deve mais navegar por conta própria.
+        saindo.current = true;
+
         const s = finalizar(cardio);
         pararDescanso();
         useCinta.getState().zerarAmostras();
@@ -115,6 +133,7 @@ export default function TreinoAtivo() {
       confirmar: 'Descartar',
       destrutiva: true,
       onConfirmar: () => {
+        saindo.current = true;
         descartar();
         pararDescanso();
         router.back();
@@ -148,7 +167,7 @@ export default function TreinoAtivo() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: color.papel }}
+      style={{ flex: 1, backgroundColor: c.fundo }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
@@ -162,24 +181,24 @@ export default function TreinoAtivo() {
         onChangeText={renomear}
         style={estilos.titulo}
         placeholder="Nome do treino"
-        placeholderTextColor={color.tintaFantasma}
+        placeholderTextColor={c.tintaFantasma}
         returnKeyType="done"
         maxFontSizeMultiplier={1.3}
       />
 
       {/* Faixa de totais: colunas rotuladas, valores em condensada tabular. */}
       <CabecaColuna>
-        <Rotulo cor={color.tintaMid} style={{ flex: 1.3 }}>
+        <Rotulo cor={c.tintaMid} style={{ flex: 1.3 }}>
           Tempo
         </Rotulo>
-        <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+        <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
           Séries
         </Rotulo>
-        <Rotulo cor={color.tintaMid} style={{ flex: 1.2 }}>
+        <Rotulo cor={c.tintaMid} style={{ flex: 1.2 }}>
           Volume
         </Rotulo>
         {bpm !== null ? (
-          <Rotulo cor={color.tintaMid} style={{ width: 52, textAlign: 'right' }}>
+          <Rotulo cor={c.tintaMid} style={{ width: 52, textAlign: 'right' }}>
             bpm
           </Rotulo>
         ) : null}
@@ -196,14 +215,14 @@ export default function TreinoAtivo() {
         </Tx>
         {bpm !== null ? (
           <View style={estilos.bpm}>
-            <Glifo nome="coracao" tamanho={11} cor={color.vermelho} />
-            <Tx v="numeroG" tab cor={color.vermelho}>
+            <Glifo nome="coracao" tamanho={11} cor={c.vermelho} />
+            <Tx v="numeroG" tab cor={c.vermelho}>
               {bpm}
             </Tx>
           </View>
         ) : null}
       </View>
-      <Regua peso="forte" cor={color.tinta} />
+      <Regua peso="forte" cor={c.tinta} />
 
       <ScrollView
         contentContainerStyle={{ paddingTop: sp.xl, paddingBottom: alturaRodape + 80 }}
@@ -242,10 +261,10 @@ export default function TreinoAtivo() {
               onPress={() => router.push('/selecionar')}
               haptico="leve"
               escala={0.995}
-              fundoPressionado={color.papelBaixo}
+              fundoPressionado={c.fundoBaixo}
               style={estilos.addExercicio}
             >
-              <Glifo nome="mais" tamanho={16} cor={color.tinta} />
+              <Glifo nome="mais" tamanho={16} cor={c.tinta} />
               <Tx v="bodyMed">Adicionar exercício</Tx>
             </Pressavel>
             <Regua />
@@ -256,7 +275,7 @@ export default function TreinoAtivo() {
       <TiraDescanso bottom={alturaRodape} />
 
       <View style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>
-        <Regua peso="forte" cor={color.tinta} />
+        <Regua peso="forte" cor={c.tinta} />
         <View style={estilos.rodapeCorpo}>
           <Botao titulo="Concluir treino" grande onPress={concluir} style={{ flex: 1 }} />
         </View>
@@ -265,7 +284,7 @@ export default function TreinoAtivo() {
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,7 +292,7 @@ const estilos = StyleSheet.create({
   },
   titulo: {
     ...type.title,
-    color: color.tinta,
+    color: c.tinta,
     paddingHorizontal: margem.pagina,
     paddingVertical: 0,
     marginBottom: sp.md,
@@ -297,11 +316,11 @@ const estilos = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: color.papel,
+    backgroundColor: c.fundo,
   },
   rodapeCorpo: {
     flexDirection: 'row',
     paddingHorizontal: margem.pagina,
     paddingTop: sp.md,
   },
-});
+}));

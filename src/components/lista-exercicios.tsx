@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import {
   ScrollView,
   SectionList,
-  StyleSheet,
   TextInput,
   View,
   type ViewStyle,
@@ -12,7 +11,8 @@ import { Miniatura } from '@/components/demo';
 import { Glifo } from '@/components/glifos';
 import { buscar, EXERCICIOS } from '@/data/exercicios';
 import { EQUIP_LABEL, GRUPO_LABEL, ORDEM_GRUPOS, type Exercicio, type Grupo } from '@/data/types';
-import { color, margem, radius, sp, traco, type } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, radius, sp, traco, type } from '@/design/tokens';
 
 export interface FiltroProps {
   /** Ids marcados — quando definido, a lista entra em modo de seleção. */
@@ -29,6 +29,8 @@ export interface FiltroProps {
  * dentro do treino (marca e desmarca).
  */
 export function ListaExercicios({ selecionados, onPress, rodape = 120, cabecalho }: FiltroProps) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const [termo, setTermo] = useState('');
   const [grupo, setGrupo] = useState<Grupo | null>(null);
 
@@ -56,12 +58,12 @@ export function ListaExercicios({ selecionados, onPress, rodape = 120, cabecalho
 
       {/* Campo de formulário: régua embaixo, sem caixa. */}
       <View style={estilos.busca}>
-        <Glifo nome="busca" tamanho={16} cor={color.tintaFraca} />
+        <Glifo nome="busca" tamanho={16} cor={c.tintaFraca} />
         <TextInput
           value={termo}
           onChangeText={setTermo}
           placeholder="Buscar exercício ou máquina"
-          placeholderTextColor={color.tintaFantasma}
+          placeholderTextColor={c.tintaFantasma}
           style={estilos.input}
           autoCorrect={false}
           returnKeyType="search"
@@ -69,7 +71,7 @@ export function ListaExercicios({ selecionados, onPress, rodape = 120, cabecalho
         />
         {termo.length > 0 ? (
           <Pressavel hitSlop={12} onPress={() => setTermo('')} accessibilityLabel="Limpar busca">
-            <Glifo nome="fechar" tamanho={14} cor={color.tintaFraca} />
+            <Glifo nome="fechar" tamanho={14} cor={c.tintaFraca} />
           </Pressavel>
         ) : null}
       </View>
@@ -103,7 +105,7 @@ export function ListaExercicios({ selecionados, onPress, rodape = 120, cabecalho
         windowSize={9}
         renderSectionHeader={({ section }) => (
           <View style={estilos.secao}>
-            <Rotulo cor={color.tintaMid}>{section.title}</Rotulo>
+            <Rotulo cor={c.tintaMid}>{section.title}</Rotulo>
             <Regua peso="forte" style={{ marginTop: sp.xs }} />
           </View>
         )}
@@ -123,7 +125,7 @@ export function ListaExercicios({ selecionados, onPress, rodape = 120, cabecalho
         }
         ListFooterComponent={
           total > 0 ? (
-            <Rotulo cor={color.tintaFantasma} style={estilos.total}>
+            <Rotulo cor={c.tintaFantasma} style={estilos.total}>
               {total} exercícios
             </Rotulo>
           ) : null
@@ -146,12 +148,14 @@ export function LinhaExercicio({
   onPress: () => void;
   style?: ViewStyle;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <Pressavel
       onPress={onPress}
       escala={0.995}
-      fundo={marcado ? color.azulSuave : undefined}
-      fundoPressionado={color.papelBaixo}
+      fundo={marcado ? c.azulSuave : undefined}
+      fundoPressionado={c.fundoBaixo}
       accessibilityRole="button"
       accessibilityState={modoSelecao ? { selected: !!marcado } : undefined}
       style={[estilos.linha, style]}
@@ -161,7 +165,7 @@ export function LinhaExercicio({
         <Tx v="bodyMed" numberOfLines={1}>
           {ex.nome}
         </Tx>
-        <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+        <Tx v="small" cor={c.tintaFraca} numberOfLines={1}>
           {EQUIP_LABEL[ex.equip]}
           {ex.unilateral ? ' · unilateral' : ''}
         </Tx>
@@ -170,16 +174,16 @@ export function LinhaExercicio({
         // Caixa de marcar quadrada — o círculo com check dentro é forma de
         // biblioteca, não deste caderno.
         <View style={[estilos.caixa, marcado && estilos.caixaAtiva]}>
-          {marcado ? <Glifo nome="confere" tamanho={13} cor={color.azulTexto} /> : null}
+          {marcado ? <Glifo nome="confere" tamanho={13} cor={c.azulTexto} /> : null}
         </View>
       ) : (
-        <Glifo nome="avancar" tamanho={14} cor={color.tintaFantasma} />
+        <Glifo nome="avancar" tamanho={14} cor={c.tintaFantasma} />
       )}
     </Pressavel>
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   busca: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -187,9 +191,9 @@ const estilos = StyleSheet.create({
     height: 46,
     marginHorizontal: margem.pagina,
     borderBottomWidth: traco.normal,
-    borderBottomColor: color.reguaForte,
+    borderBottomColor: c.reguaForte,
   },
-  input: { flex: 1, color: color.tinta, ...type.body, padding: 0 },
+  input: { flex: 1, color: c.tinta, ...type.body, padding: 0 },
   chips: { gap: sp.sm, paddingHorizontal: margem.pagina, paddingVertical: sp.lg },
   secao: { paddingTop: sp.xl, paddingBottom: sp.sm, paddingHorizontal: margem.pagina },
   linha: {
@@ -199,17 +203,17 @@ const estilos = StyleSheet.create({
     paddingVertical: sp.md,
     paddingHorizontal: margem.pagina,
     borderBottomWidth: traco.fina,
-    borderBottomColor: color.regua,
+    borderBottomColor: c.regua,
   },
   caixa: {
     width: 24,
     height: 24,
     borderRadius: radius.sm,
     borderWidth: traco.normal,
-    borderColor: color.reguaForte,
+    borderColor: c.reguaForte,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  caixaAtiva: { backgroundColor: color.azul, borderColor: color.azul },
+  caixaAtiva: { backgroundColor: c.azul, borderColor: c.azul },
   total: { paddingTop: sp.xxl, paddingHorizontal: margem.pagina },
-});
+}));

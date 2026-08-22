@@ -1,19 +1,22 @@
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BotaoGlifo, Pressavel, Regua, Rotulo, Secao, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
 import { PROGRAMAS, type Modelo } from '@/data/modelos';
-import { color, margem, sp } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp } from '@/design/tokens';
 
 /** Vitrine de treinos prontos, agrupados por divisão. */
 export default function Modelos() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.papel }}>
+    <View style={{ flex: 1, backgroundColor: c.fundo }}>
       <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
         <View style={{ marginLeft: -sp.sm }}>
           <BotaoGlifo glifo="fechar" acessivel="Fechar" onPress={() => router.back()} />
@@ -22,13 +25,13 @@ export default function Modelos() {
           Modelos prontos
         </Tx>
       </View>
-      <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+      <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + sp.h2 }}
         showsVerticalScrollIndicator={false}
       >
-        <Tx v="small" cor={color.tintaMid} style={estilos.intro}>
+        <Tx v="small" cor={c.tintaMid} style={estilos.intro}>
           Divisões clássicas com séries e descansos já definidos. Use como estão ou ajuste depois
           de salvar — viram rotinas suas.
         </Tx>
@@ -37,9 +40,9 @@ export default function Modelos() {
           <Secao
             key={prog.id}
             titulo={prog.nome}
-            direita={<Rotulo cor={color.tintaFraca}>{prog.freq}</Rotulo>}
+            direita={<Rotulo cor={c.tintaFraca}>{prog.freq}</Rotulo>}
           >
-            <Tx v="small" cor={color.tintaFraca} style={estilos.descricao}>
+            <Tx v="small" cor={c.tintaFraca} style={estilos.descricao}>
               {prog.descricao}
             </Tx>
             {prog.modelos.map((mo, i) => (
@@ -53,6 +56,8 @@ export default function Modelos() {
 }
 
 function LinhaModelo({ modelo, numero }: { modelo: Modelo; numero: number }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const exs = modelo.itens.map((i) => POR_ID[i.exId]).filter(Boolean);
   const series = modelo.itens.reduce((t, i) => t + i.series, 0);
 
@@ -61,12 +66,12 @@ function LinhaModelo({ modelo, numero }: { modelo: Modelo; numero: number }) {
       <Pressavel
         onPress={() => router.push(`/modelo/${modelo.id}`)}
         escala={0.995}
-        fundoPressionado={color.papelBaixo}
+        fundoPressionado={c.fundoBaixo}
         accessibilityRole="button"
         accessibilityLabel={modelo.nome}
         style={estilos.linha}
       >
-        <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+        <Tx v="numero" tab cor={c.tintaFantasma} style={{ width: margem.calha }}>
           {numero}
         </Tx>
         <View style={estilos.pilha}>
@@ -80,27 +85,27 @@ function LinhaModelo({ modelo, numero }: { modelo: Modelo; numero: number }) {
           <Tx v="bodyMed" numberOfLines={1}>
             {modelo.nome}
           </Tx>
-          <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+          <Tx v="small" cor={c.tintaFraca} numberOfLines={1}>
             {modelo.foco}
           </Tx>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Tx v="numero" tab>
             {modelo.itens.length}
-            <Tx v="small" cor={color.tintaFraca}> ex</Tx>
+            <Tx v="small" cor={c.tintaFraca}> ex</Tx>
           </Tx>
-          <Tx v="small" tab cor={color.tintaFraca}>
+          <Tx v="small" tab cor={c.tintaFraca}>
             {series} séries
           </Tx>
         </View>
-        <Glifo nome="avancar" tamanho={13} cor={color.tintaFantasma} />
+        <Glifo nome="avancar" tamanho={13} cor={c.tintaFantasma} />
       </Pressavel>
       <Regua />
     </View>
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos(() => ({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -118,4 +123,4 @@ const estilos = StyleSheet.create({
     paddingHorizontal: margem.pagina,
   },
   pilha: { flexDirection: 'row', alignItems: 'center' },
-});
+}));

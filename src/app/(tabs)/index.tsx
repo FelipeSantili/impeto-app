@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Botao, BotaoGlifo, Pressavel, Regua, Rotulo, Secao, Tela, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
 import { GRUPO_LABEL } from '@/data/types';
-import { color, margem, sp, traco } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp, traco } from '@/design/tokens';
 import { fmtDuracaoCurta, fmtVolume, resumoDaSemana, sequenciaDias } from '@/lib/metricas';
 import { useTreino, type Rotina } from '@/store/treino';
 
@@ -32,6 +33,8 @@ function dataDeHoje() {
  * alinhada à direita numa coluna tabular.
  */
 export default function Inicio() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const rotinas = useTreino((s) => s.rotinas);
   const historico = useTreino((s) => s.historico);
   const ativa = useTreino((s) => s.ativa);
@@ -95,12 +98,12 @@ export default function Inicio() {
     <Tela scroll>
       {/* Cabeçalho da página: marca à esquerda, data à direita, mesma base. */}
       <View style={estilos.marca}>
-        <Glifo nome="raio" tamanho={16} cor={color.tinta} />
-        <Rotulo cor={color.tinta} style={estilos.marcaTexto}>
+        <Glifo nome="raio" tamanho={16} cor={c.tinta} />
+        <Rotulo cor={c.tinta} style={estilos.marcaTexto}>
           Ímpeto
         </Rotulo>
         <View style={{ flex: 1 }} />
-        <Rotulo cor={color.tintaFraca}>{dataDeHoje()}</Rotulo>
+        <Rotulo cor={c.tintaFraca}>{dataDeHoje()}</Rotulo>
         <BotaoGlifo
           glifo="ajustes"
           tamanho={32}
@@ -108,15 +111,15 @@ export default function Inicio() {
           onPress={() => router.push('/ajustes')}
         />
       </View>
-      <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+      <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
 
       <Secao
         titulo="Semana"
         espaco={sp.xxl}
-        direita={sequencia > 1 ? <Rotulo cor={color.azul}>{sequencia} dias seguidos</Rotulo> : null}
+        direita={sequencia > 1 ? <Rotulo cor={c.azul}>{sequencia} dias seguidos</Rotulo> : null}
       >
         <LinhaSemana dias={semana.dias} hoje={hoje} />
-        <Tx v="small" cor={color.tintaMid} style={estilos.resumo}>
+        <Tx v="small" cor={c.tintaMid} style={estilos.resumo}>
           {resumo}
         </Tx>
       </Secao>
@@ -124,7 +127,7 @@ export default function Inicio() {
       {/* A única decisão da tela. Barra cheia, largura total, canto reto. */}
       <View style={estilos.acao}>
         <Tx v="display">{ativa ? 'Treino em curso' : 'Registrar treino'}</Tx>
-        <Tx v="body" cor={color.tintaMid} style={{ marginTop: sp.xs, maxWidth: 320 }}>
+        <Tx v="body" cor={c.tintaMid} style={{ marginTop: sp.xs, maxWidth: 320 }}>
           {ativa
             ? 'Você tem um treino aberto agora.'
             : rotinas.length
@@ -150,8 +153,8 @@ export default function Inicio() {
               hitSlop={10}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
             >
-              <Rotulo cor={color.azul}>Modelos</Rotulo>
-              <Glifo nome="avancar" tamanho={11} cor={color.azul} />
+              <Rotulo cor={c.azul}>Modelos</Rotulo>
+              <Glifo nome="avancar" tamanho={11} cor={c.azul} />
             </Pressavel>
             <BotaoGlifo
               glifo="mais"
@@ -166,29 +169,29 @@ export default function Inicio() {
           <View>
             <Pressavel
               onPress={() => router.push('/modelos')}
-              fundoPressionado={color.papelBaixo}
+              fundoPressionado={c.fundoBaixo}
               escala={0.995}
               style={estilos.linhaVazia}
             >
               <View style={{ flex: 1, gap: 2 }}>
                 <Tx v="bodyMed">Começar por um modelo</Tx>
-                <Tx v="small" cor={color.tintaFraca}>
+                <Tx v="small" cor={c.tintaFraca}>
                   Upper · Lower, Push · Pull · Legs, ABC e mais
                 </Tx>
               </View>
-              <Glifo nome="avancar" tamanho={14} cor={color.tintaFantasma} />
+              <Glifo nome="avancar" tamanho={14} cor={c.tintaFantasma} />
             </Pressavel>
             <Regua />
             <Pressavel
               onPress={() => router.push('/rotina/nova')}
-              fundoPressionado={color.papelBaixo}
+              fundoPressionado={c.fundoBaixo}
               escala={0.995}
               style={estilos.linhaVazia}
             >
-              <Tx v="bodyMed" cor={color.tintaMid} style={{ flex: 1 }}>
+              <Tx v="bodyMed" cor={c.tintaMid} style={{ flex: 1 }}>
                 Criar do zero
               </Tx>
-              <Glifo nome="mais" tamanho={14} cor={color.tintaFantasma} />
+              <Glifo nome="mais" tamanho={14} cor={c.tintaFantasma} />
             </Pressavel>
             <Regua />
           </View>
@@ -219,16 +222,18 @@ export default function Inicio() {
  * emoldurada. Nenhum ponto, nenhum anel.
  */
 function LinhaSemana({ dias, hoje }: { dias: boolean[]; hoje: number }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <View>
       <View style={estilos.semanaCabeca}>
         {INICIAIS.map((letra, i) => (
           <View key={`${letra}-${i}`} style={estilos.celula}>
-            <Rotulo cor={i === hoje ? color.tinta : color.tintaFraca}>{letra}</Rotulo>
+            <Rotulo cor={i === hoje ? c.tinta : c.tintaFraca}>{letra}</Rotulo>
           </View>
         ))}
       </View>
-      <Regua peso="normal" cor={color.reguaMid} />
+      <Regua peso="normal" cor={c.reguaMid} />
       <View style={estilos.semanaLinha}>
         {dias.map((feito, i) => (
           <View
@@ -262,6 +267,8 @@ function LinhaRotina({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const series = rotina.itens.reduce((t, i) => t + i.series, 0);
   const exs = rotina.itens.map((i) => POR_ID[i.exId]).filter(Boolean);
   const grupos = [...new Set(exs.map((e) => e.grupo))].map((g) => GRUPO_LABEL[g]);
@@ -273,12 +280,12 @@ function LinhaRotina({
         onLongPress={onLongPress}
         delayLongPress={280}
         escala={0.995}
-        fundoPressionado={color.papelBaixo}
+        fundoPressionado={c.fundoBaixo}
         accessibilityRole="button"
         accessibilityLabel={`${rotina.nome}, ${rotina.itens.length} exercícios`}
         style={estilos.rotina}
       >
-        <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+        <Tx v="numero" tab cor={c.tintaFantasma} style={{ width: margem.calha }}>
           {numero}
         </Tx>
         <View style={estilos.pilha}>
@@ -292,7 +299,7 @@ function LinhaRotina({
           <Tx v="bodyMed" numberOfLines={1}>
             {rotina.nome}
           </Tx>
-          <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+          <Tx v="small" cor={c.tintaFraca} numberOfLines={1}>
             {grupos.slice(0, 3).join(' · ') || 'Sem exercícios'}
           </Tx>
         </View>
@@ -300,12 +307,12 @@ function LinhaRotina({
         <View style={{ alignItems: 'flex-end' }}>
           <Tx v="numero" tab>
             {rotina.itens.length}
-            <Tx v="small" cor={color.tintaFraca}>
+            <Tx v="small" cor={c.tintaFraca}>
               {' '}
               ex
             </Tx>
           </Tx>
-          <Tx v="small" tab cor={color.tintaFraca}>
+          <Tx v="small" tab cor={c.tintaFraca}>
             {series} séries
           </Tx>
         </View>
@@ -315,7 +322,7 @@ function LinhaRotina({
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   marca: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,16 +336,16 @@ const estilos = StyleSheet.create({
   semanaLinha: { flexDirection: 'row', paddingHorizontal: margem.pagina },
   celula: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   celulaAlta: { height: 40 },
-  celulaDivisa: { borderLeftWidth: traco.fina, borderLeftColor: color.regua },
+  celulaDivisa: { borderLeftWidth: traco.fina, borderLeftColor: c.regua },
   celulaHoje: {
     borderWidth: traco.normal,
-    borderColor: color.tinta,
+    borderColor: c.tinta,
     borderTopWidth: 0,
   },
   blocoFeito: {
     width: 16,
     height: 16,
-    backgroundColor: color.azul,
+    backgroundColor: c.azul,
     borderRadius: 1,
   },
   resumo: { paddingHorizontal: margem.pagina, paddingTop: sp.sm },
@@ -358,4 +365,4 @@ const estilos = StyleSheet.create({
     minHeight: 60,
     paddingHorizontal: margem.pagina,
   },
-});
+}));

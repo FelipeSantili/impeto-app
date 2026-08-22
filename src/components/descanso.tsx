@@ -1,10 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Pressavel, Regua, Rotulo, Tx } from '@/components/base';
 import { ReguaProgresso } from '@/components/decor';
-import { color, margem, sp, traco } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp, traco } from '@/design/tokens';
 import { fmtDuracao } from '@/lib/metricas';
 import { useDescanso } from '@/store/descanso';
 
@@ -21,6 +22,8 @@ import { useDescanso } from '@/store/descanso';
  * grande; os controles ficam pequenos e à direita.
  */
 export function TiraDescanso({ bottom }: { bottom: number }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const { alvo, total, somar, parar } = useDescanso();
   const [restante, setRestante] = useState(0);
   const avisou = useRef(false);
@@ -56,32 +59,32 @@ export function TiraDescanso({ bottom }: { bottom: number }) {
       style={[estilos.tira, { bottom }]}
     >
       <Regua peso="forte" />
-      <ReguaProgresso fracao={fracao} altura={2} cor={color.azul} />
+      <ReguaProgresso fracao={fracao} altura={2} cor={c.azul} />
       <View style={estilos.corpo}>
         <View style={{ flex: 1 }}>
-          <Rotulo cor={color.tintaFraca}>Descanso</Rotulo>
+          <Rotulo cor={c.tintaFraca}>Descanso</Rotulo>
           <Tx v="numeroXG" tab style={{ marginTop: -2 }}>
             {fmtDuracao(restante)}
           </Tx>
         </View>
 
         <Pressavel haptico="leve" onPress={() => somar(15)} style={estilos.acao}>
-          <Rotulo cor={color.tinta}>+15s</Rotulo>
+          <Rotulo cor={c.tinta}>+15s</Rotulo>
         </Pressavel>
         <Pressavel haptico="leve" onPress={parar} style={estilos.acao}>
-          <Rotulo cor={color.tintaMid}>Pular</Rotulo>
+          <Rotulo cor={c.tintaMid}>Pular</Rotulo>
         </Pressavel>
       </View>
     </Animated.View>
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   tira: {
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: color.papelAlto,
+    backgroundColor: c.fundoAlto,
   },
   corpo: {
     flexDirection: 'row',
@@ -97,7 +100,7 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: traco.normal,
-    borderColor: color.reguaMid,
+    borderColor: c.reguaMid,
     paddingHorizontal: sp.sm,
   },
-});
+}));

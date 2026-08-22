@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
 import type { TabTriggerSlotProps } from 'expo-router/ui';
 import type { ReactNode, Ref } from 'react';
-import { StyleSheet, Text, View, type ViewProps } from 'react-native';
+import { Text, View, type ViewProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressavel, Regua, Tx } from '@/components/base';
 import { Glifo, type NomeGlifo } from '@/components/glifos';
-import { color, margem, sp, traco, type as typeScale } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp, traco, type as typeScale } from '@/design/tokens';
 import { useTreino } from '@/store/treino';
 
 /**
@@ -24,6 +25,8 @@ export function Doca({
   ref,
   ...rest
 }: ViewProps & { children?: ReactNode; ref?: Ref<View> }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
   const ativa = useTreino((s) => s.ativa);
 
@@ -36,23 +39,23 @@ export function Doca({
           onPress={() => router.push('/treino')}
           style={estilos.retomar}
           escala={1}
-          fundo={color.azul}
+          fundo={c.azul}
           fundoPressionado="#1B2B73"
           accessibilityRole="button"
           accessibilityLabel={`Retomar treino ${ativa.nome}`}
         >
-          <Tx v="smallMed" cor={color.azulTexto} style={{ flex: 1 }} numberOfLines={1}>
+          <Tx v="smallMed" cor={c.azulTexto} style={{ flex: 1 }} numberOfLines={1}>
             {ativa.nome}
           </Tx>
           <Text
             style={[
               typeScale.carimbo,
-              { color: color.azulTexto, fontSize: 11, textTransform: 'uppercase' },
+              { color: c.azulTexto, fontSize: 11, textTransform: 'uppercase' },
             ]}
           >
             Retomar
           </Text>
-          <Glifo nome="avancar" tamanho={13} cor={color.azulTexto} />
+          <Glifo nome="avancar" tamanho={13} cor={c.azulTexto} />
         </Pressavel>
       ) : null}
 
@@ -76,7 +79,9 @@ export function Aba({
   rotulo: string;
   ref?: Ref<View>;
 }) {
-  const cor = isFocused ? color.tinta : color.tintaFraca;
+  const c = usarPaleta();
+  const estilos = usarEstilos();
+  const cor = isFocused ? c.tinta : c.tintaFraca;
   return (
     <Pressavel
       {...rest}
@@ -88,7 +93,7 @@ export function Aba({
       accessibilityState={{ selected: !!isFocused }}
       style={estilos.aba}
     >
-      <View style={[estilos.barraAtiva, isFocused && { backgroundColor: color.tinta }]} />
+      <View style={[estilos.barraAtiva, isFocused && { backgroundColor: c.tinta }]} />
       <Glifo nome={glifo} tamanho={19} cor={cor} />
       <Text
         numberOfLines={1}
@@ -101,13 +106,13 @@ export function Aba({
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   ancora: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: color.papel,
+    backgroundColor: c.fundo,
   },
   barra: {
     flexDirection: 'row',
@@ -138,8 +143,8 @@ const estilos = StyleSheet.create({
     gap: sp.sm,
     height: 44,
     paddingHorizontal: margem.pagina,
-    backgroundColor: color.azul,
+    backgroundColor: c.azul,
     borderTopWidth: traco.normal,
-    borderTopColor: color.azul,
+    borderTopColor: c.azul,
   },
-});
+}));

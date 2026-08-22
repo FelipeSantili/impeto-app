@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BarraAnimada, CarimboConcluido, Contador, Entrada } from '@/components/animado';
 import {
@@ -23,7 +23,8 @@ import { MapaMuscular } from '@/components/mapa-muscular';
 import { POR_ID } from '@/data/exercicios';
 import { tecnicaDe } from '@/data/tecnicas';
 import { GRUPO_LABEL, MEDIDA_LABEL } from '@/data/types';
-import { color, margem, sp, traco } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, sp, traco } from '@/design/tokens';
 import { compartilharView } from '@/lib/compartilhar';
 import {
   conquistasDaSessao,
@@ -61,6 +62,8 @@ const RECORDE_TEXTO: Record<Recorde['tipo'], string> = {
  * como um registro é lido: de cima para baixo, sem recipientes.
  */
 export default function RelatorioSessao() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
   const { id, novo } = useLocalSearchParams<{ id: string; novo?: string }>();
   const festa = novo === '1';
@@ -122,7 +125,7 @@ export default function RelatorioSessao() {
 
   if (!sessao) {
     return (
-      <View style={{ flex: 1, backgroundColor: color.papel, paddingTop: insets.top + sp.sm }}>
+      <View style={{ flex: 1, backgroundColor: c.fundo, paddingTop: insets.top + sp.sm }}>
         <View style={estilos.topo}>
           <BotaoGlifo glifo="voltar" acessivel="Voltar" onPress={sair} />
         </View>
@@ -177,7 +180,7 @@ export default function RelatorioSessao() {
   const t = (ms: number) => (festa ? ms : 0);
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.papel }}>
+    <View style={{ flex: 1, backgroundColor: c.fundo }}>
       <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
         <BotaoGlifo glifo={festa ? 'fechar' : 'voltar'} acessivel="Voltar" onPress={sair} />
         <View style={{ flex: 1 }} />
@@ -208,7 +211,7 @@ export default function RelatorioSessao() {
             <Tx v="display" numberOfLines={2}>
               {sessao.nome}
             </Tx>
-            <Rotulo cor={color.tintaFraca} style={{ marginTop: sp.xs }}>
+            <Rotulo cor={c.tintaFraca} style={{ marginTop: sp.xs }}>
               {fmtData(sessao.fim ?? sessao.inicio)} · {fmtHora(sessao.inicio)}
             </Rotulo>
           </View>
@@ -216,13 +219,13 @@ export default function RelatorioSessao() {
 
         {/* Totais: cabeça de coluna e uma linha de valores. Sem caixa. */}
         <CabecaColuna>
-          <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+          <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
             Tempo
           </Rotulo>
-          <Rotulo cor={color.tintaMid} style={{ flex: 1.2 }}>
+          <Rotulo cor={c.tintaMid} style={{ flex: 1.2 }}>
             Volume
           </Rotulo>
-          <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+          <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
             Séries
           </Rotulo>
         </CabecaColuna>
@@ -244,7 +247,7 @@ export default function RelatorioSessao() {
           />
           <Total valor={series} anima={festa} atraso={780} style={{ flex: 1 }} />
         </View>
-        <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+        <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
 
         {/* Frequência cardíaca — da cinta ou do relógio via Health Connect */}
         {sessao.cardio ? (
@@ -253,22 +256,22 @@ export default function RelatorioSessao() {
               titulo="Frequência cardíaca"
               espaco={sp.xxl}
               direita={
-                <Rotulo cor={color.tintaFraca}>
+                <Rotulo cor={c.tintaFraca}>
                   {sessao.cardio.fonte === 'cinta' ? 'Cinta' : 'Do relógio'}
                 </Rotulo>
               }
             >
               <View style={estilos.cardio}>
-                <Glifo nome="coracao" tamanho={15} cor={color.vermelho} />
+                <Glifo nome="coracao" tamanho={15} cor={c.vermelho} />
                 <Tx v="numero" tab>
                   {sessao.cardio.media}
-                  <Tx v="small" cor={color.tintaFraca}>
+                  <Tx v="small" cor={c.tintaFraca}>
                     {' '}
                     bpm médio
                   </Tx>
                   {'   '}
                   {sessao.cardio.maxima}
-                  <Tx v="small" cor={color.tintaFraca}>
+                  <Tx v="small" cor={c.tintaFraca}>
                     {' '}
                     máx
                   </Tx>
@@ -276,7 +279,7 @@ export default function RelatorioSessao() {
                     <>
                       {'   '}
                       {sessao.cardio.calorias}
-                      <Tx v="small" cor={color.tintaFraca}>
+                      <Tx v="small" cor={c.tintaFraca}>
                         {' '}
                         kcal
                       </Tx>
@@ -311,16 +314,16 @@ export default function RelatorioSessao() {
                       <Tx v="smallMed" numberOfLines={1}>
                         {ex?.nome ?? r.exId}
                       </Tx>
-                      <Tx v="small" cor={color.tintaFraca}>
+                      <Tx v="small" cor={c.tintaFraca}>
                         {RECORDE_TEXTO[r.tipo]} {fmtNumero(Math.round(r.anterior))} kg
                       </Tx>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Tx v="numero" tab cor={color.vermelho}>
+                      <Tx v="numero" tab cor={c.vermelho}>
                         {fmtNumero(Math.round(r.valor))} kg
                       </Tx>
                       {ganho > 0 ? (
-                        <Tx v="small" tab cor={color.tintaFraca}>
+                        <Tx v="small" tab cor={c.tintaFraca}>
                           +{ganho}
                         </Tx>
                       ) : null}
@@ -336,7 +339,7 @@ export default function RelatorioSessao() {
         {/* Estreias: sem carimbo, porque não houve o que superar ainda. */}
         {estreias.length > 0 ? (
           <Entrada atraso={t(950)}>
-            <Tx v="small" cor={color.tintaFraca} style={estilos.estreias}>
+            <Tx v="small" cor={c.tintaFraca} style={estilos.estreias}>
               {estreias.length === 1
                 ? '1 exercício estreando — o próximo treino já compara.'
                 : `${estreias.length} exercícios estreando — o próximo treino já compara.`}
@@ -348,7 +351,7 @@ export default function RelatorioSessao() {
         {musculos.length > 0 ? (
           <Secao
             titulo="Músculos trabalhados"
-            direita={<Rotulo cor={color.tintaFraca}>Séries efetivas</Rotulo>}
+            direita={<Rotulo cor={c.tintaFraca}>Séries efetivas</Rotulo>}
           >
             {/* A prancha primeiro: dá a leitura imediata de onde o treino pegou. */}
             <View style={estilos.prancha}>
@@ -370,12 +373,12 @@ export default function RelatorioSessao() {
                       altura={12}
                       // Densidade de tinta, não matiz: o grupo mais trabalhado é
                       // o mais cheio, não o de outra cor.
-                      cor={i === 0 ? color.azul : color.reguaForte}
+                      cor={i === 0 ? c.azul : c.reguaForte}
                     />
                     <Tx
                       v="numero"
                       tab
-                      cor={i === 0 ? color.tinta : color.tintaMid}
+                      cor={i === 0 ? c.tinta : c.tintaMid}
                       style={estilos.valorMusculo}
                     >
                       {m.series % 1 === 0 ? m.series : m.series.toFixed(1).replace('.', ',')}
@@ -385,7 +388,7 @@ export default function RelatorioSessao() {
               })}
             </View>
 
-            <Tx v="small" cor={color.tintaFraca} style={estilos.rodapeNota}>
+            <Tx v="small" cor={c.tintaFraca} style={estilos.rodapeNota}>
               O grupo principal de cada exercício conta série cheia; os assistentes contam 0,4.
             </Tx>
           </Secao>
@@ -401,10 +404,10 @@ export default function RelatorioSessao() {
                 <Pressavel
                   onPress={() => router.push(`/exercicio/${e.exId}`)}
                   escala={0.995}
-                  fundoPressionado={color.papelBaixo}
+                  fundoPressionado={c.fundoBaixo}
                   style={estilos.cabecalhoEx}
                 >
-                  <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+                  <Tx v="numero" tab cor={c.tintaFantasma} style={{ width: margem.calha }}>
                     {i + 1}
                   </Tx>
                   <Miniatura ex={ex} tamanho={34} />
@@ -412,14 +415,14 @@ export default function RelatorioSessao() {
                     <Tx v="bodyMed" numberOfLines={1}>
                       {ex?.nome ?? e.exId}
                     </Tx>
-                    <Tx v="small" cor={color.tintaFraca}>
+                    <Tx v="small" cor={c.tintaFraca}>
                       {e.series.length} séries · {fmtVolume(volumeExercicio(e))}
                     </Tx>
                   </View>
                 </Pressavel>
 
                 {e.nota ? (
-                  <Tx v="small" cor={color.azul} style={estilos.nota}>
+                  <Tx v="small" cor={c.azul} style={estilos.nota}>
                     {e.nota}
                   </Tx>
                 ) : null}
@@ -433,21 +436,21 @@ export default function RelatorioSessao() {
                         <Tx
                           v="small"
                           tab
-                          cor={color.tintaFraca}
+                          cor={c.tintaFraca}
                           style={{ width: margem.calha }}
                         >
                           {aquecimento ? `(${idx + 1})` : idx + 1}
                         </Tx>
-                        <Tx v="numero" tab cor={color.azul} style={{ width: 74 }}>
+                        <Tx v="numero" tab cor={c.azul} style={{ width: 74 }}>
                           {fmtNumero(s.peso) || '—'}
-                          <Tx v="small" cor={color.tintaFraca}>
+                          <Tx v="small" cor={c.tintaFraca}>
                             {' '}
                             {rotulos.a.toLowerCase()}
                           </Tx>
                         </Tx>
-                        <Tx v="numero" tab cor={color.azul} style={{ flex: 1 }}>
+                        <Tx v="numero" tab cor={c.azul} style={{ flex: 1 }}>
                           {fmtNumero(s.reps) || '—'}
-                          <Tx v="small" cor={color.tintaFraca}>
+                          <Tx v="small" cor={c.tintaFraca}>
                             {' '}
                             {rotulos.b.toLowerCase()}
                           </Tx>
@@ -475,7 +478,7 @@ export default function RelatorioSessao() {
       </View>
 
       <Entrada atraso={t(1350)} style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>
-        <Regua peso="forte" cor={color.tinta} />
+        <Regua peso="forte" cor={c.tinta} />
         <View style={estilos.rodapeCorpo}>
           <Botao
             titulo="Compartilhar"
@@ -531,7 +534,7 @@ function Total({
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -561,9 +564,9 @@ const estilos = StyleSheet.create({
   },
   calhaRec: { width: 6, alignItems: 'flex-start' },
   // Marca de correção do professor: um traço vermelho na margem da linha.
-  marcaRec: { width: 3, height: 26, backgroundColor: color.vermelho },
+  marcaRec: { width: 3, height: 26, backgroundColor: c.vermelho },
   estreias: { paddingHorizontal: margem.pagina, paddingTop: sp.lg },
-  prancha: { paddingVertical: sp.xxl, backgroundColor: color.papelAlto },
+  prancha: { paddingVertical: sp.xxl, backgroundColor: c.fundoAlto },
   blocoMusculos: { paddingHorizontal: margem.pagina, paddingTop: sp.lg, gap: sp.md },
   linhaMusculo: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
   rotuloMusculo: { width: 84 },
@@ -581,9 +584,9 @@ const estilos = StyleSheet.create({
     marginHorizontal: margem.pagina,
     paddingHorizontal: sp.md,
     paddingVertical: sp.sm,
-    backgroundColor: color.papelAlto,
+    backgroundColor: c.fundoAlto,
     borderLeftWidth: 2,
-    borderLeftColor: color.azulLinha,
+    borderLeftColor: c.azulLinha,
   },
   tabela: { paddingHorizontal: margem.pagina, paddingBottom: sp.md },
   linhaSerie: {
@@ -592,7 +595,7 @@ const estilos = StyleSheet.create({
     gap: sp.sm,
     height: 30,
     borderBottomWidth: traco.fina,
-    borderBottomColor: color.regua,
+    borderBottomColor: c.regua,
   },
   fora: { position: 'absolute', left: -10000, top: 0 },
   rodape: {
@@ -600,7 +603,7 @@ const estilos = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: color.papel,
+    backgroundColor: c.fundo,
   },
   rodapeCorpo: {
     flexDirection: 'row',
@@ -608,4 +611,4 @@ const estilos = StyleSheet.create({
     paddingHorizontal: margem.pagina,
     paddingTop: sp.md,
   },
-});
+}));

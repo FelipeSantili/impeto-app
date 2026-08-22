@@ -18,12 +18,11 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AvisoAtualizacao } from '@/components/aviso-atualizacao';
 import { Folhas } from '@/components/folha';
-import { color } from '@/design/tokens';
+import { TemaProvider, usarPaleta } from '@/design/tema';
 import { useVerificarAtualizacao } from '@/lib/atualizacao';
 import { useTreino } from '@/store/treino';
 
 SplashScreen.preventAutoHideAsync();
-SystemUI.setBackgroundColorAsync(color.papel);
 
 export default function RootLayout() {
   const [fontesProntas] = useFonts({
@@ -38,22 +37,51 @@ export default function RootLayout() {
   const hidratado = useTreino((s) => s.hidratado);
   useVerificarAtualizacao();
 
-  // Só liberamos a splash quando fontes e dados salvos estão prontos — evita o
-  // primeiro quadro com tipografia trocada ou lista de rotinas vazia.
-  useEffect(() => {
-    if (fontesProntas && hidratado) SplashScreen.hideAsync();
-  }, [fontesProntas, hidratado]);
+  const pronto = fontesProntas && hidratado;
 
-  if (!fontesProntas || !hidratado) return null;
+  // Só liberamos a splash quando fontes, tema e dados salvos estão prontos —
+  // evita o primeiro quadro com tipografia trocada ou lista de rotinas vazia.
+  useEffect(() => {
+    if (pronto) SplashScreen.hideAsync();
+  }, [pronto]);
+
+  if (!pronto) return null;
 
   return (
     <SafeAreaProvider>
-      {/* Papel claro: os ícones da barra de status precisam ser escuros. */}
-      <StatusBar style="dark" />
+      <TemaProvider>
+        <Moldura />
+      </TemaProvider>
+    </SafeAreaProvider>
+  );
+}
+
+/**
+ * Tudo que depende do tema.
+ *
+ * Vive abaixo do TemaProvider e do portão de hidratação. O layout raiz não lê
+ * a paleta: ele só segura a splash. Quem pinta é este.
+ */
+function Moldura() {
+  const c = usarPaleta();
+
+  /*
+   * Fundo do sistema: é o que o Android pinta atrás da janela durante rotações
+   * e transições. Fixo no claro, apareceria uma faixa branca piscando no tema
+   * escuro.
+   */
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(c.fundo);
+  }, [c]);
+
+  return (
+    <>
+      {/* Ícones da barra de status ao contrário do fundo. */}
+      <StatusBar style={c.barraStatus} />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: color.papel },
+          contentStyle: { backgroundColor: c.fundo },
           animation: 'slide_from_right',
         }}
       >
@@ -72,6 +100,6 @@ export default function RootLayout() {
       </Stack>
       <AvisoAtualizacao />
       <Folhas />
-    </SafeAreaProvider>
+    </>
   );
 }

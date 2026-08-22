@@ -1,10 +1,11 @@
 import type { RefObject } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Regua, Rotulo, Tx } from '@/components/base';
 import { Glifo } from '@/components/glifos';
 import { MapaMuscular } from '@/components/mapa-muscular';
 import { GRUPO_LABEL } from '@/data/types';
-import { color, sp, traco } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { sp, traco } from '@/design/tokens';
 import {
   duracaoMs,
   fmtDataAbs,
@@ -36,44 +37,46 @@ export function CartaoCompartilhar({
   sessao: Sessao;
   refCaptura: RefObject<View | null>;
 }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const musculos = musculosDaSessao(sessao);
   const principais = musculos.slice(0, 3).map((m) => GRUPO_LABEL[m.grupo]);
 
   return (
     <View ref={refCaptura} collapsable={false} style={estilos.cartao}>
       <View style={estilos.topo}>
-        <Glifo nome="raio" tamanho={16} cor={color.tinta} />
-        <Rotulo cor={color.tinta} style={estilos.marca}>
+        <Glifo nome="raio" tamanho={16} cor={c.tinta} />
+        <Rotulo cor={c.tinta} style={estilos.marca}>
           Ímpeto
         </Rotulo>
         <View style={{ flex: 1 }} />
-        <Rotulo cor={color.tintaFraca}>{fmtDataAbs(sessao.fim ?? sessao.inicio)}</Rotulo>
+        <Rotulo cor={c.tintaFraca}>{fmtDataAbs(sessao.fim ?? sessao.inicio)}</Rotulo>
       </View>
-      <Regua peso="forte" cor={color.tinta} />
+      <Regua peso="forte" cor={c.tinta} />
 
       <View style={{ paddingTop: sp.xl }}>
         <Tx v="display" numberOfLines={2}>
           {sessao.nome}
         </Tx>
         {principais.length ? (
-          <Tx v="small" cor={color.tintaFraca} style={{ marginTop: 2 }}>
+          <Tx v="small" cor={c.tintaFraca} style={{ marginTop: 2 }}>
             {principais.join(' · ')}
           </Tx>
         ) : null}
       </View>
 
       <View style={estilos.colunas}>
-        <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+        <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
           Tempo
         </Rotulo>
-        <Rotulo cor={color.tintaMid} style={{ flex: 1.2 }}>
+        <Rotulo cor={c.tintaMid} style={{ flex: 1.2 }}>
           Volume
         </Rotulo>
-        <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+        <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
           Séries
         </Rotulo>
       </View>
-      <Regua peso="normal" cor={color.reguaMid} />
+      <Regua peso="normal" cor={c.reguaMid} />
       {/*
         `numberOfLines` + `adjustsFontSizeToFit`: o cartão vira imagem e uma
         quebra de linha aqui desmonta a composição inteira. Duração longa
@@ -101,29 +104,29 @@ export function CartaoCompartilhar({
       <View style={estilos.rodape}>
         {sessao.cardio ? (
           <View style={estilos.cardio}>
-            <Glifo nome="coracao" tamanho={11} cor={color.vermelho} />
-            <Tx v="small" tab cor={color.tintaMid}>
+            <Glifo nome="coracao" tamanho={11} cor={c.vermelho} />
+            <Tx v="small" tab cor={c.tintaMid}>
               {sessao.cardio.media} bpm médio · {sessao.cardio.maxima} máx
             </Tx>
           </View>
         ) : (
           <View style={{ flex: 1 }} />
         )}
-        <Rotulo cor={color.tintaFraca}>{sessao.exercicios.length} exercícios</Rotulo>
+        <Rotulo cor={c.tintaFraca}>{sessao.exercicios.length} exercícios</Rotulo>
       </View>
     </View>
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   cartao: {
     width: 380,
-    backgroundColor: color.papel,
+    backgroundColor: c.fundo,
     paddingHorizontal: MARGEM,
     paddingTop: MARGEM,
     paddingBottom: sp.xl,
     borderWidth: traco.normal,
-    borderColor: color.papelBorda,
+    borderColor: c.fundoBorda,
   },
   topo: { flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingBottom: sp.sm },
   marca: { fontSize: 14, letterSpacing: 3.4 },
@@ -137,4 +140,4 @@ const estilos = StyleSheet.create({
     paddingTop: sp.md,
   },
   cardio: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
-});
+}));

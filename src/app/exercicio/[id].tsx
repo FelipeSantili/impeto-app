@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import {
   BotaoGlifo,
   Cabecalho,
@@ -17,7 +17,8 @@ import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
 import { familias } from '@/data/familias';
 import { EQUIP_LABEL, GRUPO_LABEL, MEDIDA_LABEL } from '@/data/types';
-import { color, margem, radius, sp } from '@/design/tokens';
+import { criarEstilos, usarPaleta } from '@/design/tema';
+import { margem, radius, sp } from '@/design/tokens';
 import { fmtData, fmtNumero, historicoDoExercicio, recordesDoExercicio } from '@/lib/metricas';
 import { useTreino } from '@/store/treino';
 
@@ -30,6 +31,8 @@ import { useTreino } from '@/store/treino';
  * é um procedimento, e procedimento se lê numerado.
  */
 export default function DetalheExercicio() {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   const { id } = useLocalSearchParams<{ id: string }>();
   const ex = POR_ID[id ?? ''];
   const historico = useTreino((s) => s.historico);
@@ -69,8 +72,8 @@ export default function DetalheExercicio() {
               accessibilityLabel="Adicionar ao treino"
               style={estilos.addTreino}
             >
-              <Glifo nome="mais" tamanho={14} cor={color.azulTexto} />
-              <Rotulo cor={color.azulTexto}>Adicionar</Rotulo>
+              <Glifo nome="mais" tamanho={14} cor={c.azulTexto} />
+              <Rotulo cor={c.azulTexto}>Adicionar</Rotulo>
             </Pressavel>
           ) : undefined
         }
@@ -83,12 +86,12 @@ export default function DetalheExercicio() {
         <Tx v="display" style={{ marginTop: sp.xl }}>
           {ex.nome}
         </Tx>
-        <Rotulo cor={color.tintaMid} style={{ marginTop: sp.sm }}>
+        <Rotulo cor={c.tintaMid} style={{ marginTop: sp.sm }}>
           {ficha}
         </Rotulo>
 
         {ex.aux?.length ? (
-          <Tx v="small" cor={color.tintaFraca} style={{ marginTop: sp.sm }}>
+          <Tx v="small" cor={c.tintaFraca} style={{ marginTop: sp.sm }}>
             Também trabalha {ex.aux.map((g) => GRUPO_LABEL[g].toLowerCase()).join(', ')}.
           </Tx>
         ) : null}
@@ -100,10 +103,10 @@ export default function DetalheExercicio() {
           {familia.passos.map((p, i) => (
             <View key={i}>
               <View style={estilos.passo}>
-                <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+                <Tx v="numero" tab cor={c.tintaFantasma} style={{ width: margem.calha }}>
                   {i + 1}
                 </Tx>
-                <Tx v="body" cor={color.tintaMid} style={{ flex: 1 }}>
+                <Tx v="body" cor={c.tintaMid} style={{ flex: 1 }}>
                   {p}
                 </Tx>
               </View>
@@ -112,8 +115,8 @@ export default function DetalheExercicio() {
           ))}
 
           <View style={estilos.aviso}>
-            <Glifo nome="alerta" tamanho={15} cor={color.vermelho} />
-            <Tx v="small" cor={color.tintaMid} style={{ flex: 1 }}>
+            <Glifo nome="alerta" tamanho={15} cor={c.vermelho} />
+            <Tx v="small" cor={c.tintaMid} style={{ flex: 1 }}>
               {familia.erro}
             </Tx>
           </View>
@@ -140,16 +143,16 @@ export default function DetalheExercicio() {
       {/* Histórico */}
       <Secao titulo="Histórico">
         {registros.length === 0 ? (
-          <Tx v="small" cor={color.tintaFraca} style={estilos.semHistorico}>
+          <Tx v="small" cor={c.tintaFraca} style={estilos.semHistorico}>
             Você ainda não registrou este exercício.
           </Tx>
         ) : (
           <>
             <CabecaColuna>
-              <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+              <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
                 Data
               </Rotulo>
-              <Rotulo cor={color.tintaMid} style={{ width: 110, textAlign: 'right' }}>
+              <Rotulo cor={c.tintaMid} style={{ width: 110, textAlign: 'right' }}>
                 Séries
               </Rotulo>
             </CabecaColuna>
@@ -158,23 +161,23 @@ export default function DetalheExercicio() {
                 <Pressavel
                   onPress={() => router.push(`/sessao/${r.sessaoId}`)}
                   escala={0.995}
-                  fundoPressionado={color.papelBaixo}
+                  fundoPressionado={c.fundoBaixo}
                   style={estilos.registro}
                 >
                   <View style={{ flex: 1 }}>
                     <Tx v="smallMed">{fmtData(r.data)}</Tx>
-                    <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+                    <Tx v="small" cor={c.tintaFraca} numberOfLines={1}>
                       {r.nomeSessao}
                     </Tx>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     {r.series.slice(0, 4).map((s) => (
-                      <Tx key={s.id} v="small" tab cor={color.azul}>
+                      <Tx key={s.id} v="small" tab cor={c.azul}>
                         {fmtNumero(s.peso)} × {fmtNumero(s.reps)}
                       </Tx>
                     ))}
                     {r.series.length > 4 ? (
-                      <Rotulo cor={color.tintaFantasma}>+{r.series.length - 4}</Rotulo>
+                      <Rotulo cor={c.tintaFantasma}>+{r.series.length - 4}</Rotulo>
                     ) : null}
                   </View>
                 </Pressavel>
@@ -190,13 +193,15 @@ export default function DetalheExercicio() {
 
 /** Linha de marca pessoal: rótulo à esquerda, valor tabular à direita. */
 function Marca({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: string }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
   return (
     <View>
       <View style={estilos.marca}>
         <View style={{ flex: 1 }}>
           <Tx v="bodyMed">{rotulo}</Tx>
           {nota ? (
-            <Tx v="small" cor={color.tintaFraca}>
+            <Tx v="small" cor={c.tintaFraca}>
               {nota}
             </Tx>
           ) : null}
@@ -210,7 +215,7 @@ function Marca({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: 
   );
 }
 
-const estilos = StyleSheet.create({
+const usarEstilos = criarEstilos((c) => ({
   demo: {
     width: '100%',
     aspectRatio: 1.28,
@@ -222,7 +227,7 @@ const estilos = StyleSheet.create({
     gap: 5,
     height: 34,
     paddingHorizontal: sp.md,
-    backgroundColor: color.azul,
+    backgroundColor: c.azul,
     borderRadius: radius.sm,
   },
   passo: {
@@ -238,9 +243,9 @@ const estilos = StyleSheet.create({
     marginTop: sp.lg,
     marginHorizontal: margem.pagina,
     padding: sp.md,
-    backgroundColor: color.vermelhoSuave,
+    backgroundColor: c.vermelhoSuave,
     borderLeftWidth: 2,
-    borderLeftColor: color.vermelho,
+    borderLeftColor: c.vermelho,
   },
   marca: {
     flexDirection: 'row',
@@ -257,4 +262,4 @@ const estilos = StyleSheet.create({
     paddingHorizontal: margem.pagina,
   },
   semHistorico: { paddingTop: sp.lg, paddingHorizontal: margem.pagina },
-});
+}));
