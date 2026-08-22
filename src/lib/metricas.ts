@@ -317,22 +317,37 @@ export function fmtDuracao(ms: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/**
+ * Duração compacta: `45min`, `1h05`, `2h`.
+ *
+ * A forma antiga era `1h 5min` — sete caracteres com espaço, que quebravam em
+ * duas linhas nas colunas de total, onde o número é grande. `1h05` é como
+ * duração se escreve em placar e cabe em qualquer coluna.
+ */
 export function fmtDuracaoCurta(ms: number): string {
   const min = Math.round(ms / 60000);
   if (min < 60) return `${min}min`;
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return m ? `${h}h ${m}min` : `${h}h`;
+  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
 }
 
 export function fmtVolume(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(kg >= 10000 ? 0 : 1)}t`;
-  return `${Math.round(kg)}kg`;
+  // Vírgula decimal e espaço antes da unidade: é como se escreve peso em
+  // português, e o app inteiro exibe número em fonte tabular, onde "1.6t"
+  // aparece com o ponto na altura errada e lê como separador de milhar.
+  if (kg >= 1000) {
+    const t = (kg / 1000).toFixed(kg >= 10000 ? 0 : 1);
+    return `${t.replace('.', ',')} t`;
+  }
+  return `${Math.round(kg)} kg`;
 }
 
 export function fmtNumero(n: number | null): string {
   if (n === null || Number.isNaN(n)) return '';
-  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
+  if (Number.isInteger(n)) return String(n);
+  // 82,5 kg — a carga fracionada mais comum na academia.
+  return String(Number(n.toFixed(2))).replace('.', ',');
 }
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -347,6 +362,17 @@ export function fmtData(t: number): string {
   if (mesmoDia(d, ontem)) return 'Ontem';
   const ano = d.getFullYear() !== hoje.getFullYear() ? ` ${d.getFullYear()}` : '';
   return `${d.getDate()} ${MESES[d.getMonth()]}${ano}`;
+}
+
+/**
+ * Data absoluta, sempre com dia, mês e ano.
+ *
+ * O cartão de compartilhar precisa disto: "Hoje" só significa alguma coisa
+ * dentro do app, e a imagem sai dele.
+ */
+export function fmtDataAbs(t: number): string {
+  const d = new Date(t);
+  return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function fmtHora(t: number): string {

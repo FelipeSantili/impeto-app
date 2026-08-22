@@ -1,10 +1,15 @@
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  useFonts,
-} from '@expo-google-fonts/inter';
+  Archivo_400Regular,
+  Archivo_500Medium,
+  Archivo_600SemiBold,
+  Archivo_700Bold,
+} from '@expo-google-fonts/archivo';
+import {
+  BarlowCondensed_500Medium,
+  BarlowCondensed_600SemiBold,
+  BarlowCondensed_700Bold,
+} from '@expo-google-fonts/barlow-condensed';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -18,14 +23,17 @@ import { useVerificarAtualizacao } from '@/lib/atualizacao';
 import { useTreino } from '@/store/treino';
 
 SplashScreen.preventAutoHideAsync();
-SystemUI.setBackgroundColorAsync(color.bg);
+SystemUI.setBackgroundColorAsync(color.papel);
 
 export default function RootLayout() {
   const [fontesProntas] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+    Archivo_400Regular,
+    Archivo_500Medium,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
+    BarlowCondensed_500Medium,
+    BarlowCondensed_600SemiBold,
+    BarlowCondensed_700Bold,
   });
   const hidratado = useTreino((s) => s.hidratado);
   useVerificarAtualizacao();
@@ -40,11 +48,12 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
+      {/* Papel claro: os ícones da barra de status precisam ser escuros. */}
+      <StatusBar style="dark" />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: color.bg },
+          contentStyle: { backgroundColor: color.papel },
           animation: 'slide_from_right',
         }}
       >

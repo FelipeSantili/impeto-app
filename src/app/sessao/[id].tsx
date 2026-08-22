@@ -1,21 +1,30 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BarraAnimada, Contador, EntradaCartao, SeloConcluido } from '@/components/animado';
-import { Botao, BotaoIcone, Rotulo, Tx, Vazio } from '@/components/base';
+import { BarraAnimada, CarimboConcluido, Contador, Entrada } from '@/components/animado';
+import {
+  Botao,
+  BotaoGlifo,
+  CabecaColuna,
+  Carimbo,
+  Pressavel,
+  Regua,
+  Rotulo,
+  Secao,
+  Tx,
+  Vazio,
+} from '@/components/base';
 import { CartaoCompartilhar } from '@/components/cartao-compartilhar';
-import { Brilho } from '@/components/decor';
 import { Miniatura } from '@/components/demo';
-import { MapaMuscular } from '@/components/mapa-muscular';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
+import { Glifo } from '@/components/glifos';
+import { MapaMuscular } from '@/components/mapa-muscular';
 import { POR_ID } from '@/data/exercicios';
 import { tecnicaDe } from '@/data/tecnicas';
 import { GRUPO_LABEL, MEDIDA_LABEL } from '@/data/types';
-import { color, radius, shadow, sp } from '@/design/tokens';
+import { color, margem, sp, traco } from '@/design/tokens';
+import { compartilharView } from '@/lib/compartilhar';
 import {
   conquistasDaSessao,
   duracaoMs,
@@ -29,23 +38,27 @@ import {
   volumeSessao,
   type Recorde,
 } from '@/lib/metricas';
-import { compartilharView } from '@/lib/compartilhar';
 import { lerCardio } from '@/lib/saude';
 import { useTreino } from '@/store/treino';
 
 // O recorde de força é medido em 1RM estimado, não em peso levantado de fato —
 // o rótulo precisa deixar isso explícito para o número não enganar.
 const RECORDE_TEXTO: Record<Recorde['tipo'], string> = {
-  carga: 'Nova carga máxima · antes',
-  forca: 'Melhor série · 1RM est. antes',
+  carga: 'Antes',
+  forca: '1RM est. antes',
 };
 
 /**
- * Relatório de treino.
+ * Relatório de treino — a página fechada e carimbada.
  *
- * Com `?novo=1` (logo após concluir) entra no modo comemorativo: selo animado,
- * números que sobem e barras que preenchem. Aberto pelo histórico, mostra o
- * mesmo conteúdo sem a encenação.
+ * Com `?novo=1` (logo após concluir) entra no modo comemorativo: o carimbo
+ * desce sobre o papel e os totais sobem de zero. Aberto pelo histórico, mostra
+ * exatamente o mesmo conteúdo, sem a encenação.
+ *
+ * O relatório inteiro perdeu as caixas. Antes eram seis cartões empilhados —
+ * métricas, cardio, recordes, estreias, corpo, músculos —, cada um com borda e
+ * canto de 22px. Agora é uma sequência de seções separadas por régua, que é
+ * como um registro é lido: de cima para baixo, sem recipientes.
  */
 export default function RelatorioSessao() {
   const insets = useSafeAreaInsets();
@@ -67,11 +80,6 @@ export default function RelatorioSessao() {
     () => (sessao ? conquistasDaSessao(historico, sessao) : { recordes: [], estreias: [] }),
     [historico, sessao],
   );
-
-  // Uma vibração de vitória ao abrir o relatório de um treino recém-concluído.
-  useEffect(() => {
-    if (festa && sessao) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [festa, sessao]);
 
   // Sem cinta, tentamos o Health Connect: o Mi Fitness pode ter sincronizado a
   // frequência do relógio para a janela deste treino.
@@ -114,11 +122,11 @@ export default function RelatorioSessao() {
 
   if (!sessao) {
     return (
-      <View style={{ flex: 1, backgroundColor: color.bg, paddingTop: insets.top + sp.sm }}>
+      <View style={{ flex: 1, backgroundColor: color.papel, paddingTop: insets.top + sp.sm }}>
         <View style={estilos.topo}>
-          <BotaoIcone icone="chevron-back" onPress={sair} />
+          <BotaoGlifo glifo="voltar" acessivel="Voltar" onPress={sair} />
         </View>
-        <Vazio icone="alert-circle-outline" titulo="Treino não encontrado" />
+        <Vazio titulo="Treino não encontrado" />
       </View>
     );
   }
@@ -126,6 +134,7 @@ export default function RelatorioSessao() {
   const volume = volumeSessao(sessao);
   const series = seriesFeitas(sessao);
   const minutos = Math.round(duracaoMs(sessao) / 60000);
+  const emToneladas = volume >= 1000;
 
   function menu() {
     abrirMenu({
@@ -133,7 +142,7 @@ export default function RelatorioSessao() {
       opcoes: [
         {
           texto: 'Salvar como rotina',
-          icone: 'bookmark-outline',
+          glifo: 'lista',
           onPress: () =>
             salvarRotina(
               sessao!.nome,
@@ -146,7 +155,7 @@ export default function RelatorioSessao() {
         },
         {
           texto: 'Apagar treino',
-          icone: 'trash-outline',
+          glifo: 'lixo',
           destrutiva: true,
           onPress: () =>
             abrirConfirmacao({
@@ -164,256 +173,297 @@ export default function RelatorioSessao() {
     });
   }
 
+  /** Atrasos da encenação. Fora da festa tudo entra imediatamente. */
+  const t = (ms: number) => (festa ? ms : 0);
+
   return (
-    <View style={{ flex: 1, backgroundColor: color.bg }}>
-      <View style={[estilos.topo, { paddingTop: insets.top + sp.sm }]}>
-        <BotaoIcone icone={festa ? 'close' : 'chevron-back'} onPress={sair} />
+    <View style={{ flex: 1, backgroundColor: color.papel }}>
+      <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
+        <BotaoGlifo glifo={festa ? 'fechar' : 'voltar'} acessivel="Voltar" onPress={sair} />
         <View style={{ flex: 1 }} />
-        <BotaoIcone icone="ellipsis-horizontal" onPress={menu} />
+        <BotaoGlifo glifo="reticencias" acessivel="Opções" onPress={menu} />
       </View>
 
       <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: sp.xl,
-          paddingBottom: insets.bottom + (festa ? 110 : sp.h2),
-        }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Herói */}
-        <View style={estilos.heroi}>
-          <Brilho tamanho={400} intensidade={festa ? 0.16 : 0.09} style={{ top: -120 }} />
-          {festa ? (
-            <>
-              <SeloConcluido />
-              <Animated.View entering={FadeInDown.delay(760).duration(420)}>
-                <Tx v="display" center style={{ marginTop: sp.lg }}>
-                  Treino feito
-                </Tx>
-              </Animated.View>
-            </>
-          ) : (
-            <Tx v="caption" cor={color.textFaint}>
-              {fmtData(sessao.fim ?? sessao.inicio).toUpperCase()} · {fmtHora(sessao.inicio)}
-            </Tx>
-          )}
-          <Animated.View entering={FadeIn.delay(festa ? 900 : 0).duration(400)}>
-            <Tx v={festa ? 'body' : 'title'} cor={festa ? color.textFaint : color.text} center style={{ marginTop: festa ? sp.xs : sp.sm }}>
+        {/*
+          O carimbo. É o único gesto expressivo do app e acontece uma vez por
+          treino — a faixa "raro" do orçamento de deleite. Fora da festa ele
+          não aparece: o histórico não precisa ser comemorado toda vez.
+        */}
+        {festa ? (
+          <View style={estilos.selo}>
+            <CarimboConcluido
+              texto="Concluído"
+              detalhe={fmtData(sessao.fim ?? sessao.inicio)}
+              atraso={200}
+            />
+          </View>
+        ) : null}
+
+        <Entrada atraso={t(520)}>
+          <View style={estilos.cabecalho}>
+            <Tx v="display" numberOfLines={2}>
               {sessao.nome}
             </Tx>
-          </Animated.View>
-        </View>
-
-        {/* Métricas */}
-        <EntradaCartao atraso={festa ? 950 : 0}>
-          <View style={estilos.metricas}>
-            <Metrica
-              rotulo="Duração"
-              valor={minutos}
-              sufixo="min"
-              anima={festa}
-              atraso={1050}
-            />
-            <View style={estilos.sep} />
-            <Metrica
-              rotulo="Volume"
-              valor={volume >= 1000 ? volume / 1000 : volume}
-              sufixo={volume >= 1000 ? 't' : 'kg'}
-              casas={volume >= 1000 ? 1 : 0}
-              anima={festa}
-              atraso={1150}
-            />
-            <View style={estilos.sep} />
-            <Metrica rotulo="Séries" valor={series} anima={festa} atraso={1250} />
+            <Rotulo cor={color.tintaFraca} style={{ marginTop: sp.xs }}>
+              {fmtData(sessao.fim ?? sessao.inicio)} · {fmtHora(sessao.inicio)}
+            </Rotulo>
           </View>
-        </EntradaCartao>
+        </Entrada>
+
+        {/* Totais: cabeça de coluna e uma linha de valores. Sem caixa. */}
+        <CabecaColuna>
+          <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+            Tempo
+          </Rotulo>
+          <Rotulo cor={color.tintaMid} style={{ flex: 1.2 }}>
+            Volume
+          </Rotulo>
+          <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+            Séries
+          </Rotulo>
+        </CabecaColuna>
+        <View style={estilos.totais}>
+          <Total
+            valor={minutos}
+            sufixo=" min"
+            anima={festa}
+            atraso={620}
+            style={{ flex: 1 }}
+          />
+          <Total
+            valor={emToneladas ? volume / 1000 : volume}
+            casas={emToneladas ? 1 : 0}
+            sufixo={emToneladas ? ' t' : ' kg'}
+            anima={festa}
+            atraso={700}
+            style={{ flex: 1.2 }}
+          />
+          <Total valor={series} anima={festa} atraso={780} style={{ flex: 1 }} />
+        </View>
+        <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
 
         {/* Frequência cardíaca — da cinta ou do relógio via Health Connect */}
         {sessao.cardio ? (
-          <EntradaCartao atraso={festa ? 1300 : 40}>
-            <View style={estilos.cardio}>
-              <View style={estilos.iconeCardio}>
-                <Ionicons name="heart" size={15} color={color.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Tx v="caption" cor={color.textFaint}>
-                  {sessao.cardio.fonte === 'cinta' ? 'CINTA CARDÍACA' : 'DO SEU RELÓGIO'}
+          <Entrada atraso={t(850)}>
+            <Secao
+              titulo="Frequência cardíaca"
+              espaco={sp.xxl}
+              direita={
+                <Rotulo cor={color.tintaFraca}>
+                  {sessao.cardio.fonte === 'cinta' ? 'Cinta' : 'Do relógio'}
+                </Rotulo>
+              }
+            >
+              <View style={estilos.cardio}>
+                <Glifo nome="coracao" tamanho={15} cor={color.vermelho} />
+                <Tx v="numero" tab>
+                  {sessao.cardio.media}
+                  <Tx v="small" cor={color.tintaFraca}>
+                    {' '}
+                    bpm médio
+                  </Tx>
+                  {'   '}
+                  {sessao.cardio.maxima}
+                  <Tx v="small" cor={color.tintaFraca}>
+                    {' '}
+                    máx
+                  </Tx>
+                  {sessao.cardio.calorias ? (
+                    <>
+                      {'   '}
+                      {sessao.cardio.calorias}
+                      <Tx v="small" cor={color.tintaFraca}>
+                        {' '}
+                        kcal
+                      </Tx>
+                    </>
+                  ) : null}
                 </Tx>
-                <Tx v="bodyMed" tab style={{ marginTop: 2 }}>
-                  {sessao.cardio.media} bpm médio · {sessao.cardio.maxima} máx
-                  {sessao.cardio.calorias ? ` · ${sessao.cardio.calorias} kcal` : ''}
-                </Tx>
               </View>
-            </View>
-          </EntradaCartao>
+            </Secao>
+          </Entrada>
         ) : null}
 
-        {/* Recordes de verdade — marcas superadas */}
+        {/* Recordes — marcas superadas, carimbadas em vermelho na calha. */}
         {recordes.length > 0 ? (
-          <EntradaCartao atraso={festa ? 1350 : 60}>
-            <View style={estilos.recordes}>
-              <View style={estilos.cabecalhoRec}>
-                <Ionicons name="trophy" size={14} color={color.accent} />
-                <Rotulo cor={color.accent}>
-                  {recordes.length === 1 ? '1 recorde' : `${recordes.length} recordes`}
-                </Rotulo>
-              </View>
-              {recordes.map((r, i) => {
-                const ex = POR_ID[r.exId];
-                const ganho = Math.round(r.valor - r.anterior);
-                return (
-                  <Animated.View
-                    key={`${r.exId}-${r.tipo}`}
-                    entering={FadeInDown.delay((festa ? 1450 : 120) + i * 90).duration(320)}
-                    style={estilos.linhaRec}
-                  >
+          <Secao
+            titulo="Recordes"
+            espaco={sp.xxl}
+            direita={
+              <Carimbo texto={recordes.length === 1 ? '1 novo' : `${recordes.length} novos`} />
+            }
+          >
+            {recordes.map((r, i) => {
+              const ex = POR_ID[r.exId];
+              const ganho = Math.round(r.valor - r.anterior);
+              return (
+                <Entrada key={`${r.exId}-${r.tipo}`} atraso={t(900) + i * 80}>
+                  <View style={estilos.linhaRec}>
+                    <View style={estilos.calhaRec}>
+                      <View style={estilos.marcaRec} />
+                    </View>
                     <Miniatura ex={ex} tamanho={32} />
                     <View style={{ flex: 1, gap: 1 }}>
                       <Tx v="smallMed" numberOfLines={1}>
                         {ex?.nome ?? r.exId}
                       </Tx>
-                      <Tx v="caption" cor={color.textFaint} style={{ textTransform: 'none' }}>
+                      <Tx v="small" cor={color.tintaFraca}>
                         {RECORDE_TEXTO[r.tipo]} {fmtNumero(Math.round(r.anterior))} kg
                       </Tx>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Tx v="bodyMed" tab cor={color.accent}>
+                      <Tx v="numero" tab cor={color.vermelho}>
                         {fmtNumero(Math.round(r.valor))} kg
                       </Tx>
                       {ganho > 0 ? (
-                        <Tx v="caption" cor={color.textFaint} tab>
+                        <Tx v="small" tab cor={color.tintaFraca}>
                           +{ganho}
                         </Tx>
                       ) : null}
                     </View>
-                  </Animated.View>
-                );
-              })}
-            </View>
-          </EntradaCartao>
+                  </View>
+                  <Regua />
+                </Entrada>
+              );
+            })}
+          </Secao>
         ) : null}
 
-        {/* Estreias: sem troféu, porque não houve o que superar ainda. */}
+        {/* Estreias: sem carimbo, porque não houve o que superar ainda. */}
         {estreias.length > 0 ? (
-          <Animated.View entering={FadeIn.delay(festa ? 1400 : 80).duration(360)}>
-            <View style={estilos.estreias}>
-              <Ionicons name="sparkles-outline" size={13} color={color.textFaint} />
-              <Tx v="small" cor={color.textFaint} style={{ flex: 1 }}>
-                {estreias.length === 1
-                  ? '1 exercício estreando — o próximo treino já compara.'
-                  : `${estreias.length} exercícios estreando — o próximo treino já compara.`}
-              </Tx>
-            </View>
-          </Animated.View>
+          <Entrada atraso={t(950)}>
+            <Tx v="small" cor={color.tintaFraca} style={estilos.estreias}>
+              {estreias.length === 1
+                ? '1 exercício estreando — o próximo treino já compara.'
+                : `${estreias.length} exercícios estreando — o próximo treino já compara.`}
+            </Tx>
+          </Entrada>
         ) : null}
 
         {/* Músculos trabalhados */}
         {musculos.length > 0 ? (
-          <View style={{ marginTop: sp.h1 }}>
-            <View style={estilos.cabecalhoSecao}>
-              <Rotulo>Músculos trabalhados</Rotulo>
-              <Tx v="caption" cor={color.textGhost}>
-                SÉRIES EFETIVAS
-              </Tx>
+          <Secao
+            titulo="Músculos trabalhados"
+            direita={<Rotulo cor={color.tintaFraca}>Séries efetivas</Rotulo>}
+          >
+            {/* A prancha primeiro: dá a leitura imediata de onde o treino pegou. */}
+            <View style={estilos.prancha}>
+              <MapaMuscular musculos={musculos} atraso={t(1000)} largura={100} />
             </View>
-
-            {/* O corpo primeiro: dá a leitura imediata de onde o treino pegou. */}
-            <View style={estilos.blocoCorpo}>
-              <MapaMuscular musculos={musculos} atraso={festa ? 1500 : 150} largura={100} />
-            </View>
+            <Regua />
 
             <View style={estilos.blocoMusculos}>
               {musculos.map((m, i) => {
-                const atraso = (festa ? 1500 : 200) + i * 110;
+                const atraso = t(1050) + i * 90;
                 return (
-                  <Animated.View
-                    key={m.grupo}
-                    entering={FadeInDown.delay(atraso).duration(340)}
-                    style={estilos.linhaMusculo}
-                  >
-                    <View style={estilos.rotuloMusculo}>
-                      <Tx v="smallMed" numberOfLines={1}>
-                        {GRUPO_LABEL[m.grupo]}
-                      </Tx>
-                    </View>
+                  <View key={m.grupo} style={estilos.linhaMusculo}>
+                    <Tx v="smallMed" numberOfLines={1} style={estilos.rotuloMusculo}>
+                      {GRUPO_LABEL[m.grupo]}
+                    </Tx>
                     <BarraAnimada
                       fracao={m.fracao}
-                      atraso={atraso + 120}
-                      // O grupo mais trabalhado recebe o acento; o resto fica neutro.
-                      cor={i === 0 ? color.accent : color.lineHi}
+                      atraso={atraso}
+                      altura={12}
+                      // Densidade de tinta, não matiz: o grupo mais trabalhado é
+                      // o mais cheio, não o de outra cor.
+                      cor={i === 0 ? color.azul : color.reguaForte}
                     />
-                    <Tx v="small" tab cor={i === 0 ? color.text : color.textFaint} style={estilos.valorMusculo}>
-                      {m.series % 1 === 0 ? m.series : m.series.toFixed(1)}
+                    <Tx
+                      v="numero"
+                      tab
+                      cor={i === 0 ? color.tinta : color.tintaMid}
+                      style={estilos.valorMusculo}
+                    >
+                      {m.series % 1 === 0 ? m.series : m.series.toFixed(1).replace('.', ',')}
                     </Tx>
-                  </Animated.View>
+                  </View>
                 );
               })}
             </View>
 
-            <Tx v="small" cor={color.textGhost} style={{ marginTop: sp.md }}>
+            <Tx v="small" cor={color.tintaFraca} style={estilos.rodapeNota}>
               O grupo principal de cada exercício conta série cheia; os assistentes contam 0,4.
             </Tx>
-          </View>
+          </Secao>
         ) : null}
 
-        {/* Exercícios */}
-        <View style={{ marginTop: sp.h1 }}>
-          <Rotulo>Exercícios</Rotulo>
-
+        {/* Exercícios: uma tabela por exercício, como no treino. */}
+        <Secao titulo="Exercícios">
           {sessao.exercicios.map((e, i) => {
             const ex = POR_ID[e.exId];
             const rotulos = MEDIDA_LABEL[ex?.medida ?? 'peso_rep'];
             return (
-              <Animated.View
-                key={e.uid}
-                entering={FadeInDown.delay((festa ? 1700 : 260) + i * 70).duration(320)}
-              >
-                <View style={estilos.bloco}>
-                  <Pressable
-                    onPress={() => router.push(`/exercicio/${e.exId}`)}
-                    style={({ pressed }) => [estilos.cabecalhoEx, pressed && { opacity: 0.6 }]}
-                  >
-                    <Miniatura ex={ex} tamanho={38} />
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Tx v="bodyMed" numberOfLines={1}>
-                        {ex?.nome ?? e.exId}
-                      </Tx>
-                      <Tx v="small" cor={color.textFaint}>
-                        {e.series.length} séries · {fmtVolume(volumeExercicio(e))}
-                      </Tx>
-                    </View>
-                  </Pressable>
-
-                  {e.nota ? (
-                    <Tx v="small" cor={color.textFaint} style={estilos.nota}>
-                      {e.nota}
+              <Entrada key={e.uid} atraso={t(1250) + i * 60}>
+                <Pressavel
+                  onPress={() => router.push(`/exercicio/${e.exId}`)}
+                  escala={0.995}
+                  fundoPressionado={color.papelBaixo}
+                  style={estilos.cabecalhoEx}
+                >
+                  <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+                    {i + 1}
+                  </Tx>
+                  <Miniatura ex={ex} tamanho={34} />
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <Tx v="bodyMed" numberOfLines={1}>
+                      {ex?.nome ?? e.exId}
                     </Tx>
-                  ) : null}
+                    <Tx v="small" cor={color.tintaFraca}>
+                      {e.series.length} séries · {fmtVolume(volumeExercicio(e))}
+                    </Tx>
+                  </View>
+                </Pressavel>
 
-                  <View style={{ marginTop: sp.md, gap: 2 }}>
-                    {e.series.map((s, idx) => (
-                      <View key={s.id} style={estilos.linha}>
-                        <Tx v="small" tab cor={color.textGhost} style={{ width: 24 }}>
-                          {tecnicaDe(s.tipo).sigla ?? idx + 1}
+                {e.nota ? (
+                  <Tx v="small" cor={color.azul} style={estilos.nota}>
+                    {e.nota}
+                  </Tx>
+                ) : null}
+
+                <View style={estilos.tabela}>
+                  {e.series.map((s, idx) => {
+                    const tec = tecnicaDe(s.tipo);
+                    const aquecimento = s.tipo === 'aquecimento';
+                    return (
+                      <View key={s.id} style={estilos.linhaSerie}>
+                        <Tx
+                          v="small"
+                          tab
+                          cor={color.tintaFraca}
+                          style={{ width: margem.calha }}
+                        >
+                          {aquecimento ? `(${idx + 1})` : idx + 1}
                         </Tx>
-                        <Tx v="smallMed" tab style={{ flex: 1 }}>
-                          {fmtNumero(s.peso) || '—'}{' '}
-                          <Tx v="small" cor={color.textGhost}>
+                        <Tx v="numero" tab cor={color.azul} style={{ width: 74 }}>
+                          {fmtNumero(s.peso) || '—'}
+                          <Tx v="small" cor={color.tintaFraca}>
+                            {' '}
                             {rotulos.a.toLowerCase()}
                           </Tx>
-                          {'   '}
-                          {fmtNumero(s.reps) || '—'}{' '}
-                          <Tx v="small" cor={color.textGhost}>
+                        </Tx>
+                        <Tx v="numero" tab cor={color.azul} style={{ flex: 1 }}>
+                          {fmtNumero(s.reps) || '—'}
+                          <Tx v="small" cor={color.tintaFraca}>
+                            {' '}
                             {rotulos.b.toLowerCase()}
                           </Tx>
                         </Tx>
+                        {tec.sigla && !aquecimento ? (
+                          <Carimbo texto={tec.sigla} />
+                        ) : null}
                       </View>
-                    ))}
-                  </View>
+                    );
+                  })}
                 </View>
-              </Animated.View>
+                <Regua />
+              </Entrada>
             );
           })}
-        </View>
+        </Secao>
       </ScrollView>
 
       {/*
@@ -424,56 +474,60 @@ export default function RelatorioSessao() {
         <CartaoCompartilhar sessao={sessao} refCaptura={refCartao} />
       </View>
 
-      <Animated.View
-        entering={FadeInDown.delay(festa ? 1900 : 0).duration(400)}
-        style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }, shadow.soft]}
-      >
-        <Botao
-          titulo="Compartilhar"
-          tom="contorno"
-          icone="share-outline"
-          grande
-          carregando={compartilhando}
-          onPress={compartilhar}
-          style={{ flex: 1 }}
-        />
-        {festa ? (
-          <Botao titulo="Concluir" grande onPress={() => router.replace('/')} style={{ flex: 1 }} />
-        ) : null}
-      </Animated.View>
+      <Entrada atraso={t(1350)} style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>
+        <Regua peso="forte" cor={color.tinta} />
+        <View style={estilos.rodapeCorpo}>
+          <Botao
+            titulo="Compartilhar"
+            tom="contorno"
+            glifo="compartilhar"
+            grande
+            carregando={compartilhando}
+            onPress={compartilhar}
+            style={{ flex: 1 }}
+          />
+          {festa ? (
+            <Botao
+              titulo="Concluir"
+              grande
+              haptico="sucesso"
+              onPress={() => router.replace('/')}
+              style={{ flex: 1 }}
+            />
+          ) : null}
+        </View>
+      </Entrada>
     </View>
   );
 }
 
-function Metrica({
-  rotulo,
+function Total({
   valor,
   sufixo = '',
   casas = 0,
   anima,
   atraso,
+  style,
 }: {
-  rotulo: string;
   valor: number;
   sufixo?: string;
   casas?: number;
   anima: boolean;
   atraso: number;
+  style?: object;
 }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-      {anima ? (
+  if (anima) {
+    return (
+      <View style={style}>
         <Contador valor={valor} casas={casas} sufixo={sufixo} atraso={atraso} />
-      ) : (
-        <Tx v="title" tab center>
-          {casas > 0 ? valor.toFixed(casas) : Math.round(valor)}
-          {sufixo}
-        </Tx>
-      )}
-      <Tx v="caption" cor={color.textFaint}>
-        {rotulo.toUpperCase()}
-      </Tx>
-    </View>
+      </View>
+    );
+  }
+  return (
+    <Tx v="numeroG" tab style={style}>
+      {casas > 0 ? valor.toFixed(casas).replace('.', ',') : Math.round(valor)}
+      {sufixo}
+    </Tx>
   );
 }
 
@@ -482,114 +536,76 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: sp.md,
-    paddingBottom: sp.sm,
   },
-  heroi: { alignItems: 'center', paddingTop: sp.lg, paddingBottom: sp.xxl },
-  metricas: {
+  selo: { alignItems: 'center', paddingTop: sp.xxl, paddingBottom: sp.h1 },
+  cabecalho: { paddingHorizontal: margem.pagina, paddingBottom: sp.xl },
+  totais: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: sp.xl,
-    borderRadius: radius.xl,
-    backgroundColor: color.bgSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-  },
-  sep: { width: StyleSheet.hairlineWidth, height: 32, backgroundColor: color.lineMid },
-  recordes: {
-    marginTop: sp.sm,
-    padding: sp.lg,
-    borderRadius: radius.xl,
-    backgroundColor: color.accentFundo,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.accentLine,
-    gap: sp.md,
+    alignItems: 'baseline',
+    paddingHorizontal: margem.pagina,
+    paddingVertical: sp.md,
   },
   cardio: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp.md,
-    marginTop: sp.sm,
-    padding: sp.lg,
-    borderRadius: radius.xl,
-    backgroundColor: color.bgSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
+    gap: sp.sm,
+    paddingHorizontal: margem.pagina,
+    paddingVertical: sp.md,
   },
-  iconeCardio: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  linhaRec: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: color.accentSoft,
+    gap: sp.md,
+    paddingVertical: sp.md,
+    paddingHorizontal: margem.pagina,
   },
-  cabecalhoRec: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  linhaRec: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
-  estreias: {
+  calhaRec: { width: 6, alignItems: 'flex-start' },
+  // Marca de correção do professor: um traço vermelho na margem da linha.
+  marcaRec: { width: 3, height: 26, backgroundColor: color.vermelho },
+  estreias: { paddingHorizontal: margem.pagina, paddingTop: sp.lg },
+  prancha: { paddingVertical: sp.xxl, backgroundColor: color.papelAlto },
+  blocoMusculos: { paddingHorizontal: margem.pagina, paddingTop: sp.lg, gap: sp.md },
+  linhaMusculo: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
+  rotuloMusculo: { width: 84 },
+  valorMusculo: { width: 34, textAlign: 'right' },
+  rodapeNota: { paddingHorizontal: margem.pagina, paddingTop: sp.lg },
+  cabecalhoEx: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    paddingHorizontal: margem.pagina,
+    paddingTop: sp.lg,
+    paddingBottom: sp.sm,
+  },
+  nota: {
+    marginHorizontal: margem.pagina,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
+    backgroundColor: color.papelAlto,
+    borderLeftWidth: 2,
+    borderLeftColor: color.azulLinha,
+  },
+  tabela: { paddingHorizontal: margem.pagina, paddingBottom: sp.md },
+  linhaSerie: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.sm,
-    marginTop: sp.md,
-    paddingHorizontal: sp.lg,
-    paddingVertical: sp.md,
-    borderRadius: radius.lg,
-    backgroundColor: color.bgSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-  },
-  cabecalhoSecao: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: sp.md,
-  },
-  blocoCorpo: {
-    paddingVertical: sp.xl,
-    borderRadius: radius.xl,
-    backgroundColor: color.bgSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-    marginBottom: sp.sm,
+    height: 30,
+    borderBottomWidth: traco.fina,
+    borderBottomColor: color.regua,
   },
   fora: { position: 'absolute', left: -10000, top: 0 },
-  blocoMusculos: {
-    padding: sp.lg,
-    borderRadius: radius.xl,
-    backgroundColor: color.bgSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-    gap: sp.md,
-  },
-  linhaMusculo: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
-  rotuloMusculo: { width: 88 },
-  valorMusculo: { width: 30, textAlign: 'right' },
-  bloco: {
-    backgroundColor: color.bgSoft,
-    borderRadius: radius.xl,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-    padding: sp.lg,
-    marginTop: sp.md,
-  },
-  cabecalhoEx: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
-  nota: {
-    marginTop: sp.md,
-    padding: sp.md,
-    borderRadius: radius.md,
-    backgroundColor: color.surfaceHi,
-  },
-  linha: { flexDirection: 'row', alignItems: 'center', height: 26 },
   rodape: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: color.papel,
+  },
+  rodapeCorpo: {
     flexDirection: 'row',
     gap: sp.sm,
-    paddingHorizontal: sp.xl,
+    paddingHorizontal: margem.pagina,
     paddingTop: sp.md,
-    backgroundColor: color.bg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.line,
   },
 });

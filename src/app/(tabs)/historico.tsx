@@ -1,13 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, SectionList, StyleSheet, View } from 'react-native';
+import { SectionList, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Rotulo, Tx, Vazio } from '@/components/base';
+import { CabecaColuna, Pressavel, Regua, Rotulo, Tx, Vazio } from '@/components/base';
+import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
 import { GRUPO_LABEL } from '@/data/types';
-import { color, radius, sp } from '@/design/tokens';
+import { color, margem, sp } from '@/design/tokens';
 import {
   duracaoMs,
   fmtData,
@@ -34,6 +33,14 @@ const MESES = [
   'Dezembro',
 ];
 
+/**
+ * Progresso — o índice do caderno.
+ *
+ * Os totais deixaram de ser um cartão com bordas e separadores verticais e
+ * viraram o que são: cabeça de coluna e uma linha de valores. O gráfico perdeu
+ * a moldura e o degradê; ganhou uma LINHA DE BASE, que é o que faz barra
+ * significar alguma coisa.
+ */
 export default function Historico() {
   const insets = useSafeAreaInsets();
   const historico = useTreino((s) => s.historico);
@@ -55,8 +62,7 @@ export default function Historico() {
       secoes: [...mapa.entries()].map(([chave, data]) => {
         const [ano, mes] = chave.split('-').map(Number);
         const agora = new Date();
-        const titulo =
-          ano === agora.getFullYear() ? MESES[mes] : `${MESES[mes]} de ${ano}`;
+        const titulo = ano === agora.getFullYear() ? MESES[mes] : `${MESES[mes]} de ${ano}`;
         return { title: titulo, data };
       }),
       totalVolume: volume,
@@ -65,25 +71,47 @@ export default function Historico() {
   }, [historico]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.bg, paddingTop: insets.top + sp.sm }}>
+    <View style={{ flex: 1, backgroundColor: color.papel, paddingTop: insets.top + sp.sm }}>
       <SectionList
         sections={secoes}
         keyExtractor={(s) => s.id}
         stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: sp.xl, paddingBottom: 150 }}
+        contentContainerStyle={{ paddingBottom: 150 }}
         ListHeaderComponent={
-          <View style={{ paddingTop: sp.lg, paddingBottom: sp.xl }}>
-            <Tx v="title">Progresso</Tx>
+          <View>
+            <View style={estilos.cabecalho}>
+              <Tx v="title">Progresso</Tx>
+            </View>
+            <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+
             {historico.length > 0 ? (
               <>
-                <View style={estilos.resumo}>
-                  <Total valor={String(historico.length)} rotulo="Treinos" />
-                  <View style={estilos.separador} />
-                  <Total valor={fmtVolume(totalVolume)} rotulo="Volume" />
-                  <View style={estilos.separador} />
-                  <Total valor={fmtDuracaoCurta(totalMin * 60000)} rotulo="Tempo" />
+                <CabecaColuna>
+                  <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+                    Treinos
+                  </Rotulo>
+                  <Rotulo cor={color.tintaMid} style={{ flex: 1.3 }}>
+                    Volume
+                  </Rotulo>
+                  <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+                    Tempo
+                  </Rotulo>
+                </CabecaColuna>
+                {/* Encolhem em vez de quebrar: com anos de treino o volume
+                    total e o tempo total ficam longos. */}
+                <View style={estilos.totais}>
+                  <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1 }}>
+                    {historico.length}
+                  </Tx>
+                  <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1.3 }}>
+                    {fmtVolume(totalVolume)}
+                  </Tx>
+                  <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1 }}>
+                    {fmtDuracaoCurta(totalMin * 60000)}
+                  </Tx>
                 </View>
+                <Regua peso="forte" style={{ marginHorizontal: margem.pagina }} />
                 <GraficoVolume />
               </>
             ) : null}
@@ -91,14 +119,13 @@ export default function Historico() {
         }
         renderSectionHeader={({ section }) => (
           <View style={estilos.secao}>
-            <Rotulo>{section.title}</Rotulo>
-            <View style={estilos.traco} />
+            <Rotulo cor={color.tintaMid}>{section.title}</Rotulo>
+            <Regua peso="forte" style={{ marginTop: sp.xs }} />
           </View>
         )}
-        renderItem={({ item }) => <CartaoSessao sessao={item} />}
+        renderItem={({ item }) => <LinhaSessao sessao={item} />}
         ListEmptyComponent={
           <Vazio
-            icone="stats-chart-outline"
             titulo="Nada por aqui ainda"
             texto="Seus treinos concluídos aparecem aqui, com volume, séries e recordes."
           />
@@ -110,7 +137,10 @@ export default function Historico() {
 
 /**
  * Volume das últimas 8 semanas.
- * Sem eixos nem grade: as barras já dizem se a carga total está subindo.
+ *
+ * Barras a partir de uma linha de base, sem moldura e sem degradê. A semana
+ * corrente é a única CHEIA; as anteriores ficam vazadas com contorno. Estado
+ * por preenchimento, não por cor — a mesma regra da tabela de séries.
  */
 function GraficoVolume() {
   const historico = useTreino((s) => s.historico);
@@ -120,139 +150,115 @@ function GraficoVolume() {
   return (
     <View style={estilos.grafico}>
       <View style={estilos.cabecalhoGrafico}>
-        <Rotulo>Volume por semana</Rotulo>
-        <Tx v="caption" cor={color.textGhost}>
-          PICO {fmtVolume(pico).toUpperCase()}
-        </Tx>
+        <Rotulo cor={color.tintaMid}>Volume por semana</Rotulo>
+        <Rotulo cor={color.tintaFraca}>Pico {fmtVolume(pico)}</Rotulo>
       </View>
 
       <View style={estilos.barras}>
         {semanas.map((s, i) => {
           const atual = i === semanas.length - 1;
+          // 2% é o mínimo para uma semana vazia continuar legível.
+          const altura = `${Math.max(s.volume > 0 ? 6 : 2, (s.volume / pico) * 100)}%` as const;
           return (
             <View key={s.inicio} style={estilos.colunaBarra}>
               <View style={estilos.trilho}>
-                {atual ? (
-                  // A semana corrente é a única com cor — e com um degradê leve.
-                  <LinearGradient
-                    colors={[color.accent, color.accentDeep]}
-                    style={[
-                      estilos.barra,
-                      { height: `${Math.max(s.volume > 0 ? 6 : 2, (s.volume / pico) * 100)}%` },
-                    ]}
-                  />
-                ) : (
-                  <View
-                    style={[
-                      estilos.barra,
-                      {
-                        // 2% é o mínimo para uma semana vazia continuar legível.
-                        height: `${Math.max(s.volume > 0 ? 6 : 2, (s.volume / pico) * 100)}%`,
-                        backgroundColor: color.surfaceHi,
-                      },
-                    ]}
-                  />
-                )}
+                <View
+                  style={[
+                    estilos.barra,
+                    {
+                      height: altura,
+                      // Semanas passadas cheias em tinta fraca, a corrente em
+                      // azul. Vazadas com contorno liam como caixa vazia, não
+                      // como barra.
+                      backgroundColor: atual ? color.azul : color.reguaForte,
+                    },
+                  ]}
+                />
               </View>
-              <Tx v="caption" cor={atual ? color.textDim : color.textGhost}>
-                {new Date(s.inicio).getDate()}
-              </Tx>
             </View>
           );
         })}
       </View>
-    </View>
-  );
-}
-
-function Total({ valor, rotulo }: { valor: string; rotulo: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-      <Tx v="heading" tab>
-        {valor}
-      </Tx>
-      <Tx v="caption" cor={color.textFaint}>
-        {rotulo.toUpperCase()}
-      </Tx>
-    </View>
-  );
-}
-
-function CartaoSessao({ sessao }: { sessao: Sessao }) {
-  const grupos = [...new Set(sessao.exercicios.map((e) => POR_ID[e.exId]?.grupo).filter(Boolean))].map(
-    (g) => GRUPO_LABEL[g!],
-  );
-
-  return (
-    <Pressable
-      onPress={() => router.push(`/sessao/${sessao.id}`)}
-      style={({ pressed }) => [estilos.cartao, pressed && { backgroundColor: color.surfaceHi }]}
-    >
-      <View style={{ flex: 1, gap: 4 }}>
-        <Tx v="bodyMed" numberOfLines={1}>
-          {sessao.nome}
-        </Tx>
-        <Tx v="small" cor={color.textFaint} numberOfLines={1}>
-          {fmtData(sessao.fim ?? sessao.inicio)} · {sessao.exercicios.length} exercícios ·{' '}
-          {seriesFeitas(sessao)} séries
-        </Tx>
-        <Tx v="small" cor={color.textGhost} numberOfLines={1}>
-          {fmtVolume(volumeSessao(sessao))} · {fmtDuracaoCurta(duracaoMs(sessao))}
-          {grupos.length ? ` · ${grupos.slice(0, 3).join(', ')}` : ''}
-        </Tx>
+      {/* A linha de base vem imediatamente sob as barras — se os rótulos
+          ficarem no meio, a barra perde de onde cresce e vira enfeite. */}
+      <Regua peso="normal" cor={color.tinta} />
+      <View style={estilos.rotulosBarras}>
+        {semanas.map((s, i) => (
+          <View key={s.inicio} style={estilos.colunaBarra}>
+            <Rotulo cor={i === semanas.length - 1 ? color.tinta : color.tintaFraca}>
+              {new Date(s.inicio).getDate()}
+            </Rotulo>
+          </View>
+        ))}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={color.textGhost} />
-    </Pressable>
+    </View>
+  );
+}
+
+function LinhaSessao({ sessao }: { sessao: Sessao }) {
+  const grupos = [
+    ...new Set(sessao.exercicios.map((e) => POR_ID[e.exId]?.grupo).filter(Boolean)),
+  ].map((g) => GRUPO_LABEL[g!]);
+
+  return (
+    <View>
+      <Pressavel
+        onPress={() => router.push(`/sessao/${sessao.id}`)}
+        escala={0.995}
+        fundoPressionado={color.papelBaixo}
+        accessibilityRole="button"
+        accessibilityLabel={sessao.nome}
+        style={estilos.linha}
+      >
+        <View style={{ flex: 1, gap: 3 }}>
+          <Tx v="bodyMed" numberOfLines={1}>
+            {sessao.nome}
+          </Tx>
+          <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+            {fmtData(sessao.fim ?? sessao.inicio)}
+            {grupos.length ? ` · ${grupos.slice(0, 3).join(', ')}` : ''}
+          </Tx>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Tx v="numero" tab>
+            {fmtVolume(volumeSessao(sessao))}
+          </Tx>
+          <Tx v="small" tab cor={color.tintaFraca}>
+            {seriesFeitas(sessao)} séries · {fmtDuracaoCurta(duracaoMs(sessao))}
+          </Tx>
+        </View>
+        <Glifo nome="avancar" tamanho={13} cor={color.tintaFantasma} />
+      </Pressavel>
+      <Regua />
+    </View>
   );
 }
 
 const estilos = StyleSheet.create({
-  resumo: {
+  cabecalho: { paddingHorizontal: margem.pagina, paddingBottom: sp.md },
+  totais: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: sp.xl,
-    paddingVertical: sp.lg,
-    borderRadius: radius.xl,
-    backgroundColor: color.surface,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
+    alignItems: 'baseline',
+    paddingHorizontal: margem.pagina,
+    paddingVertical: sp.md,
   },
-  separador: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: color.lineMid },
-  secao: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.md,
-    paddingTop: sp.xl,
-    paddingBottom: sp.sm,
-  },
-  traco: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: color.line },
-  grafico: {
-    marginTop: sp.md,
-    padding: sp.xl,
-    borderRadius: radius.xl,
-    backgroundColor: color.surface,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-  },
+  secao: { paddingTop: sp.h1, paddingBottom: sp.sm, paddingHorizontal: margem.pagina },
+  grafico: { paddingHorizontal: margem.pagina, paddingTop: sp.xxl },
   cabecalhoGrafico: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
   },
   barras: { flexDirection: 'row', alignItems: 'flex-end', gap: sp.sm, marginTop: sp.lg },
-  colunaBarra: { flex: 1, alignItems: 'center', gap: sp.sm },
-  trilho: { width: '100%', height: 64, justifyContent: 'flex-end' },
-  barra: { width: '100%', borderRadius: radius.sm, minHeight: 3 },
-  cartao: {
+  rotulosBarras: { flexDirection: 'row', gap: sp.sm, paddingTop: sp.sm },
+  colunaBarra: { flex: 1, alignItems: 'center' },
+  trilho: { width: '100%', height: 72, justifyContent: 'flex-end' },
+  barra: { width: '100%', minHeight: 2 },
+  linha: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.md,
-    paddingVertical: sp.lg,
-    paddingHorizontal: sp.xl,
-    borderRadius: radius.lg,
-    backgroundColor: color.surface,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-    marginBottom: sp.sm,
+    paddingVertical: sp.md,
+    paddingHorizontal: margem.pagina,
   },
 });

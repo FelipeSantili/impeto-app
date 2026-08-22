@@ -1,15 +1,13 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import type { RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Polygon } from 'react-native-svg';
-import { Rotulo, Tx } from '@/components/base';
+import { Regua, Rotulo, Tx } from '@/components/base';
+import { Glifo } from '@/components/glifos';
 import { MapaMuscular } from '@/components/mapa-muscular';
 import { GRUPO_LABEL } from '@/data/types';
-import { color, radius, sp } from '@/design/tokens';
+import { color, sp, traco } from '@/design/tokens';
 import {
   duracaoMs,
-  fmtData,
+  fmtDataAbs,
   fmtDuracaoCurta,
   fmtVolume,
   musculosDaSessao,
@@ -18,22 +16,17 @@ import {
 } from '@/lib/metricas';
 import type { Sessao } from '@/store/treino';
 
-const RAIO_PONTOS = '60.5,4.5 23.5,54.5 45.5,54.5 39.5,95.5 76.5,43.5 54.5,43.5';
-
-/** A marca do app, a mesma do ícone — assina o cartão compartilhado. */
-function Marca({ tamanho = 18 }: { tamanho?: number }) {
-  return (
-    <Svg width={tamanho} height={tamanho} viewBox="0 0 100 100">
-      <Polygon points={RAIO_PONTOS} fill={color.accent} />
-    </Svg>
-  );
-}
+const MARGEM = 26;
 
 /**
- * Cartão de treino para compartilhar.
+ * Cartão de treino para compartilhar — uma folha do caderno destacada.
+ *
+ * É a única peça do app que sai dele, então é onde o mundo precisa ser mais
+ * legível: marca e data na mesma linha de base, régua forte fechando o
+ * cabeçalho, totais em colunas rotuladas e a prancha anatômica no meio.
  *
  * Renderizado fora da tela e capturado como imagem, então tem tamanho fixo e
- * não usa nada dependente de rolagem, safe area ou animação — o que estiver
+ * não usa nada dependente de rolagem, safe area ou animação — o que estivesse
  * animando no momento da captura sairia num quadro intermediário.
  */
 export function CartaoCompartilhar({
@@ -48,71 +41,76 @@ export function CartaoCompartilhar({
 
   return (
     <View ref={refCaptura} collapsable={false} style={estilos.cartao}>
-      <LinearGradient
-        colors={['rgba(124,58,237,0.28)', 'rgba(124,58,237,0.04)', 'transparent']}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.75 }}
-        style={StyleSheet.absoluteFill}
-      />
-
       <View style={estilos.topo}>
-        <Marca />
-        <Rotulo cor={color.textDim}>ÍMPETO</Rotulo>
+        <Glifo nome="raio" tamanho={16} cor={color.tinta} />
+        <Rotulo cor={color.tinta} style={estilos.marca}>
+          Ímpeto
+        </Rotulo>
         <View style={{ flex: 1 }} />
-        <Tx v="caption" cor={color.textFaint}>
-          {fmtData(sessao.fim ?? sessao.inicio).toUpperCase()}
+        <Rotulo cor={color.tintaFraca}>{fmtDataAbs(sessao.fim ?? sessao.inicio)}</Rotulo>
+      </View>
+      <Regua peso="forte" cor={color.tinta} />
+
+      <View style={{ paddingTop: sp.xl }}>
+        <Tx v="display" numberOfLines={2}>
+          {sessao.nome}
         </Tx>
-      </View>
-
-      <Tx v="title" style={{ marginTop: sp.xxl }} numberOfLines={2}>
-        {sessao.nome}
-      </Tx>
-      {principais.length ? (
-        <Tx v="small" cor={color.textFaint} style={{ marginTop: sp.xs }}>
-          {principais.join(' · ')}
-        </Tx>
-      ) : null}
-
-      <View style={estilos.numeros}>
-        <Numero valor={fmtDuracaoCurta(duracaoMs(sessao))} rotulo="Duração" />
-        <View style={estilos.sep} />
-        <Numero valor={fmtVolume(volumeSessao(sessao))} rotulo="Volume" />
-        <View style={estilos.sep} />
-        <Numero valor={String(seriesFeitas(sessao))} rotulo="Séries" />
-      </View>
-
-      <View style={{ marginTop: sp.h1 }}>
-        {/* atraso 0: a captura acontece depois, com o mapa já em opacidade cheia */}
-        <MapaMuscular musculos={musculos} atraso={0} largura={108} />
-      </View>
-
-      {sessao.cardio ? (
-        <View style={estilos.cardio}>
-          <Ionicons name="heart" size={12} color={color.accent} />
-          <Tx v="small" tab cor={color.textDim}>
-            {sessao.cardio.media} bpm médio · {sessao.cardio.maxima} máx
+        {principais.length ? (
+          <Tx v="small" cor={color.tintaFraca} style={{ marginTop: 2 }}>
+            {principais.join(' · ')}
           </Tx>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
 
-      <View style={estilos.rodape}>
-        <Tx v="caption" cor={color.textGhost}>
-          {sessao.exercicios.length} EXERCÍCIOS
+      <View style={estilos.colunas}>
+        <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+          Tempo
+        </Rotulo>
+        <Rotulo cor={color.tintaMid} style={{ flex: 1.2 }}>
+          Volume
+        </Rotulo>
+        <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+          Séries
+        </Rotulo>
+      </View>
+      <Regua peso="normal" cor={color.reguaMid} />
+      {/*
+        `numberOfLines` + `adjustsFontSizeToFit`: o cartão vira imagem e uma
+        quebra de linha aqui desmonta a composição inteira. Duração longa
+        ("2h05") ou volume alto encolhem em vez de quebrar.
+      */}
+      <View style={estilos.valores}>
+        <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1 }}>
+          {fmtDuracaoCurta(duracaoMs(sessao))}
+        </Tx>
+        <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1.2 }}>
+          {fmtVolume(volumeSessao(sessao))}
+        </Tx>
+        <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1 }}>
+          {seriesFeitas(sessao)}
         </Tx>
       </View>
-    </View>
-  );
-}
+      <Regua peso="forte" />
 
-function Numero({ valor, rotulo }: { valor: string; rotulo: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-      <Tx v="heading" tab>
-        {valor}
-      </Tx>
-      <Tx v="caption" cor={color.textFaint}>
-        {rotulo.toUpperCase()}
-      </Tx>
+      <View style={estilos.prancha}>
+        {/* atraso 0: a captura acontece com a prancha já em densidade cheia. */}
+        <MapaMuscular musculos={musculos} atraso={0} largura={104} />
+      </View>
+
+      <Regua />
+      <View style={estilos.rodape}>
+        {sessao.cardio ? (
+          <View style={estilos.cardio}>
+            <Glifo nome="coracao" tamanho={11} cor={color.vermelho} />
+            <Tx v="small" tab cor={color.tintaMid}>
+              {sessao.cardio.media} bpm médio · {sessao.cardio.maxima} máx
+            </Tx>
+          </View>
+        ) : (
+          <View style={{ flex: 1 }} />
+        )}
+        <Rotulo cor={color.tintaFraca}>{sessao.exercicios.length} exercícios</Rotulo>
+      </View>
     </View>
   );
 }
@@ -120,30 +118,23 @@ function Numero({ valor, rotulo }: { valor: string; rotulo: string }) {
 const estilos = StyleSheet.create({
   cartao: {
     width: 380,
-    backgroundColor: color.bg,
-    paddingHorizontal: sp.xxl,
-    paddingTop: sp.xxl,
+    backgroundColor: color.papel,
+    paddingHorizontal: MARGEM,
+    paddingTop: MARGEM,
     paddingBottom: sp.xl,
-    overflow: 'hidden',
+    borderWidth: traco.normal,
+    borderColor: color.papelBorda,
   },
-  topo: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
-  numeros: {
+  topo: { flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingBottom: sp.sm },
+  marca: { fontSize: 14, letterSpacing: 3.4 },
+  colunas: { flexDirection: 'row', marginTop: sp.h1, paddingBottom: sp.xs },
+  valores: { flexDirection: 'row', alignItems: 'baseline', paddingVertical: sp.md },
+  prancha: { paddingVertical: sp.xxl },
+  rodape: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: sp.xxl,
-    paddingVertical: sp.lg,
-    borderRadius: radius.xl,
-    backgroundColor: color.bgSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
+    justifyContent: 'space-between',
+    paddingTop: sp.md,
   },
-  sep: { width: StyleSheet.hairlineWidth, height: 30, backgroundColor: color.lineMid },
-  cardio: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp.sm,
-    marginTop: sp.lg,
-  },
-  rodape: { alignItems: 'center', marginTop: sp.lg },
+  cardio: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 },
 });

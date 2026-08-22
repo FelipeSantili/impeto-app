@@ -5,19 +5,19 @@ import { color } from '@/design/tokens';
 
 export default function LayoutAbas() {
   return (
-    <View style={{ flex: 1, backgroundColor: color.bg }}>
+    <View style={{ flex: 1, backgroundColor: color.papel }}>
       <Tabs>
         <TabSlot />
         <TabList asChild>
           <Doca>
             <TabTrigger name="index" href="/" asChild>
-              <Aba icone="home" rotulo="Início" />
+              <Aba glifo="raio" rotulo="Início" />
             </TabTrigger>
             <TabTrigger name="exercicios" href="/exercicios" asChild>
-              <Aba icone="search" rotulo="Exercícios" />
+              <Aba glifo="busca" rotulo="Exercícios" />
             </TabTrigger>
             <TabTrigger name="historico" href="/historico" asChild>
-              <Aba icone="stats-chart" rotulo="Progresso" />
+              <Aba glifo="grafico" rotulo="Progresso" />
             </TabTrigger>
           </Doca>
         </TabList>

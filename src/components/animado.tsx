@@ -1,32 +1,39 @@
-import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useEffect } from 'react';
-import { StyleSheet, TextInput, View, type StyleProp, type TextStyle } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 import Animated, {
   Easing,
   useAnimatedProps,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
-  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
-import { color, type as typeScale } from '@/design/tokens';
+import { color, radius, traco, type as typeScale } from '@/design/tokens';
 
 const CampoAnimado = Animated.createAnimatedComponent(TextInput);
-const CirculoAnimado = Animated.createAnimatedComponent(Circle);
+const SAIDA = Easing.bezier(0.23, 1, 0.32, 1);
 
 /**
  * Número que sobe de zero até o valor final.
  *
  * Um `Text` comum não anima sem re-renderizar a cada quadro. Usamos um
- * `TextInput` desabilitado porque o Reanimated consegue escrever direto na sua
- * prop `text` pela UI thread, sem passar pelo JS.
+ * `TextInput` desabilitado porque o Reanimated escreve direto na prop `text`
+ * pela thread de UI, sem passar pelo JS — nenhuma re-renderização do React.
  */
 export function Contador({
   valor,
-  duracao = 1100,
+  duracao = 1000,
   atraso = 0,
   casas = 0,
   prefixo = '',
@@ -42,17 +49,20 @@ export function Contador({
   style?: StyleProp<TextStyle>;
 }) {
   const p = useSharedValue(0);
+  const reduzido = useReducedMotion();
 
   useEffect(() => {
-    p.value = 0;
-    p.value = withDelay(
-      atraso,
-      withTiming(valor, { duration: duracao, easing: Easing.out(Easing.cubic) }),
-    );
-  }, [valor, duracao, atraso, p]);
+    if (reduzido) {
+      p.set(valor);
+      return;
+    }
+    p.set(0);
+    p.set(withDelay(atraso, withTiming(valor, { duration: duracao, easing: SAIDA })));
+  }, [valor, duracao, atraso, reduzido, p]);
 
   const props = useAnimatedProps(() => {
-    const n = casas > 0 ? p.value.toFixed(casas) : String(Math.round(p.value));
+    // Vírgula decimal, igual ao resto do app — `toFixed` sempre devolve ponto.
+    const n = casas > 0 ? p.get().toFixed(casas).replace('.', ',') : String(Math.round(p.get()));
     return { text: `${prefixo}${n}${sufixo}` } as never;
   });
 
@@ -68,12 +78,12 @@ export function Contador({
   );
 }
 
-/** Barra horizontal que cresce até `fracao` (0..1). */
+/** Barra que cresce até `fracao` (0..1). Retangular — é uma coluna impressa. */
 export function BarraAnimada({
   fracao,
   atraso = 0,
-  cor = color.accent,
-  altura = 8,
+  cor = color.azul,
+  altura = 10,
 }: {
   fracao: number;
   atraso?: number;
@@ -81,125 +91,135 @@ export function BarraAnimada({
   altura?: number;
 }) {
   const p = useSharedValue(0);
+  const reduzido = useReducedMotion();
+  const alvo = Math.max(0, Math.min(1, fracao));
 
   useEffect(() => {
-    p.value = 0;
-    p.value = withDelay(
-      atraso,
-      withTiming(Math.max(0, Math.min(1, fracao)), {
-        duration: 900,
-        easing: Easing.out(Easing.cubic),
-      }),
-    );
-  }, [fracao, atraso, p]);
+    if (reduzido) {
+      p.set(alvo);
+      return;
+    }
+    p.set(0);
+    p.set(withDelay(atraso, withTiming(alvo, { duration: 800, easing: SAIDA })));
+  }, [alvo, atraso, reduzido, p]);
 
-  const estilo = useAnimatedStyle(() => ({ width: `${p.value * 100}%` }));
+  const estilo = useAnimatedStyle(() => ({ width: `${p.get() * 100}%` }));
 
   return (
-    <View style={[estilos.trilho, { height: altura, borderRadius: altura / 2 }]}>
-      <Animated.View
-        style={[{ height: altura, borderRadius: altura / 2, backgroundColor: cor }, estilo]}
-      />
+    <View style={[estilos.trilho, { height: altura }]}>
+      <Animated.View style={[{ height: altura, backgroundColor: cor }, estilo]} />
     </View>
   );
 }
 
 /**
- * Selo de treino concluído: o anel se fecha e o check entra com um salto.
- * É o primeiro elemento do relatório — dá o tom de recompensa.
+ * Carimbo de treino concluído.
+ *
+ * Este é O momento de movimento do app — o único que tem licença para ser
+ * expressivo, porque acontece uma vez por treino (a faixa "raro" do orçamento
+ * de deleite). Antes havia aqui um anel de progresso que fechava com um check
+ * no meio: a comemoração mais gerada que existe, e um anel fingindo ser
+ * conteúdo.
+ *
+ * Agora é o que um livro de registro faz de verdade quando a página fecha: um
+ * carimbo de borracha desce sobre o papel. Vem de perto (escala 1,7 → 1),
+ * assenta com uma sobra mínima e crava torto, porque carimbo humano nunca sai
+ * reto. O háptico dispara no quadro em que ele encosta, não quando a animação
+ * termina — háptico atrasado lê como defeito, não como retorno.
  */
-export function SeloConcluido({ tamanho = 92 }: { tamanho?: number }) {
-  const traco = 4;
-  const r = (tamanho - traco) / 2;
-  const circunferencia = 2 * Math.PI * r;
-
-  const anel = useSharedValue(0);
-  const check = useSharedValue(0);
-  const halo = useSharedValue(0);
+export function CarimboConcluido({
+  texto = 'Concluído',
+  detalhe,
+  cor = color.vermelho,
+  atraso = 120,
+}: {
+  texto?: string;
+  detalhe?: string;
+  cor?: string;
+  atraso?: number;
+}) {
+  const p = useSharedValue(0);
+  const reduzido = useReducedMotion();
 
   useEffect(() => {
-    anel.value = withTiming(1, { duration: 850, easing: Easing.out(Easing.cubic) });
-    check.value = withDelay(520, withSpring(1, { damping: 9, stiffness: 150 }));
-    halo.value = withDelay(
-      520,
-      withSequence(
-        withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) }),
-        withTiming(0, { duration: 620, easing: Easing.in(Easing.quad) }),
+    if (reduzido) {
+      p.set(withTiming(1, { duration: 200 }));
+      return;
+    }
+    p.set(
+      withDelay(
+        atraso,
+        withSpring(1, {
+          duration: 520,
+          dampingRatio: 0.68,
+          // Sem isto o carimbo passa de 1 e cresce demais antes de assentar.
+          overshootClamping: false,
+        }),
       ),
     );
-  }, [anel, check, halo]);
+    const t = setTimeout(
+      () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
+      // O instante do impacto: quando a escala cruza o papel, não no fim.
+      atraso + 180,
+    );
+    return () => clearTimeout(t);
+  }, [atraso, reduzido, p]);
 
-  const propsAnel = useAnimatedProps(() => ({
-    strokeDashoffset: circunferencia * (1 - anel.value),
-  }));
-
-  const estiloCheck = useAnimatedStyle(() => ({
-    opacity: check.value,
-    transform: [{ scale: check.value }],
-  }));
-
-  const estiloHalo = useAnimatedStyle(() => ({
-    opacity: halo.value * 0.5,
-    transform: [{ scale: 1 + halo.value * 0.55 }],
-  }));
+  const estilo = useAnimatedStyle(() => {
+    const v = p.get();
+    return {
+      opacity: Math.min(1, v * 2.2),
+      transform: [{ rotate: `${-3.5 * v}deg` }, { scale: 1.7 - 0.7 * v }],
+    };
+  });
 
   return (
-    <View style={{ width: tamanho, height: tamanho, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View
-        style={[
-          estilos.halo,
-          { width: tamanho, height: tamanho, borderRadius: tamanho / 2 },
-          estiloHalo,
-        ]}
-      />
-      <Svg width={tamanho} height={tamanho} style={StyleSheet.absoluteFill}>
-        <Circle
-          cx={tamanho / 2}
-          cy={tamanho / 2}
-          r={r}
-          stroke={color.surfaceHi}
-          strokeWidth={traco}
-          fill="none"
-        />
-        <CirculoAnimado
-          cx={tamanho / 2}
-          cy={tamanho / 2}
-          r={r}
-          stroke={color.accent}
-          strokeWidth={traco}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={circunferencia}
-          animatedProps={propsAnel}
-          transform={`rotate(-90 ${tamanho / 2} ${tamanho / 2})`}
-        />
-      </Svg>
-      <Animated.View style={estiloCheck}>
-        <Ionicons name="checkmark" size={tamanho * 0.42} color={color.accent} />
-      </Animated.View>
-    </View>
+    <Animated.View style={[estilos.carimbo, { borderColor: cor }, estilo]}>
+      <View style={[estilos.carimboInterno, { borderColor: cor }]}>
+        <Text style={[typeScale.carimbo, estilos.carimboTexto, { color: cor }]}>
+          {texto.toUpperCase()}
+        </Text>
+        {detalhe ? (
+          <Text style={[typeScale.coluna, estilos.carimboDetalhe, { color: cor }]}>
+            {detalhe.toUpperCase()}
+          </Text>
+        ) : null}
+      </View>
+    </Animated.View>
   );
 }
 
-/** Cartão que entra deslizando e com leve escala. Usado nas métricas do topo. */
-export function EntradaCartao({
+/**
+ * Entrada discreta: sobe 10px e aparece.
+ *
+ * Sem escala. Escalar um bloco de texto na entrada é o tique de animação
+ * genérica — e a mesma entrada repetida em toda seção da tela é o que o piso
+ * de qualidade chama de "efeito espalhado" em vez de um momento autoral.
+ * Aqui ela existe só onde há uma cascata curta e proposital.
+ */
+export function Entrada({
   atraso = 0,
   children,
   style,
 }: {
   atraso?: number;
   children: React.ReactNode;
-  style?: StyleProp<import('react-native').ViewStyle>;
+  style?: StyleProp<ViewStyle>;
 }) {
   const p = useSharedValue(0);
+  const reduzido = useReducedMotion();
 
   useEffect(() => {
-    p.value = withDelay(atraso, withSpring(1, { damping: 16, stiffness: 120 }));
-  }, [atraso, p]);
+    if (reduzido) {
+      p.set(1);
+      return;
+    }
+    p.set(withDelay(atraso, withTiming(1, { duration: 260, easing: SAIDA })));
+  }, [atraso, reduzido, p]);
 
   const estilo = useAnimatedStyle(() => ({
-    opacity: p.value,
-    transform: [{ translateY: (1 - p.value) * 18 }, { scale: 0.96 + p.value * 0.04 }],
+    opacity: p.get(),
+    transform: [{ translateY: (1 - p.get()) * 10 }],
   }));
 
   return <Animated.View style={[estilo, style]}>{children}</Animated.View>;
@@ -207,22 +227,32 @@ export function EntradaCartao({
 
 const estilos = StyleSheet.create({
   contador: {
-    ...typeScale.title,
-    color: color.text,
+    ...typeScale.numeroG,
+    color: color.tinta,
     padding: 0,
     margin: 0,
-    textAlign: 'center',
+    textAlign: 'left',
     fontVariant: ['tabular-nums'],
   },
   trilho: {
     flex: 1,
-    backgroundColor: color.surfaceHi,
+    backgroundColor: color.papelBaixo,
     overflow: 'hidden',
   },
-  halo: {
-    position: 'absolute',
-    backgroundColor: color.accentSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.accentLine,
+  carimbo: {
+    alignSelf: 'center',
+    borderWidth: 2.5,
+    borderRadius: radius.sm,
+    padding: 3,
   },
+  carimboInterno: {
+    borderWidth: traco.normal,
+    borderRadius: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    alignItems: 'center',
+    gap: 2,
+  },
+  carimboTexto: { fontSize: 17, letterSpacing: 2.6 },
+  carimboDetalhe: { fontSize: 10, letterSpacing: 1.6 },
 });

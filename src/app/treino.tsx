@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { router } from 'expo-router';
@@ -6,23 +5,41 @@ import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Botao, BotaoIcone, Divisor, Tx, Vazio } from '@/components/base';
-import { BarraDescanso } from '@/components/descanso';
+import {
+  Botao,
+  BotaoGlifo,
+  CabecaColuna,
+  Pressavel,
+  Regua,
+  Rotulo,
+  Tx,
+  Vazio,
+} from '@/components/base';
+import { TiraDescanso } from '@/components/descanso';
 import { abrirConfirmacao, abrirMenu, abrirPrompt } from '@/components/folha';
+import { Glifo } from '@/components/glifos';
 import { BlocoExercicio } from '@/components/treino-exercicio';
-import { color, radius, shadow, sp, type } from '@/design/tokens';
+import { color, margem, sp, type } from '@/design/tokens';
 import { fmtDuracao, fmtVolume, ultimaExecucao, volumeSessao } from '@/lib/metricas';
 import { useCinta } from '@/store/cinta';
 import { useDescanso } from '@/store/descanso';
 import { useTreino } from '@/store/treino';
 
+/**
+ * Treino em andamento.
+ *
+ * O topo virou o cabeçalho da página: nome editável e, abaixo, uma FAIXA DE
+ * TOTAIS com cabeça de coluna — tempo, séries, volume e batimento. Antes esses
+ * números eram um aglomerado centralizado em texto miúdo; em colunas rotuladas
+ * eles se leem de relance, que é a única forma de leitura que existe entre uma
+ * série e outra.
+ */
 export default function TreinoAtivo() {
   useKeepAwake();
   const insets = useSafeAreaInsets();
@@ -109,14 +126,10 @@ export default function TreinoAtivo() {
     abrirMenu({
       titulo: ativa!.nome,
       opcoes: [
-        {
-          texto: 'Adicionar exercício',
-          icone: 'add-circle-outline',
-          onPress: () => router.push('/selecionar'),
-        },
+        { texto: 'Adicionar exercício', glifo: 'mais', onPress: () => router.push('/selecionar') },
         {
           texto: 'Salvar como rotina',
-          icone: 'bookmark-outline',
+          glifo: 'lista',
           onPress: () =>
             abrirPrompt({
               titulo: 'Salvar como rotina',
@@ -126,71 +139,86 @@ export default function TreinoAtivo() {
               onConfirmar: (nome) => rotinaDaAtiva(nome || ativa!.nome),
             }),
         },
-        {
-          texto: 'Descartar treino',
-          icone: 'trash-outline',
-          destrutiva: true,
-          onPress: abandonar,
-        },
+        { texto: 'Descartar treino', glifo: 'lixo', destrutiva: true, onPress: abandonar },
       ],
     });
   }
 
-  const alturaRodape = insets.bottom + 78;
+  const alturaRodape = insets.bottom + 74;
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: color.bg }}
+      style={{ flex: 1, backgroundColor: color.papel }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[estilos.topo, { paddingTop: insets.top + sp.sm }]}>
-        <BotaoIcone icone="chevron-down" onPress={() => router.back()} />
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Tx v="heading" tab>
-            {fmtDuracao(agora - ativa.inicio)}
-          </Tx>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-            <Tx v="caption" cor={color.textFaint}>
-              {series} SÉRIES · {fmtVolume(volume)}
-            </Tx>
-            {bpm !== null ? (
-              <View style={estilos.bpm}>
-                <Ionicons name="heart" size={9} color={color.accent} />
-                <Tx v="caption" tab cor={color.accent}>
-                  {bpm}
-                </Tx>
-              </View>
-            ) : null}
-          </View>
-        </View>
-        <BotaoIcone icone="ellipsis-horizontal" onPress={menu} />
+      <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
+        <BotaoGlifo glifo="baixo" acessivel="Voltar" onPress={() => router.back()} />
+        <View style={{ flex: 1 }} />
+        <BotaoGlifo glifo="reticencias" acessivel="Opções do treino" onPress={menu} />
       </View>
 
+      <TextInput
+        value={ativa.nome}
+        onChangeText={renomear}
+        style={estilos.titulo}
+        placeholder="Nome do treino"
+        placeholderTextColor={color.tintaFantasma}
+        returnKeyType="done"
+        maxFontSizeMultiplier={1.3}
+      />
+
+      {/* Faixa de totais: colunas rotuladas, valores em condensada tabular. */}
+      <CabecaColuna>
+        <Rotulo cor={color.tintaMid} style={{ flex: 1.3 }}>
+          Tempo
+        </Rotulo>
+        <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+          Séries
+        </Rotulo>
+        <Rotulo cor={color.tintaMid} style={{ flex: 1.2 }}>
+          Volume
+        </Rotulo>
+        {bpm !== null ? (
+          <Rotulo cor={color.tintaMid} style={{ width: 52, textAlign: 'right' }}>
+            bpm
+          </Rotulo>
+        ) : null}
+      </CabecaColuna>
+      <View style={estilos.totais}>
+        <Tx v="numeroG" tab style={{ flex: 1.3 }}>
+          {fmtDuracao(agora - ativa.inicio)}
+        </Tx>
+        <Tx v="numeroG" tab style={{ flex: 1 }}>
+          {series}
+        </Tx>
+        <Tx v="numeroG" tab style={{ flex: 1.2 }}>
+          {fmtVolume(volume)}
+        </Tx>
+        {bpm !== null ? (
+          <View style={estilos.bpm}>
+            <Glifo nome="coracao" tamanho={11} cor={color.vermelho} />
+            <Tx v="numeroG" tab cor={color.vermelho}>
+              {bpm}
+            </Tx>
+          </View>
+        ) : null}
+      </View>
+      <Regua peso="forte" cor={color.tinta} />
+
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: sp.xl, paddingBottom: alturaRodape + 70 }}
+        contentContainerStyle={{ paddingTop: sp.xl, paddingBottom: alturaRodape + 80 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        <TextInput
-          value={ativa.nome}
-          onChangeText={renomear}
-          style={estilos.titulo}
-          placeholder="Nome do treino"
-          placeholderTextColor={color.textGhost}
-          returnKeyType="done"
-        />
-        <Divisor style={{ marginTop: sp.lg, marginBottom: sp.sm }} />
-
         {ativa.exercicios.length === 0 ? (
           <Vazio
-            icone="barbell-outline"
             titulo="Treino vazio"
             texto="Adicione os exercícios do dia. Cada um já vem com três séries prontas para preencher."
             acao={
               <Botao
                 titulo="Adicionar exercício"
-                icone="add"
+                glifo="mais"
                 onPress={() => router.push('/selecionar')}
               />
             }
@@ -208,20 +236,30 @@ export default function TreinoAtivo() {
         )}
 
         {ativa.exercicios.length > 0 ? (
-          <Pressable
-            onPress={() => router.push('/selecionar')}
-            style={({ pressed }) => [estilos.addExercicio, pressed && { opacity: 0.7 }]}
-          >
-            <Ionicons name="add" size={17} color={color.text} />
-            <Tx v="bodyMed">Adicionar exercício</Tx>
-          </Pressable>
+          <View>
+            <Regua peso="forte" />
+            <Pressavel
+              onPress={() => router.push('/selecionar')}
+              haptico="leve"
+              escala={0.995}
+              fundoPressionado={color.papelBaixo}
+              style={estilos.addExercicio}
+            >
+              <Glifo nome="mais" tamanho={16} cor={color.tinta} />
+              <Tx v="bodyMed">Adicionar exercício</Tx>
+            </Pressavel>
+            <Regua />
+          </View>
         ) : null}
       </ScrollView>
 
-      <BarraDescanso bottom={alturaRodape + sp.sm} />
+      <TiraDescanso bottom={alturaRodape} />
 
       <View style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>
-        <Botao titulo="Concluir treino" grande onPress={concluir} style={{ flex: 1 }} />
+        <Regua peso="forte" cor={color.tinta} />
+        <View style={estilos.rodapeCorpo}>
+          <Botao titulo="Concluir treino" grande onPress={concluir} style={{ flex: 1 }} />
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -232,41 +270,38 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: sp.md,
-    paddingBottom: sp.md,
   },
-  bpm: {
+  titulo: {
+    ...type.title,
+    color: color.tinta,
+    paddingHorizontal: margem.pagina,
+    paddingVertical: 0,
+    marginBottom: sp.md,
+  },
+  totais: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: radius.pill,
-    backgroundColor: color.accentSoft,
+    alignItems: 'baseline',
+    paddingHorizontal: margem.pagina,
+    paddingVertical: sp.sm,
   },
-  titulo: { ...type.title, color: color.text, padding: 0, marginTop: sp.sm },
+  bpm: { width: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
   addExercicio: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: sp.sm,
-    height: 52,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineMid,
-    borderStyle: 'dashed',
-    marginTop: sp.lg,
+    height: 56,
+    paddingHorizontal: margem.pagina,
   },
   rodape: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: color.papel,
+  },
+  rodapeCorpo: {
     flexDirection: 'row',
-    paddingHorizontal: sp.xl,
+    paddingHorizontal: margem.pagina,
     paddingTop: sp.md,
-    backgroundColor: color.bg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.line,
-    ...shadow.soft,
   },
 });

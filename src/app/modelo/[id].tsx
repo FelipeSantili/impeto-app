@@ -1,19 +1,31 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Botao, BotaoIcone, Rotulo, Tx, Vazio } from '@/components/base';
-import { abrirConfirmacao } from '@/components/folha';
+import {
+  Botao,
+  BotaoGlifo,
+  CabecaColuna,
+  Pressavel,
+  Regua,
+  Rotulo,
+  Tx,
+  Vazio,
+} from '@/components/base';
 import { Miniatura } from '@/components/demo';
+import { abrirConfirmacao } from '@/components/folha';
+import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
 import { MODELO_POR_ID } from '@/data/modelos';
 import { EQUIP_LABEL } from '@/data/types';
-import { color, radius, shadow, sp } from '@/design/tokens';
+import { color, margem, sp } from '@/design/tokens';
 import { useTreino } from '@/store/treino';
 
-/** Detalhe de um modelo pronto: lista completa + salvar / iniciar. */
+function fmtDescanso(seg: number) {
+  return `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
+}
+
+/** Detalhe de um modelo pronto: sequência completa + salvar / iniciar. */
 export default function DetalheModelo() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,11 +37,11 @@ export default function DetalheModelo() {
 
   if (!entrada) {
     return (
-      <View style={{ flex: 1, backgroundColor: color.bg, paddingTop: insets.top + sp.sm }}>
+      <View style={{ flex: 1, backgroundColor: color.papel, paddingTop: insets.top + sp.sm }}>
         <View style={estilos.topo}>
-          <BotaoIcone icone="chevron-back" onPress={() => router.back()} />
+          <BotaoGlifo glifo="voltar" acessivel="Voltar" onPress={() => router.back()} />
         </View>
-        <Vazio icone="alert-circle-outline" titulo="Modelo não encontrado" />
+        <Vazio titulo="Modelo não encontrado" />
       </View>
     );
   }
@@ -66,68 +78,83 @@ export default function DetalheModelo() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.bg }}>
-      <View style={[estilos.topo, { paddingTop: insets.top + sp.sm }]}>
-        <BotaoIcone icone="chevron-back" onPress={() => router.back()} />
-        <Tx v="caption" cor={color.textFaint} style={{ flex: 1, textAlign: 'center' }}>
-          {programa.nome.toUpperCase()} · {programa.freq.toUpperCase()}
-        </Tx>
-        <View style={{ width: 40 }} />
+    <View style={{ flex: 1, backgroundColor: color.papel }}>
+      <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
+        <View style={{ marginLeft: -sp.sm }}>
+          <BotaoGlifo glifo="voltar" acessivel="Voltar" onPress={() => router.back()} />
+        </View>
+        <View style={{ flex: 1 }} />
+        <Rotulo cor={color.tintaFraca}>
+          {programa.nome} · {programa.freq}
+        </Rotulo>
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: sp.xl, paddingBottom: insets.bottom + 150 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 140 }}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={FadeInDown.duration(280)}>
-          <Tx v="title" style={{ marginTop: sp.sm }}>
-            {modelo.nome}
-          </Tx>
-          <Tx v="body" cor={color.textFaint} style={{ marginTop: sp.xs }}>
+        <View style={{ paddingHorizontal: margem.pagina, paddingBottom: sp.lg }}>
+          <Tx v="display">{modelo.nome}</Tx>
+          <Tx v="body" cor={color.tintaMid} style={{ marginTop: sp.xs }}>
             {modelo.foco}
           </Tx>
-          <Tx v="caption" cor={color.textGhost} style={{ marginTop: sp.md }}>
-            {modelo.itens.length} EXERCÍCIOS · {series} SÉRIES
-          </Tx>
-        </Animated.View>
-
-        <View style={{ marginTop: sp.xl }}>
-          <Rotulo>Sequência</Rotulo>
-          <View style={{ marginTop: sp.sm }}>
-            {modelo.itens.map((item, i) => {
-              const ex = POR_ID[item.exId];
-              return (
-                <Animated.View key={`${item.exId}-${i}`} entering={FadeInDown.delay(50 + i * 35).duration(260)}>
-                  <Pressable
-                    onPress={() => router.push(`/exercicio/${item.exId}`)}
-                    style={({ pressed }) => [estilos.linha, pressed && { opacity: 0.6 }]}
-                  >
-                    <Tx v="caption" tab cor={color.textGhost} style={{ width: 20 }}>
-                      {String(i + 1).padStart(2, '0')}
-                    </Tx>
-                    <Miniatura ex={ex} tamanho={42} />
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Tx v="bodyMed" numberOfLines={1}>
-                        {ex?.nome ?? item.exId}
-                      </Tx>
-                      <Tx v="small" cor={color.textFaint} numberOfLines={1}>
-                        {ex ? EQUIP_LABEL[ex.equip] : ''} · {item.series}{' '}
-                        {item.series === 1 ? 'série' : 'séries'} · descanso{' '}
-                        {Math.floor(item.descanso / 60)}:{String(item.descanso % 60).padStart(2, '0')}
-                      </Tx>
-                    </View>
-                    <Ionicons name="chevron-forward" size={15} color={color.textGhost} />
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
-          </View>
         </View>
+        <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+
+        <CabecaColuna>
+          <Rotulo cor={color.tintaMid} style={{ width: margem.calha }}>
+            Nº
+          </Rotulo>
+          <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+            Sequência
+          </Rotulo>
+          <Rotulo cor={color.tintaMid} style={{ width: 86, textAlign: 'right' }}>
+            {modelo.itens.length} ex · {series} sér
+          </Rotulo>
+        </CabecaColuna>
+
+        {modelo.itens.map((item, i) => {
+          const ex = POR_ID[item.exId];
+          return (
+            <View key={`${item.exId}-${i}`}>
+              <Pressavel
+                onPress={() => router.push(`/exercicio/${item.exId}`)}
+                escala={0.995}
+                fundoPressionado={color.papelBaixo}
+                accessibilityRole="button"
+                accessibilityLabel={ex?.nome ?? item.exId}
+                style={estilos.linha}
+              >
+                <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+                  {i + 1}
+                </Tx>
+                <Miniatura ex={ex} tamanho={40} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Tx v="bodyMed" numberOfLines={1}>
+                    {ex?.nome ?? item.exId}
+                  </Tx>
+                  <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+                    {ex ? EQUIP_LABEL[ex.equip] : ''} · descanso {fmtDescanso(item.descanso)}
+                  </Tx>
+                </View>
+                <Tx v="numero" tab style={{ width: 46, textAlign: 'right' }}>
+                  {item.series}
+                  <Tx v="small" cor={color.tintaFraca}> sér</Tx>
+                </Tx>
+                <Glifo nome="avancar" tamanho={13} cor={color.tintaFantasma} />
+              </Pressavel>
+              <Regua />
+            </View>
+          );
+        })}
       </ScrollView>
 
-      <View style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }, shadow.soft]}>
-        <Botao titulo="Salvar rotina" tom="contorno" onPress={usarModelo} style={{ flex: 1 }} />
-        <Botao titulo="Iniciar agora" icone="play" onPress={iniciarAgora} style={{ flex: 1 }} />
+      <View style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>
+        <Regua peso="forte" cor={color.tinta} />
+        <View style={estilos.rodapeCorpo}>
+          <Botao titulo="Salvar rotina" tom="contorno" grande onPress={usarModelo} style={{ flex: 1 }} />
+          <Botao titulo="Iniciar agora" glifo="play" grande onPress={iniciarAgora} style={{ flex: 1 }} />
+        </View>
       </View>
     </View>
   );
@@ -137,7 +164,8 @@ const estilos = StyleSheet.create({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: sp.md,
+    gap: sp.sm,
+    paddingHorizontal: margem.pagina,
     paddingBottom: sp.sm,
   },
   linha: {
@@ -145,20 +173,19 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     gap: sp.md,
     paddingVertical: sp.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: color.line,
+    paddingHorizontal: margem.pagina,
   },
   rodape: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: color.papel,
+  },
+  rodapeCorpo: {
     flexDirection: 'row',
     gap: sp.sm,
-    paddingHorizontal: sp.xl,
+    paddingHorizontal: margem.pagina,
     paddingTop: sp.md,
-    backgroundColor: color.bg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.line,
   },
 });

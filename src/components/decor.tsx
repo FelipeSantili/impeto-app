@@ -1,84 +1,70 @@
-import { useId } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
-import { color } from '@/design/tokens';
+import { useEffect } from 'react';
+import { View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { color, traco } from '@/design/tokens';
 
 /**
- * Brilho radial — a única "luz" do app.
- * Vive atrás de títulos e momentos-chave; nunca compete com o conteúdo.
+ * Régua de progresso.
+ *
+ * Substituiu o anel de progresso que havia aqui. Anel de progresso e brilho
+ * radial eram as duas peças decorativas do app antigo, e as duas são
+ * assinatura de interface gerada — anel fingindo ser conteúdo, halo colorido
+ * fingindo ser profundidade. No mundo do caderno, progresso é uma régua que
+ * encurta: a mesma régua que separa as seções, agora medindo.
  */
-export function Brilho({
-  tamanho = 380,
-  cor = color.accent,
-  intensidade = 0.13,
-  style,
+export function ReguaProgresso({
+  fracao,
+  cor = color.tinta,
+  altura = 2,
+  animar = false,
 }: {
-  tamanho?: number;
+  fracao: number;
   cor?: string;
-  intensidade?: number;
-  style?: StyleProp<ViewStyle>;
+  altura?: number;
+  animar?: boolean;
 }) {
-  // Cada instância precisa do seu gradiente — ids repetidos fazem um SVG
-  // pintar com o gradiente de outro.
-  const id = useId();
+  const alvo = Math.max(0, Math.min(1, fracao));
+  const p = useSharedValue(animar ? 0 : alvo);
+
+  useEffect(() => {
+    if (animar) {
+      p.set(withTiming(alvo, { duration: 700, easing: Easing.out(Easing.cubic) }));
+    } else {
+      // O cronômetro atualiza a cada 250ms; animar cada passo faria a régua
+      // parecer travada. Ela salta direto para a posição real.
+      p.set(alvo);
+    }
+  }, [alvo, animar, p]);
+
+  const estilo = useAnimatedStyle(() => ({ width: `${p.get() * 100}%` }));
+
   return (
-    <Svg
-      width={tamanho}
-      height={tamanho}
-      style={[{ position: 'absolute' }, style]}
-      pointerEvents="none"
-    >
-      <Defs>
-        <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor={cor} stopOpacity={intensidade} />
-          <Stop offset="55%" stopColor={cor} stopOpacity={intensidade * 0.35} />
-          <Stop offset="100%" stopColor={cor} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Circle cx={tamanho / 2} cy={tamanho / 2} r={tamanho / 2} fill={`url(#${id})`} />
-    </Svg>
+    <View style={{ height: altura, backgroundColor: color.regua, overflow: 'hidden' }}>
+      <Animated.View style={[{ height: altura, backgroundColor: cor }, estilo]} />
+    </View>
   );
 }
 
-/** Anel de progresso — usado no cronômetro de descanso. `progresso` em 0..1. */
-export function Anel({
-  tamanho = 34,
-  espessura = 3,
-  progresso,
-  cor = color.accent,
-  trilha = color.surfacePress,
-}: {
-  tamanho?: number;
-  espessura?: number;
-  progresso: number;
-  cor?: string;
-  trilha?: string;
-}) {
-  const r = (tamanho - espessura) / 2;
-  const c = 2 * Math.PI * r;
-  const p = Math.max(0, Math.min(1, progresso));
+/** Moldura de prancha: o quadro impresso onde a demonstração vive. */
+export function Prancha({ children, style }: { children?: React.ReactNode; style?: object }) {
   return (
-    <Svg width={tamanho} height={tamanho}>
-      <Circle
-        cx={tamanho / 2}
-        cy={tamanho / 2}
-        r={r}
-        stroke={trilha}
-        strokeWidth={espessura}
-        fill="none"
-      />
-      <Circle
-        cx={tamanho / 2}
-        cy={tamanho / 2}
-        r={r}
-        stroke={cor}
-        strokeWidth={espessura}
-        fill="none"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - p)}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${tamanho / 2} ${tamanho / 2})`}
-      />
-    </Svg>
+    <View
+      style={[
+        {
+          backgroundColor: color.papelAlto,
+          borderWidth: traco.normal,
+          borderColor: color.reguaMid,
+          overflow: 'hidden',
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
   );
 }

@@ -1,23 +1,38 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { memo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
-import { Rotulo, Tx } from '@/components/base';
+import { CabecaColuna, Pressavel, Regua, Rotulo, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
+import { Glifo } from '@/components/glifos';
 import { abrirMenu, type OpcaoMenu } from '@/components/folha';
 import { POR_ID } from '@/data/exercicios';
 import { TECNICAS, tecnicaDe } from '@/data/tecnicas';
 import { MEDIDA_LABEL, type Medida } from '@/data/types';
-import { color, radius, sp, type } from '@/design/tokens';
+import { color, margem, radius, sp, traco, type } from '@/design/tokens';
 import { fmtNumero } from '@/lib/metricas';
 import { useDescanso } from '@/store/descanso';
 import { useTreino, type ExercicioTreino, type Serie } from '@/store/treino';
 
 const OPCOES_DESCANSO = [0, 45, 60, 90, 120, 150, 180, 240];
 
-/** Bloco de um exercício dentro do treino: cabeçalho, tabela de séries e ações. */
+/** Larguras das colunas. Fixas, porque tabela que dança não se lê de relance. */
+const COL = { serie: 34, valor: 62, check: 36 };
+
+function fmtDescanso(seg: number) {
+  return `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Um exercício dentro do treino, montado como página de livro-caixa:
+ * cabeçalho, cabeça de coluna sobre faixa, e uma linha por série.
+ *
+ * Antes isto era um cartão com borda e canto de 22px, e cada série era uma
+ * pílula solta. O que mudou não é cosmético: colunas de largura fixa com
+ * cabeça de coluna transformam uma lista de valores em TABELA, que é o que se
+ * lê em três segundos entre uma série e outra.
+ */
 function BlocoExercicioBase({
   item,
   indice,
@@ -41,35 +56,27 @@ function BlocoExercicioBase({
 
   const [mostrarNota, setMostrarNota] = useState(!!item.nota);
 
+  // A linha da vez é a primeira não concluída — é ela que ganha a barra de
+  // tinta na margem, a marca de "é aqui que você está".
+  const indiceAtivo = item.series.findIndex((s) => !s.feita);
+
   function menu() {
     const opcoes: OpcaoMenu[] = [
-      {
-        texto: 'Ver demonstração',
-        icone: 'play-circle-outline',
-        onPress: () => router.push(`/exercicio/${item.exId}`),
-      },
+      { texto: 'Ver demonstração', glifo: 'play', onPress: () => router.push(`/exercicio/${item.exId}`) },
       {
         texto: item.nota ? 'Editar anotação' : 'Adicionar anotação',
-        icone: 'create-outline',
+        glifo: 'lista',
         onPress: () => setMostrarNota(true),
       },
-      { texto: 'Tempo de descanso', icone: 'timer-outline', onPress: menuDescanso },
+      { texto: 'Tempo de descanso', glifo: 'relogio', onPress: menuDescanso },
     ];
     if (indice > 0)
-      opcoes.push({
-        texto: 'Mover para cima',
-        icone: 'arrow-up',
-        onPress: () => moverExercicio(item.uid, -1),
-      });
+      opcoes.push({ texto: 'Mover para cima', glifo: 'cima', onPress: () => moverExercicio(item.uid, -1) });
     if (indice < total - 1)
-      opcoes.push({
-        texto: 'Mover para baixo',
-        icone: 'arrow-down',
-        onPress: () => moverExercicio(item.uid, 1),
-      });
+      opcoes.push({ texto: 'Mover para baixo', glifo: 'baixo', onPress: () => moverExercicio(item.uid, 1) });
     opcoes.push({
       texto: 'Remover do treino',
-      icone: 'trash-outline',
+      glifo: 'lixo',
       destrutiva: true,
       onPress: () => removerExercicio(item.uid),
     });
@@ -81,10 +88,7 @@ function BlocoExercicioBase({
       titulo: 'Descanso entre séries',
       subtitulo: 'Vale para todas as séries deste exercício.',
       opcoes: OPCOES_DESCANSO.map((seg) => ({
-        texto:
-          seg === 0
-            ? 'Sem cronômetro'
-            : `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`,
+        texto: seg === 0 ? 'Sem cronômetro' : fmtDescanso(seg),
         onPress: () => setDescanso(item.uid, seg),
       })),
     });
@@ -92,41 +96,53 @@ function BlocoExercicioBase({
 
   return (
     <Animated.View layout={LinearTransition.springify().damping(18)} style={estilos.bloco}>
-      <Pressable onPress={() => router.push(`/exercicio/${item.exId}`)} style={estilos.cabecalho}>
-        <Miniatura ex={ex} tamanho={40} />
-        <View style={{ flex: 1, gap: 1 }}>
-          <Tx v="bodyMed" numberOfLines={1}>
-            {ex?.nome ?? 'Exercício'}
-          </Tx>
-          <Tx v="small" cor={color.textFaint}>
-            {item.descanso > 0
-              ? `Descanso ${Math.floor(item.descanso / 60)}:${String(item.descanso % 60).padStart(2, '0')}`
-              : 'Sem cronômetro'}
-          </Tx>
-        </View>
-        <Pressable hitSlop={10} onPress={menu} style={estilos.menu}>
-          <Ionicons name="ellipsis-horizontal" size={16} color={color.textDim} />
-        </Pressable>
-      </Pressable>
+      <View style={estilos.cabecalho}>
+        <Pressavel
+          onPress={() => router.push(`/exercicio/${item.exId}`)}
+          style={estilos.cabecalhoToque}
+          escala={0.995}
+        >
+          <Miniatura ex={ex} tamanho={38} />
+          <View style={{ flex: 1, gap: 1 }}>
+            <Tx v="heading" numberOfLines={1}>
+              {ex?.nome ?? 'Exercício'}
+            </Tx>
+            <Tx v="small" cor={color.tintaFraca}>
+              {item.descanso > 0 ? `Descanso ${fmtDescanso(item.descanso)}` : 'Sem cronômetro'}
+            </Tx>
+          </View>
+        </Pressavel>
+        <Pressavel onPress={menu} hitSlop={12} style={estilos.menu} accessibilityLabel="Opções do exercício">
+          <Glifo nome="reticencias" tamanho={16} cor={color.tintaMid} />
+        </Pressavel>
+      </View>
 
       {mostrarNota ? (
         <TextInput
           value={item.nota ?? ''}
           onChangeText={(t) => setNota(item.uid, t)}
           placeholder="Anotação (pino, altura do banco, pegada…)"
-          placeholderTextColor={color.textGhost}
+          placeholderTextColor={color.tintaFantasma}
           style={estilos.nota}
           multiline
         />
       ) : null}
 
-      <View style={estilos.colunas}>
-        <Rotulo style={{ width: 30, textAlign: 'center' }}>Sér</Rotulo>
-        <Rotulo style={{ flex: 1, textAlign: 'center' }}>Anterior</Rotulo>
-        <Rotulo style={{ width: 64, textAlign: 'center' }}>{rotulos.a}</Rotulo>
-        <Rotulo style={{ width: 64, textAlign: 'center' }}>{rotulos.b}</Rotulo>
-        <View style={{ width: 34 }} />
-      </View>
+      <CabecaColuna>
+        <Rotulo cor={color.tintaMid} style={{ width: COL.serie }}>
+          Sér
+        </Rotulo>
+        <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+          Anterior
+        </Rotulo>
+        <Rotulo cor={color.tintaMid} style={{ width: COL.valor, textAlign: 'center' }}>
+          {rotulos.a}
+        </Rotulo>
+        <Rotulo cor={color.tintaMid} style={{ width: COL.valor, textAlign: 'center' }}>
+          {rotulos.b}
+        </Rotulo>
+        <View style={{ width: COL.check }} />
+      </CabecaColuna>
 
       {item.series.map((serie, i) => (
         <LinhaSerie
@@ -135,22 +151,22 @@ function BlocoExercicioBase({
           serie={serie}
           numero={i + 1}
           descanso={item.descanso}
+          ativa={i === indiceAtivo}
           anterior={anterior?.[i] ?? null}
         />
       ))}
 
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          addSerie(item.uid);
-        }}
-        style={({ pressed }) => [estilos.addSerie, pressed && { backgroundColor: color.surfaceHi }]}
+      <Regua />
+      <Pressavel
+        haptico="leve"
+        onPress={() => addSerie(item.uid)}
+        fundoPressionado={color.papelBaixo}
+        escala={0.995}
+        style={estilos.addSerie}
       >
-        <Ionicons name="add" size={15} color={color.textDim} />
-        <Tx v="smallMed" cor={color.textDim}>
-          Adicionar série
-        </Tx>
-      </Pressable>
+        <Glifo nome="mais" tamanho={13} cor={color.tintaMid} />
+        <Rotulo cor={color.tintaMid}>Adicionar série</Rotulo>
+      </Pressavel>
     </Animated.View>
   );
 }
@@ -162,12 +178,14 @@ function LinhaSerie({
   serie,
   numero,
   descanso,
+  ativa,
   anterior,
 }: {
   uid: string;
   serie: Serie;
   numero: number;
   descanso: number;
+  ativa: boolean;
   anterior: Serie | null;
 }) {
   const editarSerie = useTreino((s) => s.editarSerie);
@@ -178,29 +196,32 @@ function LinhaSerie({
 
   const tecnica = tecnicaDe(serie.tipo);
   const feita = serie.feita;
+  const aquecimento = serie.tipo === 'aquecimento';
 
-  /** Dez técnicas não cabem num toque cíclico — a folha lista todas com explicação. */
+  /** Dez técnicas não cabem num toque cíclico — a folha lista todas. */
   function escolherTecnica() {
     abrirMenu({
       titulo: `Série ${numero}`,
       subtitulo: 'Como você vai executar',
       opcoes: TECNICAS.map((t) => ({
         texto: t.tipo === tecnica.tipo ? `${t.nome}  ·  atual` : t.nome,
-        icone: t.tipo === tecnica.tipo ? ('checkmark-circle' as const) : ('ellipse-outline' as const),
+        glifo: t.tipo === tecnica.tipo ? ('confere' as const) : undefined,
         onPress: () => definirTipo(uid, serie.id, t.tipo),
       })),
     });
   }
 
-  const dicaPeso = anterior?.peso != null ? fmtNumero(anterior.peso) : '—';
-  const dicaReps = anterior?.reps != null ? fmtNumero(anterior.reps) : '—';
+  const dicaPeso = anterior?.peso != null ? fmtNumero(anterior.peso) : null;
+  const dicaReps = anterior?.reps != null ? fmtNumero(anterior.reps) : null;
 
   function concluir() {
     // Marcar sem digitar nada assume o desempenho anterior — é o caminho comum
     // de quem repete a carga da semana passada.
     if (!feita) {
-      if (serie.peso === null && anterior?.peso != null) editarSerie(uid, serie.id, 'peso', anterior.peso);
-      if (serie.reps === null && anterior?.reps != null) editarSerie(uid, serie.id, 'reps', anterior.reps);
+      if (serie.peso === null && anterior?.peso != null)
+        editarSerie(uid, serie.id, 'peso', anterior.peso);
+      if (serie.reps === null && anterior?.reps != null)
+        editarSerie(uid, serie.id, 'reps', anterior.reps);
     }
     const virou = alternarFeita(uid, serie.id);
     if (virou) {
@@ -212,27 +233,42 @@ function LinhaSerie({
   }
 
   return (
-    <Animated.View entering={FadeIn.duration(180)} style={[estilos.linha, feita && estilos.linhaFeita]}>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync();
-          escolherTecnica();
-        }}
+    <Animated.View
+      entering={FadeIn.duration(160)}
+      style={[estilos.linha, feita && estilos.linhaFeita, ativa && estilos.linhaAtiva]}
+    >
+      {/* Marca de linha da vez: barra de tinta encostada na margem. */}
+      {ativa ? <View style={estilos.barraAtiva} /> : null}
+
+      {/*
+        Ordinal. Aquecimento vem ENTRE PARÊNTESES porque é assim que um
+        livro-caixa marca a linha que não soma ao total — e aquecimento é
+        exatamente a única série que não entra no volume.
+      */}
+      <Pressavel
+        haptico="selecao"
+        onPress={escolherTecnica}
         onLongPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           removerSerie(uid, serie.id);
         }}
         delayLongPress={400}
-        hitSlop={6}
-        style={{ width: 30, alignItems: 'center' }}
+        hitSlop={8}
+        accessibilityLabel={`Série ${numero}, ${tecnica.nome}. Toque para mudar a técnica.`}
+        style={{ width: COL.serie }}
       >
-        <Tx v="smallMed" tab cor={tecnica.sigla ? tecnica.cor : color.textDim}>
-          {tecnica.sigla ?? numero}
+        <Tx v="numero" tab cor={aquecimento ? color.tintaFraca : color.tinta}>
+          {aquecimento ? `(${numero})` : numero}
         </Tx>
-      </Pressable>
+        {tecnica.sigla && !aquecimento ? (
+          <Text style={estilos.sigla} numberOfLines={1}>
+            {tecnica.sigla}
+          </Text>
+        ) : null}
+      </Pressavel>
 
-      <Tx v="small" tab cor={color.textGhost} center style={{ flex: 1 }} numberOfLines={1}>
-        {anterior ? `${dicaPeso} × ${dicaReps}` : '—'}
+      <Tx v="small" tab cor={color.tintaFraca} style={{ flex: 1 }} numberOfLines={1}>
+        {dicaPeso && dicaReps ? `${dicaPeso} × ${dicaReps}` : '—'}
       </Tx>
 
       <CampoNumero
@@ -249,13 +285,27 @@ function LinhaSerie({
         onChange={(v) => editarSerie(uid, serie.id, 'reps', v)}
       />
 
-      <Pressable onPress={concluir} hitSlop={6} style={[estilos.check, feita && estilos.checkFeito]}>
-        <Ionicons name="checkmark" size={16} color={feita ? color.accentText : color.textFaint} />
-      </Pressable>
+      <Pressavel
+        onPress={concluir}
+        hitSlop={8}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: feita }}
+        accessibilityLabel={`Concluir série ${numero}`}
+        style={[estilos.check, feita && estilos.checkFeito]}
+      >
+        <Glifo nome="confere" tamanho={15} cor={feita ? color.azulTexto : color.tintaFantasma} />
+      </Pressavel>
     </Animated.View>
   );
 }
 
+/**
+ * Célula de valor: campo de formulário com régua embaixo, não caixa com fundo.
+ *
+ * Vazia mostra o pontilhado de campo não preenchido; preenchida escreve em
+ * AZUL, porque azul é o que você escreveu. Quando a linha é dada por
+ * concluída a régua some — deixou de ser campo a preencher e virou registro.
+ */
 function CampoNumero({
   valor,
   dica,
@@ -264,7 +314,7 @@ function CampoNumero({
   onChange,
 }: {
   valor: number | null;
-  dica: string;
+  dica: string | null;
   feita: boolean;
   inteiro?: boolean;
   onChange: (v: number | null) => void;
@@ -278,18 +328,20 @@ function CampoNumero({
     <TextInput
       value={mostrado}
       onChangeText={(t) => {
-        const limpo = inteiro ? t.replace(/[^0-9]/g, '') : t.replace(',', '.').replace(/[^0-9.]/g, '');
+        const limpo = inteiro
+          ? t.replace(/[^0-9]/g, '')
+          : t.replace(',', '.').replace(/[^0-9.]/g, '');
         setTexto(limpo);
         if (limpo === '') return onChange(null);
         const n = Number(limpo);
         if (!Number.isNaN(n)) onChange(n);
       }}
       onBlur={() => setTexto(null)}
-      placeholder={dica}
-      placeholderTextColor={color.textGhost}
+      placeholder={dica ?? '·····'}
+      placeholderTextColor={color.tintaFantasma}
       keyboardType={inteiro ? 'number-pad' : 'decimal-pad'}
       selectTextOnFocus
-      // A célula tem 64×34 fixos: a fonte não pode crescer a ponto de cortar o número.
+      // A célula tem altura fixa: a fonte não pode crescer a ponto de cortar.
       maxFontSizeMultiplier={1.2}
       style={[estilos.campo, feita && estilos.campoFeito]}
     />
@@ -297,78 +349,79 @@ function CampoNumero({
 }
 
 const estilos = StyleSheet.create({
-  bloco: {
-    backgroundColor: color.bgSoft,
-    borderRadius: radius.xl,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-    padding: sp.lg,
-    paddingTop: sp.md,
-    marginBottom: sp.md,
-  },
-  cabecalho: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: sp.sm },
-  menu: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: color.surfaceHi,
-  },
-  nota: {
-    ...type.small,
-    color: color.textDim,
-    backgroundColor: color.surfaceHi,
-    borderRadius: radius.md,
-    paddingHorizontal: sp.md,
-    paddingVertical: sp.sm,
-    marginTop: sp.sm,
-    minHeight: 40,
-  },
-  colunas: {
+  bloco: { marginBottom: sp.h1 },
+  cabecalho: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp.sm,
-    paddingTop: sp.lg,
-    paddingBottom: sp.sm,
+    paddingHorizontal: margem.pagina,
+    paddingBottom: sp.md,
+  },
+  cabecalhoToque: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp.md },
+  menu: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  nota: {
+    ...type.small,
+    color: color.azul,
+    backgroundColor: color.papelAlto,
+    borderLeftWidth: 2,
+    borderLeftColor: color.azulLinha,
+    paddingHorizontal: sp.md,
+    paddingVertical: sp.sm,
+    marginHorizontal: margem.pagina,
+    marginBottom: sp.md,
+    minHeight: 40,
   },
   linha: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp.sm,
-    height: 42,
-    borderRadius: radius.md,
-    marginBottom: 2,
+    height: 48,
+    paddingHorizontal: margem.pagina,
+    borderBottomWidth: traco.fina,
+    borderBottomColor: color.regua,
   },
-  linhaFeita: { backgroundColor: color.accentFundo },
+  linhaFeita: { backgroundColor: color.papelAlto },
+  linhaAtiva: { backgroundColor: color.azulSuave },
+  barraAtiva: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: color.tinta,
+  },
+  sigla: {
+    ...type.carimbo,
+    fontSize: 9,
+    letterSpacing: 0.8,
+    color: color.vermelho,
+    marginTop: -2,
+  },
   campo: {
-    width: 64,
+    width: COL.valor,
     height: 34,
-    borderRadius: radius.sm,
-    backgroundColor: color.surfaceHi,
-    color: color.text,
+    color: color.azul,
     textAlign: 'center',
-    ...type.mono,
+    ...type.numero,
     padding: 0,
+    borderBottomWidth: traco.normal,
+    borderBottomColor: color.reguaMid,
   },
-  campoFeito: { backgroundColor: 'transparent', color: color.text },
+  campoFeito: { borderBottomColor: 'transparent' },
   check: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.sm,
+    width: COL.check,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: color.surfaceHi,
+    borderWidth: traco.normal,
+    borderColor: color.reguaMid,
+    borderRadius: radius.sm,
+    marginLeft: sp.xs,
   },
-  checkFeito: { backgroundColor: color.accent },
+  checkFeito: { backgroundColor: color.azul, borderColor: color.azul },
   addSerie: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp.xs,
-    height: 38,
-    borderRadius: radius.md,
-    marginTop: sp.sm,
-    backgroundColor: color.surface,
+    gap: sp.sm,
+    height: 46,
+    paddingHorizontal: margem.pagina,
   },
 });

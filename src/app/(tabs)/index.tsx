@@ -1,20 +1,36 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Botao, BotaoIcone, Rotulo, Tela, Tx } from '@/components/base';
-import { Brilho } from '@/components/decor';
+import { StyleSheet, View } from 'react-native';
+import { Botao, BotaoGlifo, Pressavel, Regua, Rotulo, Secao, Tela, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
+import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
 import { GRUPO_LABEL } from '@/data/types';
-import { color, radius, sp } from '@/design/tokens';
-import { fmtDuracaoCurta, fmtVolume, resumoDaSemana, saudacao, sequenciaDias } from '@/lib/metricas';
+import { color, margem, sp, traco } from '@/design/tokens';
+import { fmtDuracaoCurta, fmtVolume, resumoDaSemana, sequenciaDias } from '@/lib/metricas';
 import { useTreino, type Rotina } from '@/store/treino';
 
 const INICIAIS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
 
+function dataDeHoje() {
+  const d = new Date();
+  const s = d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+  // "sex., 22 de ago." → "sex 22 ago"
+  return s.replace(/\./g, '').replace(' de ', ' ');
+}
+
+/**
+ * Início — a primeira página do caderno.
+ *
+ * O que havia antes: saudação centralizada, título de 42px, sete bolinhas e um
+ * halo roxo atrás do botão. Tudo simétrico, tudo centralizado, nenhuma tensão.
+ *
+ * Agora a página abre como abre um livro de registro: marca e data na mesma
+ * linha de base, a SEMANA como linha pautada de sete células com as iniciais
+ * por cabeçalho de coluna, e a ação primária como barra cheia de tinta. As
+ * rotinas são linhas de livro-caixa — ordinal na margem, nome, e a contagem
+ * alinhada à direita numa coluna tabular.
+ */
 export default function Inicio() {
   const rotinas = useTreino((s) => s.rotinas);
   const historico = useTreino((s) => s.historico);
@@ -51,11 +67,11 @@ export default function Inicio() {
       titulo: r.nome,
       subtitulo: `${r.itens.length} exercícios`,
       opcoes: [
-        { texto: 'Iniciar esta rotina', icone: 'play', onPress: () => abrirRotina(r) },
-        { texto: 'Editar', icone: 'create-outline', onPress: () => router.push(`/rotina/${r.id}`) },
+        { texto: 'Iniciar esta rotina', glifo: 'play', onPress: () => abrirRotina(r) },
+        { texto: 'Editar', glifo: 'lista', onPress: () => router.push(`/rotina/${r.id}`) },
         {
           texto: 'Apagar rotina',
-          icone: 'trash-outline',
+          glifo: 'lixo',
           destrutiva: true,
           onPress: () =>
             abrirConfirmacao({
@@ -70,128 +86,179 @@ export default function Inicio() {
     });
   }
 
-  return (
-    <Tela scroll contentStyle={{ paddingHorizontal: sp.xl }}>
-      {/* Semana: sete pontos, o de hoje ganha um anel. */}
-      <View style={estilos.semana}>
-        <View style={estilos.barraTopo}>
-          <BotaoIcone icone="settings-outline" tamanho={30} onPress={() => router.push('/ajustes')} />
-        </View>
-        <View style={estilos.pontos}>
-          {semana.dias.map((feito, i) => (
-            <View key={i} style={estilos.diaCol}>
-              <View style={[estilos.anelDia, i === hoje && estilos.anelHoje]}>
-                <View style={[estilos.ponto, feito && estilos.pontoAtivo]} />
-              </View>
-              <Tx v="caption" cor={i === hoje ? color.text : feito ? color.textDim : color.textGhost}>
-                {INICIAIS[i]}
-              </Tx>
-            </View>
-          ))}
-        </View>
-        <Tx v="small" cor={color.textFaint} center style={{ marginTop: sp.md }}>
-          {semana.treinos === 0
-            ? 'Nenhum treino esta semana'
-            : `${semana.treinos} ${semana.treinos === 1 ? 'treino' : 'treinos'} · ${fmtVolume(semana.volume)} · ${fmtDuracaoCurta(semana.minutos * 60000)}`}
-        </Tx>
-      </View>
+  const resumo =
+    semana.treinos === 0
+      ? 'Nenhum treino esta semana'
+      : `${semana.treinos} ${semana.treinos === 1 ? 'treino' : 'treinos'} · ${fmtVolume(semana.volume)} · ${fmtDuracaoCurta(semana.minutos * 60000)}`;
 
-      {/* Bloco central: a única decisão da tela, com a única luz da tela. */}
-      <Animated.View entering={FadeInDown.duration(320)} style={estilos.centro}>
-        <Brilho tamanho={420} style={{ top: -70 }} />
-        <Tx v="small" cor={color.textFaint} center>
-          {saudacao()}
+  return (
+    <Tela scroll>
+      {/* Cabeçalho da página: marca à esquerda, data à direita, mesma base. */}
+      <View style={estilos.marca}>
+        <Glifo nome="raio" tamanho={16} cor={color.tinta} />
+        <Rotulo cor={color.tinta} style={estilos.marcaTexto}>
+          Ímpeto
+        </Rotulo>
+        <View style={{ flex: 1 }} />
+        <Rotulo cor={color.tintaFraca}>{dataDeHoje()}</Rotulo>
+        <BotaoGlifo
+          glifo="ajustes"
+          tamanho={32}
+          acessivel="Ajustes"
+          onPress={() => router.push('/ajustes')}
+        />
+      </View>
+      <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
+
+      <Secao
+        titulo="Semana"
+        espaco={sp.xxl}
+        direita={sequencia > 1 ? <Rotulo cor={color.azul}>{sequencia} dias seguidos</Rotulo> : null}
+      >
+        <LinhaSemana dias={semana.dias} hoje={hoje} />
+        <Tx v="small" cor={color.tintaMid} style={estilos.resumo}>
+          {resumo}
         </Tx>
-        <Tx v="display" center style={{ marginTop: sp.xs }}>
-          {ativa ? 'Treino em curso' : sequencia > 1 ? `${sequencia} dias seguidos` : 'Bora treinar'}
-        </Tx>
-        <Tx v="body" cor={color.textFaint} center style={{ marginTop: sp.sm, maxWidth: 280 }}>
+      </Secao>
+
+      {/* A única decisão da tela. Barra cheia, largura total, canto reto. */}
+      <View style={estilos.acao}>
+        <Tx v="display">{ativa ? 'Treino em curso' : 'Registrar treino'}</Tx>
+        <Tx v="body" cor={color.tintaMid} style={{ marginTop: sp.xs, maxWidth: 320 }}>
           {ativa
             ? 'Você tem um treino aberto agora.'
             : rotinas.length
               ? 'Escolha uma rotina abaixo ou monte um treino do zero.'
               : 'Comece por um modelo pronto ou monte o seu do zero.'}
         </Tx>
-
         <Botao
           titulo={ativa ? 'Continuar treino' : 'Iniciar treino'}
-          icone={ativa ? 'play' : 'add'}
+          glifo={ativa ? 'play' : 'mais'}
           grande
           onPress={comecar}
-          style={{ marginTop: sp.xxl, alignSelf: 'stretch' }}
+          style={{ marginTop: sp.xl }}
         />
-      </Animated.View>
-
-      {/* Rotinas */}
-      <View style={estilos.cabecalhoSecao}>
-        <Rotulo>Rotinas</Rotulo>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-          <Pressable
-            onPress={() => {
-              Haptics.selectionAsync();
-              router.push('/modelos');
-            }}
-            style={({ pressed }) => [estilos.pilulaModelos, pressed && { opacity: 0.7 }]}
-          >
-            <Ionicons name="sparkles" size={12} color={color.accent} />
-            <Tx v="smallMed" cor={color.textDim}>
-              Modelos
-            </Tx>
-          </Pressable>
-          <BotaoIcone icone="add" tamanho={30} onPress={() => router.push('/rotina/nova')} />
-        </View>
       </View>
 
-      {rotinas.length === 0 ? (
-        <View style={{ gap: sp.sm }}>
-          <Pressable
-            onPress={() => router.push('/modelos')}
-            style={({ pressed }) => [estilos.cartaoModelos, pressed && { opacity: 0.8 }]}
-          >
-            <View style={estilos.iconeModelos}>
-              <Ionicons name="sparkles" size={16} color={color.accent} />
-            </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Tx v="bodyMed">Começar por um modelo</Tx>
-              <Tx v="small" cor={color.textFaint}>
-                Upper · Lower, Push · Pull · Legs, ABC e mais
+      <Secao
+        titulo="Rotinas"
+        direita={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+            <Pressavel
+              haptico="selecao"
+              onPress={() => router.push('/modelos')}
+              hitSlop={10}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+            >
+              <Rotulo cor={color.azul}>Modelos</Rotulo>
+              <Glifo nome="avancar" tamanho={11} cor={color.azul} />
+            </Pressavel>
+            <BotaoGlifo
+              glifo="mais"
+              tamanho={28}
+              acessivel="Criar rotina"
+              onPress={() => router.push('/rotina/nova')}
+            />
+          </View>
+        }
+      >
+        {rotinas.length === 0 ? (
+          <View>
+            <Pressavel
+              onPress={() => router.push('/modelos')}
+              fundoPressionado={color.papelBaixo}
+              escala={0.995}
+              style={estilos.linhaVazia}
+            >
+              <View style={{ flex: 1, gap: 2 }}>
+                <Tx v="bodyMed">Começar por um modelo</Tx>
+                <Tx v="small" cor={color.tintaFraca}>
+                  Upper · Lower, Push · Pull · Legs, ABC e mais
+                </Tx>
+              </View>
+              <Glifo nome="avancar" tamanho={14} cor={color.tintaFantasma} />
+            </Pressavel>
+            <Regua />
+            <Pressavel
+              onPress={() => router.push('/rotina/nova')}
+              fundoPressionado={color.papelBaixo}
+              escala={0.995}
+              style={estilos.linhaVazia}
+            >
+              <Tx v="bodyMed" cor={color.tintaMid} style={{ flex: 1 }}>
+                Criar do zero
               </Tx>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={color.textGhost} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/rotina/nova')}
-            style={({ pressed }) => [estilos.rotinaVazia, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <Ionicons name="add" size={18} color={color.textFaint} />
-            <Tx v="bodyMed" cor={color.textDim}>
-              Criar do zero
-            </Tx>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={{ gap: sp.sm }}>
-          {rotinas.map((r, i) => (
-            <Animated.View key={r.id} entering={FadeInDown.delay(60 + i * 40).duration(280)}>
-              <CartaoRotina
+              <Glifo nome="mais" tamanho={14} cor={color.tintaFantasma} />
+            </Pressavel>
+            <Regua />
+          </View>
+        ) : (
+          <View>
+            {rotinas.map((r, i) => (
+              <LinhaRotina
+                key={r.id}
                 rotina={r}
+                numero={i + 1}
                 onPress={() => abrirRotina(r)}
                 onLongPress={() => opcoesRotina(r)}
               />
-            </Animated.View>
-          ))}
-        </View>
-      )}
+            ))}
+          </View>
+        )}
+      </Secao>
     </Tela>
   );
 }
 
-function CartaoRotina({
+/**
+ * A semana como linha pautada.
+ *
+ * Sete células de largura igual, separadas por régua fina, com as iniciais por
+ * cabeçalho de coluna. Um dia treinado recebe um BLOCO DE TINTA AZUL — azul é
+ * o que você escreveu, a mesma regra da tabela de séries. Hoje é a célula
+ * emoldurada. Nenhum ponto, nenhum anel.
+ */
+function LinhaSemana({ dias, hoje }: { dias: boolean[]; hoje: number }) {
+  return (
+    <View>
+      <View style={estilos.semanaCabeca}>
+        {INICIAIS.map((letra, i) => (
+          <View key={`${letra}-${i}`} style={estilos.celula}>
+            <Rotulo cor={i === hoje ? color.tinta : color.tintaFraca}>{letra}</Rotulo>
+          </View>
+        ))}
+      </View>
+      <Regua peso="normal" cor={color.reguaMid} />
+      <View style={estilos.semanaLinha}>
+        {dias.map((feito, i) => (
+          <View
+            key={i}
+            style={[
+              estilos.celula,
+              estilos.celulaAlta,
+              // Régua entre as células: sem elas a fileira não lê como linha de
+              // tabela, e o quadro de "hoje" fica pendurado no vazio.
+              i > 0 && estilos.celulaDivisa,
+              i === hoje && estilos.celulaHoje,
+            ]}
+          >
+            {feito ? <View style={estilos.blocoFeito} /> : null}
+          </View>
+        ))}
+      </View>
+      <Regua />
+    </View>
+  );
+}
+
+function LinhaRotina({
   rotina,
+  numero,
   onPress,
   onLongPress,
 }: {
   rotina: Rotina;
+  numero: number;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -200,138 +267,95 @@ function CartaoRotina({
   const grupos = [...new Set(exs.map((e) => e.grupo))].map((g) => GRUPO_LABEL[g]);
 
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={280}
-      style={({ pressed }) => [estilos.rotina, pressed && { backgroundColor: color.surfaceHi }]}
-    >
-      <View style={estilos.pilha}>
-        {exs.slice(0, 3).map((e, i) => (
-          <View key={`${e.id}-${i}`} style={[estilos.pilhaItem, i > 0 && { marginLeft: -12 }]}>
-            <Miniatura ex={e} tamanho={34} />
-          </View>
-        ))}
-      </View>
-      <View style={{ flex: 1, gap: 3 }}>
-        <Tx v="heading" numberOfLines={1}>
-          {rotina.nome}
+    <View>
+      <Pressavel
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={280}
+        escala={0.995}
+        fundoPressionado={color.papelBaixo}
+        accessibilityRole="button"
+        accessibilityLabel={`${rotina.nome}, ${rotina.itens.length} exercícios`}
+        style={estilos.rotina}
+      >
+        <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+          {numero}
         </Tx>
-        <Tx v="small" cor={color.textFaint} numberOfLines={1}>
-          {rotina.itens.length} exercícios · {series} séries
-          {grupos.length ? ` · ${grupos.slice(0, 3).join(', ')}` : ''}
-        </Tx>
-      </View>
-      <View style={estilos.playRotina}>
-        <Ionicons name="play" size={13} color={color.accent} style={{ marginLeft: 2 }} />
-      </View>
-    </Pressable>
+        <View style={estilos.pilha}>
+          {exs.slice(0, 3).map((e, i) => (
+            <View key={`${e.id}-${i}`} style={i > 0 ? { marginLeft: -10 } : null}>
+              <Miniatura ex={e} tamanho={32} />
+            </View>
+          ))}
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Tx v="bodyMed" numberOfLines={1}>
+            {rotina.nome}
+          </Tx>
+          <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+            {grupos.slice(0, 3).join(' · ') || 'Sem exercícios'}
+          </Tx>
+        </View>
+        {/* Coluna tabular à direita: sempre no mesmo x, sempre alinhada. */}
+        <View style={{ alignItems: 'flex-end' }}>
+          <Tx v="numero" tab>
+            {rotina.itens.length}
+            <Tx v="small" cor={color.tintaFraca}>
+              {' '}
+              ex
+            </Tx>
+          </Tx>
+          <Tx v="small" tab cor={color.tintaFraca}>
+            {series} séries
+          </Tx>
+        </View>
+      </Pressavel>
+      <Regua />
+    </View>
   );
 }
 
 const estilos = StyleSheet.create({
-  semana: { paddingTop: sp.xs, paddingBottom: sp.sm },
-  barraTopo: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: sp.sm },
-  pontos: { flexDirection: 'row', justifyContent: 'center', gap: sp.md },
-  diaCol: { alignItems: 'center', gap: sp.sm },
-  anelDia: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: 'transparent',
-  },
-  anelHoje: { borderColor: color.accentLine },
-  ponto: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: color.surfaceHi,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineMid,
-  },
-  pontoAtivo: { backgroundColor: color.accent, borderColor: color.accent },
-  centro: {
-    alignItems: 'center',
-    paddingTop: sp.h3,
-    paddingBottom: sp.h3,
-  },
-  cabecalhoSecao: {
+  marca: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: sp.md,
-    paddingLeft: sp.xs,
+    gap: sp.sm,
+    paddingHorizontal: margem.pagina,
+    paddingBottom: sp.sm,
+    minHeight: 40,
   },
-  pilulaModelos: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 30,
-    paddingHorizontal: sp.md,
-    borderRadius: radius.pill,
-    backgroundColor: color.surface,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
+  marcaTexto: { fontSize: 14, letterSpacing: 3.4 },
+  semanaCabeca: { flexDirection: 'row', paddingHorizontal: margem.pagina, paddingBottom: sp.xs },
+  semanaLinha: { flexDirection: 'row', paddingHorizontal: margem.pagina },
+  celula: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  celulaAlta: { height: 40 },
+  celulaDivisa: { borderLeftWidth: traco.fina, borderLeftColor: color.regua },
+  celulaHoje: {
+    borderWidth: traco.normal,
+    borderColor: color.tinta,
+    borderTopWidth: 0,
   },
+  blocoFeito: {
+    width: 16,
+    height: 16,
+    backgroundColor: color.azul,
+    borderRadius: 1,
+  },
+  resumo: { paddingHorizontal: margem.pagina, paddingTop: sp.sm },
+  acao: { paddingHorizontal: margem.pagina, paddingTop: sp.h2 },
   rotina: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.md,
-    backgroundColor: color.bgSoft,
-    borderRadius: radius.xl,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-    paddingVertical: sp.lg,
-    paddingLeft: sp.lg,
-    paddingRight: sp.md,
+    paddingVertical: sp.md,
+    paddingHorizontal: margem.pagina,
   },
   pilha: { flexDirection: 'row', alignItems: 'center' },
-  pilhaItem: {
-    borderWidth: 2,
-    borderColor: color.bgSoft,
-    borderRadius: 13,
-  },
-  // Discreto de propósito: o único verde-limão sólido da tela é o botão principal.
-  playRotina: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: color.accentSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.accentLine,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cartaoModelos: {
+  linhaVazia: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.md,
-    padding: sp.lg,
-    borderRadius: radius.xl,
-    backgroundColor: color.bgSoft,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.accentLine,
-  },
-  iconeModelos: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: color.accentSoft,
-  },
-  rotinaVazia: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp.sm,
-    height: 56,
-    borderRadius: radius.xl,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineMid,
-    borderStyle: 'dashed',
+    minHeight: 60,
+    paddingHorizontal: margem.pagina,
   },
 });

@@ -123,9 +123,9 @@ arquivo.
 
 ## Como o app funciona
 
-**Início** — a semana em sete pontos (o de hoje com anel), um botão para começar e a
-lista de rotinas. Toque numa rotina para iniciá-la já montada; segure para editar ou
-apagar.
+**Início** — a semana como linha pautada de sete células (o dia treinado recebe um bloco
+de tinta, hoje fica emoldurado), um botão para começar e a lista de rotinas. Toque numa
+rotina para iniciá-la já montada; segure para editar ou apagar.
 
 **Modelos prontos** — 14 treinos em 5 divisões clássicas: Upper · Lower (A e B),
 Push · Pull · Legs, ABC, Full Body e Primeiras semanas (só máquinas, para quem está
@@ -148,12 +148,12 @@ comum, seus recordes e o histórico.
 drop set, rest-pause, bi-set, cluster, isometria, negativa ou parcial. Toque no número
 da série para escolher. Aquecimento é a única que não entra no volume.
 
-**Relatório de fim de treino** — ao concluir, abre um resumo animado: selo de conclusão,
-duração, volume e séries subindo de zero, recordes batidos, frequência cardíaca e o
-**mapa dos músculos trabalhados sobre uma figura humana** (frente e costas), com cada
-região pintada pela intensidade do esforço. Dá para **compartilhar como imagem**, no
-estilo Strava. O mesmo relatório, sem a encenação, é o que você vê ao abrir um treino
-pelo histórico.
+**Relatório de fim de treino** — ao concluir, um **carimbo de borracha desce sobre a
+página** e o resumo se abre: duração, volume e séries subindo de zero, recordes batidos
+marcados a vermelho na margem, frequência cardíaca e a **prancha dos músculos
+trabalhados sobre uma figura humana** (frente e costas), cada região com a densidade de
+tinta proporcional ao esforço. Dá para **compartilhar como imagem**, no estilo Strava. O
+mesmo relatório, sem a encenação, é o que você vê ao abrir um treino pelo histórico.
 
 **Progresso** — total de treinos, volume e tempo, o volume das últimas oito semanas e
 todos os treinos concluídos.
@@ -180,6 +180,9 @@ vira só uma nota de rodapé.
 
 ## Estrutura
 
+O visual — paleta, tipografia, vocabulário de marcas de estado e o que foi
+deliberadamente recusado — está documentado em [DESIGN.md](DESIGN.md).
+
 ```
 src/
   app/            rotas (expo-router)
@@ -189,13 +192,16 @@ src/
     modelos.tsx · modelo/[id].tsx    vitrine e detalhe dos treinos prontos
     ajustes.tsx   conexões (Health Connect, cinta) e backup
     exercicio/[id].tsx · rotina/[id].tsx · sessao/[id].tsx
-  components/     base (texto, botões, folhas modais), demo, decor, animado
+  components/
+    base.tsx      vocabulário do caderno: texto, botões, régua, seção, linha,
+                  cabeça de coluna, carimbo, pressionável
+    glifos.tsx    as 26 marcas desenhadas do app (não há biblioteca de ícones)
+    demo · folha · descanso · animado · mapa-muscular · cartao-compartilhar
   data/           catálogo, modelos prontos, tipos e execução por família de movimento
-  design/tokens.ts  cores, tipografia, espaçamento
-  lib/            metricas, saude (Health Connect), backup, atualizacao
-  store/          treino, cinta (Bluetooth), descanso, atualizacao
-  lib/metricas.ts   volume, 1RM, recordes, formatação
-  store/          estado persistido (zustand + AsyncStorage)
+  design/tokens.ts  contrato de direção, cores, tipografia, marcas, espaçamento
+  lib/            metricas, saude (Health Connect), backup, atualizacao, compartilhar
+  store/          estado persistido (zustand + AsyncStorage): treino, cinta,
+                  descanso, selecao, atualizacao
 ```
 
 ## Dados dos exercícios

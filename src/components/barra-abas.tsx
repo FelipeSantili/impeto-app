@@ -1,18 +1,21 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import type { TabTriggerSlotProps } from 'expo-router/ui';
 import type { ReactNode, Ref } from 'react';
-import { Pressable, StyleSheet, View, type ViewProps } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { StyleSheet, Text, View, type ViewProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Tx } from '@/components/base';
-import { color, radius, shadow, sp } from '@/design/tokens';
+import { Pressavel, Regua, Tx } from '@/components/base';
+import { Glifo, type NomeGlifo } from '@/components/glifos';
+import { color, margem, sp, traco, type as typeScale } from '@/design/tokens';
 import { useTreino } from '@/store/treino';
 
 /**
- * Doca inferior: a barra de abas flutuante e, quando há treino em andamento,
- * a faixa de retomada logo acima dela.
+ * Rodapé da página: as abas e, quando há treino aberto, a tira de retomada.
+ *
+ * Antes isto era uma pílula flutuante com sombra e cantos de 28px — a forma
+ * mais gerada que existe em app mobile. Agora é o pé da folha: encostado na
+ * borda, separado por régua forte, e a aba ativa é marcada por uma BARRA DE
+ * TINTA em cima do rótulo, como aba de índice impressa. Sem sombra, porque
+ * papel não flutua.
  *
  * Recebe os `TabTrigger` como filhos via `<TabList asChild>`.
  */
@@ -25,68 +28,76 @@ export function Doca({
   const ativa = useTreino((s) => s.ativa);
 
   return (
-    <View
-      {...rest}
-      ref={ref}
-      style={[estilos.ancora, { paddingBottom: Math.max(insets.bottom, sp.md) }]}
-    >
+    <View {...rest} ref={ref} style={estilos.ancora}>
       {ativa ? (
-        <Animated.View entering={FadeIn.duration(220)}>
-          <Pressable
-            onPress={() => router.push('/treino')}
-            style={({ pressed }) => [estilos.retomar, { opacity: pressed ? 0.75 : 1 }]}
+        // Tira de tinta: o treino aberto é a única coisa que interrompe a
+        // página, então é sólida e ocupa a largura toda.
+        <Pressavel
+          onPress={() => router.push('/treino')}
+          style={estilos.retomar}
+          escala={1}
+          fundo={color.azul}
+          fundoPressionado="#1B2B73"
+          accessibilityRole="button"
+          accessibilityLabel={`Retomar treino ${ativa.nome}`}
+        >
+          <Tx v="smallMed" cor={color.azulTexto} style={{ flex: 1 }} numberOfLines={1}>
+            {ativa.nome}
+          </Tx>
+          <Text
+            style={[
+              typeScale.carimbo,
+              { color: color.azulTexto, fontSize: 11, textTransform: 'uppercase' },
+            ]}
           >
-            <View style={estilos.pulso} />
-            <Tx v="smallMed" style={{ flex: 1 }} numberOfLines={1}>
-              {ativa.nome}
-            </Tx>
-            <Tx v="small" cor={color.accent}>
-              Retomar
-            </Tx>
-            <Ionicons name="chevron-forward" size={14} color={color.accent} />
-          </Pressable>
-        </Animated.View>
+            Retomar
+          </Text>
+          <Glifo nome="avancar" tamanho={13} cor={color.azulTexto} />
+        </Pressavel>
       ) : null}
 
-      <View style={[estilos.barra, shadow.floating]}>{children}</View>
+      <Regua peso="forte" />
+      <View style={[estilos.barra, { paddingBottom: Math.max(insets.bottom, sp.sm) }]}>
+        {children}
+      </View>
     </View>
   );
 }
 
-/** Um item da barra. Recebe `isFocused` do `TabTrigger asChild`. */
+/** Uma aba. Recebe `isFocused` do `TabTrigger asChild`. */
 export function Aba({
-  icone,
+  glifo,
   rotulo,
   isFocused,
-  onPress,
   ref,
   ...rest
 }: TabTriggerSlotProps & {
-  icone: keyof typeof Ionicons.glyphMap;
+  glifo: NomeGlifo;
   rotulo: string;
   ref?: Ref<View>;
 }) {
+  const cor = isFocused ? color.tinta : color.tintaFraca;
   return (
-    <Pressable
+    <Pressavel
       {...rest}
       ref={ref}
-      onPress={(e) => {
-        Haptics.selectionAsync();
-        onPress?.(e);
-      }}
+      // Trocar de aba acontece dezenas de vezes por sessão: sem animação de
+      // transição e sem háptico. Só a marca muda.
+      escala={1}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: !!isFocused }}
       style={estilos.aba}
     >
-      <View style={[estilos.abaPilula, isFocused && estilos.abaPilulaAtiva]}>
-        <Ionicons
-          name={isFocused ? icone : (`${icone}-outline` as keyof typeof Ionicons.glyphMap)}
-          size={20}
-          color={isFocused ? color.text : color.textFaint}
-        />
-        <Tx v="caption" cor={isFocused ? color.text : color.textGhost} style={estilos.rotulo}>
-          {rotulo}
-        </Tx>
-      </View>
-    </Pressable>
+      <View style={[estilos.barraAtiva, isFocused && { backgroundColor: color.tinta }]} />
+      <Glifo nome={glifo} tamanho={19} cor={cor} />
+      <Text
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.25}
+        style={[typeScale.coluna, { color: cor, textTransform: 'uppercase', fontSize: 11 }]}
+      >
+        {rotulo}
+      </Text>
+    </Pressavel>
   );
 }
 
@@ -96,45 +107,39 @@ const estilos = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: sp.lg,
-    gap: sp.sm,
-    backgroundColor: 'transparent',
+    backgroundColor: color.papel,
   },
   barra: {
     flexDirection: 'row',
-    height: 62,
-    borderRadius: radius.xxl,
-    backgroundColor: 'rgba(24,21,32,0.97)',
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineMid,
+    alignItems: 'stretch',
+    paddingTop: sp.sm,
+    paddingHorizontal: sp.sm,
+  },
+  aba: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: sp.xs,
+    justifyContent: 'flex-start',
+    gap: 5,
+    // 48dp de alvo mesmo com o rodapé compacto.
+    minHeight: 52,
+    paddingTop: sp.sm,
   },
-  aba: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
-  abaPilula: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    width: 76,
-    height: 50,
-    borderRadius: radius.lg,
+  // A marca da aba ativa: barra de tinta encostada na régua de cima.
+  barraAtiva: {
+    position: 'absolute',
+    top: 0,
+    height: 2.5,
+    width: 34,
+    backgroundColor: 'transparent',
   },
-  abaPilulaAtiva: {
-    backgroundColor: color.surfaceHi,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineMid,
-  },
-  rotulo: { textTransform: 'none', letterSpacing: 0 },
   retomar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.sm,
-    height: 42,
-    paddingHorizontal: sp.lg,
-    borderRadius: radius.lg,
-    backgroundColor: color.surface,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.accentLine,
+    height: 44,
+    paddingHorizontal: margem.pagina,
+    backgroundColor: color.azul,
+    borderTopWidth: traco.normal,
+    borderTopColor: color.azul,
   },
-  pulso: { width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent },
 });

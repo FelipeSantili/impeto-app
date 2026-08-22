@@ -1,10 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -12,11 +10,21 @@ import {
 } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Botao, BotaoIcone, Rotulo, Tx, Vazio } from '@/components/base';
+import {
+  Botao,
+  BotaoGlifo,
+  CabecaColuna,
+  Pressavel,
+  Regua,
+  Rotulo,
+  Tx,
+  Vazio,
+} from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
+import { Glifo } from '@/components/glifos';
 import { POR_ID } from '@/data/exercicios';
-import { color, radius, shadow, sp, type } from '@/design/tokens';
+import { color, margem, radius, sp, traco, type } from '@/design/tokens';
 import { useSelecao } from '@/store/selecao';
 import { useTreino, type Rotina } from '@/store/treino';
 
@@ -70,13 +78,15 @@ export default function EditorRotina() {
     abrirMenu({
       titulo: ex?.nome ?? 'Exercício',
       opcoes: [
-        ...(i > 0 ? [{ texto: 'Mover para cima', icone: 'arrow-up' as const, onPress: () => mover(i, -1) }] : []),
+        ...(i > 0
+          ? [{ texto: 'Mover para cima', glifo: 'cima' as const, onPress: () => mover(i, -1) }]
+          : []),
         ...(i < itens.length - 1
-          ? [{ texto: 'Mover para baixo', icone: 'arrow-down' as const, onPress: () => mover(i, 1) }]
+          ? [{ texto: 'Mover para baixo', glifo: 'baixo' as const, onPress: () => mover(i, 1) }]
           : []),
         {
           texto: 'Remover',
-          icone: 'trash-outline',
+          glifo: 'lixo',
           destrutiva: true,
           onPress: () => setItens((atual) => atual.filter((_, idx) => idx !== i)),
         },
@@ -92,18 +102,21 @@ export default function EditorRotina() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: color.bg }}
+      style={{ flex: 1, backgroundColor: color.papel }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[estilos.topo, { paddingTop: insets.top + sp.sm }]}>
-        <BotaoIcone icone="close" onPress={() => router.back()} />
-        <Tx v="bodyMed" style={{ flex: 1, textAlign: 'center' }}>
+      <View style={[estilos.topo, { paddingTop: insets.top + sp.xs }]}>
+        <View style={{ marginLeft: -sp.sm }}>
+          <BotaoGlifo glifo="fechar" acessivel="Fechar" onPress={() => router.back()} />
+        </View>
+        <Rotulo cor={color.tintaFraca} style={{ flex: 1 }}>
           {nova ? 'Nova rotina' : 'Editar rotina'}
-        </Tx>
+        </Rotulo>
         {existente ? (
-          <BotaoIcone
-            icone="trash-outline"
-            cor={color.textFaint}
+          <BotaoGlifo
+            glifo="lixo"
+            cor={color.vermelho}
+            acessivel="Apagar rotina"
             onPress={() =>
               abrirConfirmacao({
                 titulo: 'Apagar rotina?',
@@ -117,98 +130,139 @@ export default function EditorRotina() {
               })
             }
           />
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
+        ) : null}
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: sp.xl, paddingBottom: insets.bottom + 120 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <TextInput
-          value={nome}
-          onChangeText={setNome}
-          placeholder="Nome da rotina"
-          placeholderTextColor={color.textGhost}
-          style={estilos.nome}
-          returnKeyType="done"
-        />
-
-        <View style={estilos.cabecalhoLista}>
-          <Rotulo>{itens.length ? `${itens.length} exercícios` : 'Exercícios'}</Rotulo>
+        {/* Campo de formulário com rótulo carimbado e régua embaixo. */}
+        <View style={estilos.campoNome}>
+          <Rotulo cor={color.tintaFraca}>Nome</Rotulo>
+          <TextInput
+            value={nome}
+            onChangeText={setNome}
+            placeholder="Rotina sem nome"
+            placeholderTextColor={color.tintaFantasma}
+            style={estilos.nome}
+            returnKeyType="done"
+            maxFontSizeMultiplier={1.3}
+          />
         </View>
+        <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
 
         {itens.length === 0 ? (
           <Vazio
-            icone="list-outline"
             titulo="Monte a sequência"
             texto="Escolha os exercícios e quantas séries de cada um você faz normalmente."
             acao={
               <Botao
                 titulo="Adicionar exercício"
-                icone="add"
+                glifo="mais"
                 onPress={() => router.push('/selecionar?destino=rotina')}
               />
             }
           />
         ) : (
           <>
+            <CabecaColuna>
+              <Rotulo cor={color.tintaMid} style={{ width: margem.calha }}>
+                Nº
+              </Rotulo>
+              <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+                Exercício
+              </Rotulo>
+              <Rotulo cor={color.tintaMid} style={{ width: 96, textAlign: 'center' }}>
+                Séries
+              </Rotulo>
+              <View style={{ width: 30 }} />
+            </CabecaColuna>
+
             {itens.map((it, i) => {
               const ex = POR_ID[it.exId];
               return (
-                <Animated.View key={`${it.exId}-${i}`} layout={LinearTransition.springify().damping(18)}>
+                <Animated.View
+                  key={`${it.exId}-${i}`}
+                  layout={LinearTransition.springify().damping(18)}
+                >
                   <View style={estilos.item}>
-                    <Miniatura ex={ex} tamanho={40} />
-                    <View style={{ flex: 1, gap: 2 }}>
+                    <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+                      {i + 1}
+                    </Tx>
+                    <Miniatura ex={ex} tamanho={36} />
+                    <View style={{ flex: 1 }}>
                       <Tx v="bodyMed" numberOfLines={1}>
                         {ex?.nome ?? it.exId}
                       </Tx>
-                      <Tx v="small" cor={color.textFaint}>
-                        {it.series} {it.series === 1 ? 'série' : 'séries'}
-                      </Tx>
                     </View>
 
-                    <View style={estilos.stepper}>
-                      <Pressable hitSlop={6} onPress={() => ajustarSeries(i, -1)} style={estilos.step}>
-                        <Ionicons name="remove" size={15} color={color.textDim} />
-                      </Pressable>
-                      <Tx v="smallMed" tab style={{ width: 18, textAlign: 'center' }}>
+                    {/* Contador de formulário: caixa retangular, sem pílula. */}
+                    <View style={estilos.contador}>
+                      <Pressavel
+                        hitSlop={10}
+                        haptico="selecao"
+                        onPress={() => ajustarSeries(i, -1)}
+                        accessibilityLabel="Menos uma série"
+                        style={estilos.passo}
+                      >
+                        <Glifo nome="menos" tamanho={13} cor={color.tintaMid} />
+                      </Pressavel>
+                      <Tx v="numero" tab center style={{ width: 26 }}>
                         {it.series}
                       </Tx>
-                      <Pressable hitSlop={6} onPress={() => ajustarSeries(i, 1)} style={estilos.step}>
-                        <Ionicons name="add" size={15} color={color.textDim} />
-                      </Pressable>
+                      <Pressavel
+                        hitSlop={10}
+                        haptico="selecao"
+                        onPress={() => ajustarSeries(i, 1)}
+                        accessibilityLabel="Mais uma série"
+                        style={estilos.passo}
+                      >
+                        <Glifo nome="mais" tamanho={13} cor={color.tintaMid} />
+                      </Pressavel>
                     </View>
 
-                    <Pressable hitSlop={8} onPress={() => menuItem(i)}>
-                      <Ionicons name="ellipsis-horizontal" size={16} color={color.textFaint} />
-                    </Pressable>
+                    <Pressavel
+                      hitSlop={12}
+                      onPress={() => menuItem(i)}
+                      accessibilityLabel="Opções do exercício"
+                      style={{ width: 30, alignItems: 'flex-end' }}
+                    >
+                      <Glifo nome="reticencias" tamanho={15} cor={color.tintaFraca} />
+                    </Pressavel>
                   </View>
+                  <Regua />
                 </Animated.View>
               );
             })}
 
-            <Pressable
+            <Pressavel
               onPress={() => router.push('/selecionar?destino=rotina')}
-              style={({ pressed }) => [estilos.add, pressed && { opacity: 0.7 }]}
+              haptico="leve"
+              escala={0.995}
+              fundoPressionado={color.papelBaixo}
+              style={estilos.add}
             >
-              <Ionicons name="add" size={17} color={color.text} />
+              <Glifo nome="mais" tamanho={16} cor={color.tinta} />
               <Tx v="bodyMed">Adicionar exercício</Tx>
-            </Pressable>
+            </Pressavel>
+            <Regua />
           </>
         )}
       </ScrollView>
 
-      <View style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }, shadow.soft]}>
-        <Botao
-          titulo="Salvar rotina"
-          grande
-          disabled={itens.length === 0}
-          onPress={salvar}
-          style={{ flex: 1 }}
-        />
+      <View style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>
+        <Regua peso="forte" cor={color.tinta} />
+        <View style={estilos.rodapeCorpo}>
+          <Botao
+            titulo="Salvar rotina"
+            grande
+            disabled={itens.length === 0}
+            onPress={salvar}
+            style={{ flex: 1 }}
+          />
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -218,51 +272,42 @@ const estilos = StyleSheet.create({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: sp.md,
-    paddingBottom: sp.md,
+    gap: sp.sm,
+    paddingHorizontal: margem.pagina,
+    paddingBottom: sp.sm,
   },
-  nome: { ...type.title, color: color.text, padding: 0, marginTop: sp.md },
-  cabecalhoLista: { paddingTop: sp.h1, paddingBottom: sp.sm },
+  campoNome: { paddingHorizontal: margem.pagina, paddingBottom: sp.sm },
+  nome: { ...type.display, color: color.tinta, padding: 0, marginTop: sp.xs },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.md,
     paddingVertical: sp.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: color.line,
+    paddingHorizontal: margem.pagina,
   },
-  stepper: {
+  contador: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp.xs,
-    backgroundColor: color.surface,
-    borderRadius: radius.pill,
-    paddingHorizontal: sp.xs,
-    height: 30,
+    borderWidth: traco.normal,
+    borderColor: color.reguaMid,
+    borderRadius: radius.sm,
+    height: 34,
   },
-  step: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  passo: { width: 30, height: 32, alignItems: 'center', justifyContent: 'center' },
   add: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: sp.sm,
-    height: 52,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineMid,
-    borderStyle: 'dashed',
-    marginTop: sp.xl,
+    height: 56,
+    paddingHorizontal: margem.pagina,
+    marginTop: sp.lg,
   },
   rodape: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    flexDirection: 'row',
-    paddingHorizontal: sp.xl,
-    paddingTop: sp.md,
-    backgroundColor: color.bg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.line,
+    backgroundColor: color.papel,
   },
+  rodapeCorpo: { flexDirection: 'row', paddingHorizontal: margem.pagina, paddingTop: sp.md },
 });

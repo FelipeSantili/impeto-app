@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
@@ -6,33 +5,34 @@ import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { Glifo } from '@/components/glifos';
 import { quadroUrl } from '@/data/exercicios';
 import type { Exercicio } from '@/data/types';
-import { color, radius } from '@/design/tokens';
-
-/** As fotos vêm sobre fundo claro; a placa clara faz isso parecer intencional. */
-const PLACA = '#EFEEE9';
+import { color, radius, traco } from '@/design/tokens';
 
 const HOLD = 780;
 const FADE = 300;
 
 /**
- * Demonstração animada do exercício.
+ * Demonstração do exercício, montada como PRANCHA de manual impresso:
+ * moldura de régua, canto reto, fundo de papel.
  *
- * O free-exercise-db traz dois quadros por movimento — início e fim. Alternar
- * entre eles com uma pausa em cada extremo lê como o gesto real do exercício.
+ * As fotos do free-exercise-db já vêm sobre fundo claro — o que era um
+ * acidente no app escuro agora é coerência: a prancha e a página são o mesmo
+ * papel.
  */
 export function Demo({
   ex,
   style,
   animar = true,
-  raio = radius.xl,
+  raio = radius.sm,
 }: {
   ex: Exercicio | undefined;
   style?: ViewStyle;
@@ -40,37 +40,42 @@ export function Demo({
   raio?: number;
 }) {
   const p = useSharedValue(0);
+  const reduzido = useReducedMotion();
   const inicio = quadroUrl(ex, 0);
   const fim = quadroUrl(ex, 1);
 
   useEffect(() => {
-    if (!animar || !fim) {
-      p.value = 0;
+    // Movimento reduzido: mostra o primeiro quadro parado. A demonstração
+    // ainda informa; ela só deixa de alternar.
+    if (!animar || !fim || reduzido) {
+      p.set(0);
       return;
     }
-    p.value = withRepeat(
-      withSequence(
-        withDelay(HOLD, withTiming(1, { duration: FADE, easing: Easing.inOut(Easing.quad) })),
-        withDelay(HOLD, withTiming(0, { duration: FADE, easing: Easing.inOut(Easing.quad) })),
+    p.set(
+      withRepeat(
+        withSequence(
+          withDelay(HOLD, withTiming(1, { duration: FADE, easing: Easing.inOut(Easing.quad) })),
+          withDelay(HOLD, withTiming(0, { duration: FADE, easing: Easing.inOut(Easing.quad) })),
+        ),
+        -1,
+        false,
       ),
-      -1,
-      false,
     );
     return () => cancelAnimation(p);
-  }, [animar, fim, p]);
+  }, [animar, fim, reduzido, p]);
 
-  const estiloFim = useAnimatedStyle(() => ({ opacity: p.value }));
+  const estiloFim = useAnimatedStyle(() => ({ opacity: p.get() }));
 
   if (!inicio) {
     return (
-      <View style={[estilos.placa, { borderRadius: raio, backgroundColor: color.surface }, style]}>
-        <Ionicons name="barbell-outline" size={30} color={color.textGhost} />
+      <View style={[estilos.prancha, { borderRadius: raio }, style]}>
+        <Glifo nome="halter" tamanho={28} cor={color.tintaFantasma} />
       </View>
     );
   }
 
   return (
-    <View style={[estilos.placa, { borderRadius: raio }, style]}>
+    <View style={[estilos.prancha, { borderRadius: raio }, style]}>
       <Image
         source={{ uri: inicio }}
         style={StyleSheet.absoluteFill}
@@ -93,17 +98,11 @@ export function Demo({
   );
 }
 
-/** Miniatura estática usada nas listas — não anima, para a rolagem ficar leve. */
-export function Miniatura({ ex, tamanho = 46 }: { ex: Exercicio | undefined; tamanho?: number }) {
+/** Miniatura estática das listas — não anima, para a rolagem ficar leve. */
+export function Miniatura({ ex, tamanho = 44 }: { ex: Exercicio | undefined; tamanho?: number }) {
   const uri = quadroUrl(ex, 0);
   return (
-    <View
-      style={[
-        estilos.mini,
-        { width: tamanho, height: tamanho, borderRadius: tamanho * 0.32 },
-        !uri && { backgroundColor: color.surfaceHi },
-      ]}
-    >
+    <View style={[estilos.prancha, { width: tamanho, height: tamanho, borderRadius: radius.sm }]}>
       {uri ? (
         <Image
           source={{ uri }}
@@ -113,21 +112,17 @@ export function Miniatura({ ex, tamanho = 46 }: { ex: Exercicio | undefined; tam
           cachePolicy="memory-disk"
         />
       ) : (
-        <Ionicons name="barbell-outline" size={tamanho * 0.42} color={color.textGhost} />
+        <Glifo nome="halter" tamanho={tamanho * 0.44} cor={color.tintaFantasma} />
       )}
     </View>
   );
 }
 
 const estilos = StyleSheet.create({
-  placa: {
-    backgroundColor: PLACA,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mini: {
-    backgroundColor: PLACA,
+  prancha: {
+    backgroundColor: color.papelAlto,
+    borderWidth: traco.normal,
+    borderColor: color.reguaMid,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',

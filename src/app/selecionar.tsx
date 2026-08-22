@@ -1,11 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Botao, BotaoIcone, Tx } from '@/components/base';
+import { Botao, BotaoGlifo, Regua, Rotulo, Tx } from '@/components/base';
 import { ListaExercicios } from '@/components/lista-exercicios';
-import { color, shadow, sp } from '@/design/tokens';
+import { color, margem, sp } from '@/design/tokens';
 import { useSelecao } from '@/store/selecao';
 import { useTreino } from '@/store/treino';
 
@@ -25,9 +25,7 @@ export default function Selecionar() {
   const conjunto = new Set(marcados);
 
   function alternar(id: string) {
-    setMarcados((atual) =>
-      atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id],
-    );
+    setMarcados((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
   }
 
   function confirmar() {
@@ -38,34 +36,44 @@ export default function Selecionar() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.bg, paddingTop: insets.top + sp.sm }}>
+    <View style={{ flex: 1, backgroundColor: color.papel, paddingTop: insets.top + sp.xs }}>
       <ListaExercicios
         selecionados={conjunto}
         onPress={(ex) => alternar(ex.id)}
         rodape={marcados.length ? 140 : 60}
         cabecalho={
-          <View style={estilos.topo}>
-            <BotaoIcone icone="close" onPress={() => router.back()} />
-            <Tx v="bodyMed" style={{ flex: 1, textAlign: 'center' }}>
-              Adicionar exercícios
-            </Tx>
-            <View style={{ width: 40 }} />
+          <View>
+            <View style={estilos.topo}>
+              <View style={{ marginLeft: -sp.sm }}>
+                <BotaoGlifo glifo="fechar" acessivel="Fechar" onPress={() => router.back()} />
+              </View>
+              <Tx v="title" style={{ flex: 1 }}>
+                Adicionar
+              </Tx>
+              {marcados.length > 0 ? (
+                <Rotulo cor={color.azul}>{marcados.length} marcados</Rotulo>
+              ) : null}
+            </View>
+            <Regua peso="forte" cor={color.tinta} style={{ marginHorizontal: margem.pagina }} />
           </View>
         }
       />
 
       {marcados.length > 0 ? (
         <Animated.View
-          entering={FadeInDown.duration(200)}
-          exiting={FadeOutDown.duration(160)}
-          style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }, shadow.floating]}
+          entering={FadeIn.duration(160)}
+          exiting={FadeOut.duration(140)}
+          style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}
         >
-          <Botao
-            titulo={`Adicionar ${marcados.length}`}
-            grande
-            onPress={confirmar}
-            style={{ flex: 1 }}
-          />
+          <Regua peso="forte" cor={color.tinta} />
+          <View style={estilos.rodapeCorpo}>
+            <Botao
+              titulo={`Adicionar ${marcados.length}`}
+              grande
+              onPress={confirmar}
+              style={{ flex: 1 }}
+            />
+          </View>
         </Animated.View>
       ) : null}
     </View>
@@ -76,19 +84,16 @@ const estilos = StyleSheet.create({
   topo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: sp.md,
-    paddingBottom: sp.lg,
+    gap: sp.sm,
+    paddingHorizontal: margem.pagina,
+    paddingBottom: sp.md,
   },
   rodape: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    flexDirection: 'row',
-    paddingHorizontal: sp.xl,
-    paddingTop: sp.md,
-    backgroundColor: color.bg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.line,
+    backgroundColor: color.papel,
   },
+  rodapeCorpo: { flexDirection: 'row', paddingHorizontal: margem.pagina, paddingTop: sp.md },
 });

@@ -1,22 +1,26 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import { Tx } from '@/components/base';
-import { Anel } from '@/components/decor';
-import { color, radius, shadow, sp } from '@/design/tokens';
-import { useDescanso } from '@/store/descanso';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { Pressavel, Regua, Rotulo, Tx } from '@/components/base';
+import { ReguaProgresso } from '@/components/decor';
+import { color, margem, sp, traco } from '@/design/tokens';
 import { fmtDuracao } from '@/lib/metricas';
+import { useDescanso } from '@/store/descanso';
 
 /**
- * Barra de descanso flutuante.
+ * Tira de descanso.
  *
- * Aparece sozinha quando uma série é concluída e some quando o tempo acaba.
- * O anel à esquerda esvazia conforme o descanso passa.
- * `bottom` é passado pela tela para ela pousar acima da barra de ações.
+ * Era um cartão flutuante com cantos de 22px, sombra preta e um anel de
+ * progresso. Virou o que a página pede: uma tira encostada no rodapé, largura
+ * cheia, separada por régua forte, com o tempo em condensada grande — legível
+ * com o celular largado no banco, a um braço de distância — e uma RÉGUA QUE
+ * ENCURTA no lugar do anel.
+ *
+ * O tempo restante é o número que importa aqui, então ele é o único elemento
+ * grande; os controles ficam pequenos e à direita.
  */
-export function BarraDescanso({ bottom }: { bottom: number }) {
+export function TiraDescanso({ bottom }: { bottom: number }) {
   const { alvo, total, somar, parar } = useDescanso();
   const [restante, setRestante] = useState(0);
   const avisou = useRef(false);
@@ -40,77 +44,60 @@ export function BarraDescanso({ bottom }: { bottom: number }) {
 
   if (!alvo) return null;
 
-  const progresso = total > 0 ? Math.max(0, Math.min(1, restante / (total * 1000))) : 0;
+  const fracao = total > 0 ? Math.max(0, Math.min(1, restante / (total * 1000))) : 0;
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(220)}
-      exiting={FadeOutDown.duration(180)}
-      style={[estilos.barra, shadow.floating, { bottom }]}
+      // Aparece e some sem deslocamento: a tira ocupa a largura toda e
+      // deslizar uma faixa de rodapé a cada série — dezenas de vezes por
+      // treino — cansa. Só opacidade.
+      entering={FadeIn.duration(180)}
+      exiting={FadeOut.duration(140)}
+      style={[estilos.tira, { bottom }]}
     >
-      <View style={estilos.anel}>
-        <Anel tamanho={36} espessura={3} progresso={progresso} />
-        <Ionicons name="timer-outline" size={14} color={color.textDim} style={estilos.anelIcone} />
-      </View>
+      <Regua peso="forte" />
+      <ReguaProgresso fracao={fracao} altura={2} cor={color.azul} />
+      <View style={estilos.corpo}>
+        <View style={{ flex: 1 }}>
+          <Rotulo cor={color.tintaFraca}>Descanso</Rotulo>
+          <Tx v="numeroXG" tab style={{ marginTop: -2 }}>
+            {fmtDuracao(restante)}
+          </Tx>
+        </View>
 
-      <View style={{ flex: 1 }}>
-        <Tx v="caption" cor={color.textFaint}>
-          DESCANSO
-        </Tx>
-        <Tx v="heading" tab>
-          {fmtDuracao(restante)}
-        </Tx>
+        <Pressavel haptico="leve" onPress={() => somar(15)} style={estilos.acao}>
+          <Rotulo cor={color.tinta}>+15s</Rotulo>
+        </Pressavel>
+        <Pressavel haptico="leve" onPress={parar} style={estilos.acao}>
+          <Rotulo cor={color.tintaMid}>Pular</Rotulo>
+        </Pressavel>
       </View>
-
-      <Pressable
-        hitSlop={10}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          somar(15);
-        }}
-        style={estilos.acao}
-      >
-        <Tx v="smallMed" cor={color.text}>
-          +15s
-        </Tx>
-      </Pressable>
-      <Pressable
-        hitSlop={10}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          parar();
-        }}
-        style={estilos.acao}
-      >
-        <Tx v="smallMed" cor={color.textDim}>
-          Pular
-        </Tx>
-      </Pressable>
     </Animated.View>
   );
 }
 
 const estilos = StyleSheet.create({
-  barra: {
+  tira: {
     position: 'absolute',
-    left: sp.lg,
-    right: sp.lg,
-    height: 62,
-    borderRadius: radius.xl,
-    backgroundColor: color.surfaceHi,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineMid,
+    left: 0,
+    right: 0,
+    backgroundColor: color.papelAlto,
+  },
+  corpo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp.md,
-    paddingHorizontal: sp.lg,
+    gap: sp.sm,
+    paddingHorizontal: margem.pagina,
+    paddingTop: sp.sm,
+    paddingBottom: sp.md,
   },
-  anel: { alignItems: 'center', justifyContent: 'center' },
-  anelIcone: { position: 'absolute' },
   acao: {
-    paddingHorizontal: sp.md,
-    paddingVertical: sp.sm,
-    borderRadius: radius.pill,
-    backgroundColor: color.surfacePress,
+    minWidth: 54,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: traco.normal,
+    borderColor: color.reguaMid,
+    paddingHorizontal: sp.sm,
   },
 });

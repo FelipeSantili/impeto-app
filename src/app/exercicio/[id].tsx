@@ -1,21 +1,34 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { BotaoIcone, Cabecalho, Rotulo, Tela, Tx, Vazio } from '@/components/base';
-import { Demo } from '@/components/demo';
-import { familias } from '@/data/familias';
-import { POR_ID } from '@/data/exercicios';
-import { EQUIP_LABEL, GRUPO_LABEL, MEDIDA_LABEL } from '@/data/types';
-import { color, radius, shadow, sp } from '@/design/tokens';
+import { StyleSheet, View } from 'react-native';
 import {
-  fmtData,
-  fmtNumero,
-  historicoDoExercicio,
-  recordesDoExercicio,
-} from '@/lib/metricas';
+  BotaoGlifo,
+  Cabecalho,
+  CabecaColuna,
+  Pressavel,
+  Regua,
+  Rotulo,
+  Secao,
+  Tela,
+  Tx,
+  Vazio,
+} from '@/components/base';
+import { Demo } from '@/components/demo';
+import { Glifo } from '@/components/glifos';
+import { POR_ID } from '@/data/exercicios';
+import { familias } from '@/data/familias';
+import { EQUIP_LABEL, GRUPO_LABEL, MEDIDA_LABEL } from '@/data/types';
+import { color, margem, radius, sp } from '@/design/tokens';
+import { fmtData, fmtNumero, historicoDoExercicio, recordesDoExercicio } from '@/lib/metricas';
 import { useTreino } from '@/store/treino';
 
+/**
+ * Ficha do exercício — prancha, procedimento e registro.
+ *
+ * O título deixou de ser centralizado e as etiquetas deixaram de ser pílulas
+ * coloridas: viraram uma LINHA DE FICHA, que é como um manual identifica o que
+ * está descrevendo. Os passos ganharam numeração na calha e régua entre eles —
+ * é um procedimento, e procedimento se lê numerado.
+ */
 export default function DetalheExercicio() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const ex = POR_ID[id ?? ''];
@@ -26,8 +39,8 @@ export default function DetalheExercicio() {
   if (!ex) {
     return (
       <Tela>
-        <Cabecalho esquerda={<BotaoIcone icone="chevron-back" onPress={() => router.back()} />} />
-        <Vazio icone="alert-circle-outline" titulo="Exercício não encontrado" />
+        <Cabecalho esquerda={<BotaoGlifo glifo="voltar" onPress={() => router.back()} />} />
+        <Vazio titulo="Exercício não encontrado" />
       </Tela>
     );
   }
@@ -37,157 +50,162 @@ export default function DetalheExercicio() {
   const rec = recordesDoExercicio(historico, ex.id);
   const rotulos = MEDIDA_LABEL[ex.medida];
 
+  const ficha = [GRUPO_LABEL[ex.grupo], EQUIP_LABEL[ex.equip], ex.unilateral ? 'Unilateral' : null]
+    .filter(Boolean)
+    .join('  ·  ');
+
   return (
     <Tela scroll contentStyle={{ paddingBottom: sp.h4 }}>
       <Cabecalho
-        esquerda={<BotaoIcone icone="chevron-back" onPress={() => router.back()} />}
+        esquerda={<BotaoGlifo glifo="voltar" acessivel="Voltar" onPress={() => router.back()} />}
         direita={
           ativa ? (
-            <BotaoIcone
-              icone="add"
-              cor={color.bg}
-              fundo={color.accent}
-              tamanho={34}
+            <Pressavel
+              haptico="leve"
               onPress={() => {
                 addExercicios([ex.id]);
                 router.back();
               }}
-            />
+              accessibilityLabel="Adicionar ao treino"
+              style={estilos.addTreino}
+            >
+              <Glifo nome="mais" tamanho={14} cor={color.azulTexto} />
+              <Rotulo cor={color.azulTexto}>Adicionar</Rotulo>
+            </Pressavel>
           ) : undefined
         }
+        semRegua
       />
 
-      <View style={{ paddingHorizontal: sp.xl }}>
-        <Animated.View entering={FadeIn.duration(300)}>
-          <Demo ex={ex} style={estilos.demo} raio={radius.xxl} />
-        </Animated.View>
+      <View style={{ paddingHorizontal: margem.pagina }}>
+        <Demo ex={ex} style={estilos.demo} raio={radius.sm} />
 
-        <Tx v="title" center style={{ marginTop: sp.xxl }}>
+        <Tx v="display" style={{ marginTop: sp.xl }}>
           {ex.nome}
         </Tx>
-
-        <View style={estilos.tags}>
-          <Tag texto={GRUPO_LABEL[ex.grupo]} destaque />
-          <Tag texto={EQUIP_LABEL[ex.equip]} />
-          {ex.unilateral ? <Tag texto="Unilateral" /> : null}
-        </View>
+        <Rotulo cor={color.tintaMid} style={{ marginTop: sp.sm }}>
+          {ficha}
+        </Rotulo>
 
         {ex.aux?.length ? (
-          <Tx v="small" cor={color.textFaint} center style={{ marginTop: sp.md }}>
-            Também trabalha {ex.aux.map((g) => GRUPO_LABEL[g].toLowerCase()).join(', ')}
+          <Tx v="small" cor={color.tintaFraca} style={{ marginTop: sp.sm }}>
+            Também trabalha {ex.aux.map((g) => GRUPO_LABEL[g].toLowerCase()).join(', ')}.
           </Tx>
         ) : null}
       </View>
 
       {/* Execução */}
       {familia ? (
-        <Animated.View entering={FadeInDown.delay(80).duration(300)} style={estilos.secao}>
-          <Rotulo>Como executar</Rotulo>
-          <View style={{ gap: sp.lg, marginTop: sp.lg }}>
-            {familia.passos.map((p, i) => (
-              <View key={i} style={estilos.passo}>
-                <View style={estilos.passoNumero}>
-                  <Tx v="caption" cor={color.accent} tab>
-                    {i + 1}
-                  </Tx>
-                </View>
-                <Tx v="body" cor={color.textDim} style={{ flex: 1 }}>
+        <Secao titulo="Como executar">
+          {familia.passos.map((p, i) => (
+            <View key={i}>
+              <View style={estilos.passo}>
+                <Tx v="numero" tab cor={color.tintaFantasma} style={{ width: margem.calha }}>
+                  {i + 1}
+                </Tx>
+                <Tx v="body" cor={color.tintaMid} style={{ flex: 1 }}>
                   {p}
                 </Tx>
               </View>
-            ))}
-          </View>
+              <Regua />
+            </View>
+          ))}
 
           <View style={estilos.aviso}>
-            <Ionicons name="warning-outline" size={15} color={color.textFaint} />
-            <Tx v="small" cor={color.textFaint} style={{ flex: 1 }}>
+            <Glifo nome="alerta" tamanho={15} cor={color.vermelho} />
+            <Tx v="small" cor={color.tintaMid} style={{ flex: 1 }}>
               {familia.erro}
             </Tx>
           </View>
-        </Animated.View>
+        </Secao>
       ) : null}
 
-      {/* Recordes */}
+      {/* Recordes: tabela, não grade de cartões. */}
       {rec.totalSeries > 0 ? (
-        <View style={estilos.secao}>
-          <Rotulo>Seus melhores</Rotulo>
-          <View style={estilos.grade}>
-            <Metrica rotulo="Maior carga" valor={`${fmtNumero(rec.maiorCarga)} ${rotulos.a.toLowerCase()}`} />
-            <Metrica
-              rotulo="Melhor série"
-              valor={
-                rec.melhorSerie
-                  ? `${fmtNumero(rec.melhorSerie.peso)} × ${fmtNumero(rec.melhorSerie.reps)}`
-                  : '—'
-              }
-            />
-            <Metrica rotulo="1RM estimado" valor={`${Math.round(rec.melhor1RM)} kg`} />
-            <Metrica rotulo="Séries feitas" valor={String(rec.totalSeries)} />
-          </View>
-        </View>
+        <Secao titulo="Seus melhores">
+          <Marca rotulo="Maior carga" valor={`${fmtNumero(rec.maiorCarga)} ${rotulos.a.toLowerCase()}`} />
+          <Marca
+            rotulo="Melhor série"
+            valor={
+              rec.melhorSerie
+                ? `${fmtNumero(rec.melhorSerie.peso)} × ${fmtNumero(rec.melhorSerie.reps)}`
+                : '—'
+            }
+          />
+          <Marca rotulo="1RM estimado" valor={`${Math.round(rec.melhor1RM)} kg`} nota="estimativa" />
+          <Marca rotulo="Séries feitas" valor={String(rec.totalSeries)} />
+        </Secao>
       ) : null}
 
       {/* Histórico */}
-      <View style={estilos.secao}>
-        <Rotulo>Histórico</Rotulo>
+      <Secao titulo="Histórico">
         {registros.length === 0 ? (
-          <Tx v="small" cor={color.textGhost} style={{ marginTop: sp.lg }}>
+          <Tx v="small" cor={color.tintaFraca} style={estilos.semHistorico}>
             Você ainda não registrou este exercício.
           </Tx>
         ) : (
-          <View style={{ marginTop: sp.md }}>
+          <>
+            <CabecaColuna>
+              <Rotulo cor={color.tintaMid} style={{ flex: 1 }}>
+                Data
+              </Rotulo>
+              <Rotulo cor={color.tintaMid} style={{ width: 110, textAlign: 'right' }}>
+                Séries
+              </Rotulo>
+            </CabecaColuna>
             {registros.slice(0, 8).map((r, i) => (
-              <Pressable
-                key={`${r.sessaoId}-${i}`}
-                onPress={() => router.push(`/sessao/${r.sessaoId}`)}
-                style={({ pressed }) => [estilos.registro, pressed && { opacity: 0.6 }]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Tx v="smallMed">{fmtData(r.data)}</Tx>
-                  <Tx v="small" cor={color.textGhost} numberOfLines={1}>
-                    {r.nomeSessao}
-                  </Tx>
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                  {r.series.slice(0, 4).map((s) => (
-                    <Tx key={s.id} v="small" tab cor={color.textDim}>
-                      {fmtNumero(s.peso)} × {fmtNumero(s.reps)}
+              <View key={`${r.sessaoId}-${i}`}>
+                <Pressavel
+                  onPress={() => router.push(`/sessao/${r.sessaoId}`)}
+                  escala={0.995}
+                  fundoPressionado={color.papelBaixo}
+                  style={estilos.registro}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Tx v="smallMed">{fmtData(r.data)}</Tx>
+                    <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
+                      {r.nomeSessao}
                     </Tx>
-                  ))}
-                  {r.series.length > 4 ? (
-                    <Tx v="caption" cor={color.textGhost}>
-                      +{r.series.length - 4}
-                    </Tx>
-                  ) : null}
-                </View>
-              </Pressable>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    {r.series.slice(0, 4).map((s) => (
+                      <Tx key={s.id} v="small" tab cor={color.azul}>
+                        {fmtNumero(s.peso)} × {fmtNumero(s.reps)}
+                      </Tx>
+                    ))}
+                    {r.series.length > 4 ? (
+                      <Rotulo cor={color.tintaFantasma}>+{r.series.length - 4}</Rotulo>
+                    ) : null}
+                  </View>
+                </Pressavel>
+                <Regua />
+              </View>
             ))}
-          </View>
+          </>
         )}
-      </View>
+      </Secao>
     </Tela>
   );
 }
 
-function Tag({ texto, destaque }: { texto: string; destaque?: boolean }) {
+/** Linha de marca pessoal: rótulo à esquerda, valor tabular à direita. */
+function Marca({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: string }) {
   return (
-    <View style={[estilos.tag, destaque && { backgroundColor: color.accentSoft, borderColor: color.accentLine }]}>
-      <Tx v="caption" cor={destaque ? color.accent : color.textDim} style={{ textTransform: 'none', letterSpacing: 0.2 }}>
-        {texto}
-      </Tx>
-    </View>
-  );
-}
-
-function Metrica({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <View style={estilos.metrica}>
-      <Tx v="caption" cor={color.textFaint}>
-        {rotulo.toUpperCase()}
-      </Tx>
-      <Tx v="heading" tab style={{ marginTop: sp.xs }}>
-        {valor}
-      </Tx>
+    <View>
+      <View style={estilos.marca}>
+        <View style={{ flex: 1 }}>
+          <Tx v="bodyMed">{rotulo}</Tx>
+          {nota ? (
+            <Tx v="small" cor={color.tintaFraca}>
+              {nota}
+            </Tx>
+          ) : null}
+        </View>
+        <Tx v="numeroG" tab>
+          {valor}
+        </Tx>
+      </View>
+      <Regua />
     </View>
   );
 }
@@ -196,61 +214,47 @@ const estilos = StyleSheet.create({
   demo: {
     width: '100%',
     aspectRatio: 1.28,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineMid,
-    ...shadow.soft,
+    marginTop: sp.sm,
   },
-  tags: {
+  addTreino: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: sp.sm,
-    marginTop: sp.lg,
-  },
-  tag: {
-    paddingHorizontal: sp.md,
-    height: 26,
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: color.surface,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
-  },
-  secao: { paddingHorizontal: sp.xl, paddingTop: sp.h2 },
-  passo: { flexDirection: 'row', gap: sp.md, alignItems: 'flex-start' },
-  passoNumero: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: color.accentSoft,
-    marginTop: 1,
+    gap: 5,
+    height: 34,
+    paddingHorizontal: sp.md,
+    backgroundColor: color.azul,
+    borderRadius: radius.sm,
+  },
+  passo: {
+    flexDirection: 'row',
+    gap: sp.sm,
+    alignItems: 'flex-start',
+    paddingVertical: sp.md,
+    paddingHorizontal: margem.pagina,
   },
   aviso: {
     flexDirection: 'row',
     gap: sp.md,
-    marginTop: sp.xl,
-    padding: sp.lg,
-    borderRadius: radius.lg,
-    backgroundColor: color.surface,
+    marginTop: sp.lg,
+    marginHorizontal: margem.pagina,
+    padding: sp.md,
+    backgroundColor: color.vermelhoSuave,
+    borderLeftWidth: 2,
+    borderLeftColor: color.vermelho,
   },
-  grade: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm, marginTop: sp.lg },
-  metrica: {
-    flexGrow: 1,
-    flexBasis: '46%',
-    padding: sp.lg,
-    borderRadius: radius.lg,
-    backgroundColor: color.surface,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
+  marca: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    paddingVertical: sp.md,
+    paddingHorizontal: margem.pagina,
   },
   registro: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.lg,
     paddingVertical: sp.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: color.line,
+    paddingHorizontal: margem.pagina,
   },
+  semHistorico: { paddingTop: sp.lg, paddingHorizontal: margem.pagina },
 });

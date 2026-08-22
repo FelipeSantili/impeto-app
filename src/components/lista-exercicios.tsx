@@ -1,7 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   SectionList,
   StyleSheet,
@@ -9,11 +7,12 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { Chip, Rotulo, Tx, Vazio } from '@/components/base';
+import { Chip, Pressavel, Regua, Rotulo, Tx, Vazio } from '@/components/base';
 import { Miniatura } from '@/components/demo';
-import { EXERCICIOS, buscar } from '@/data/exercicios';
+import { Glifo } from '@/components/glifos';
+import { buscar, EXERCICIOS } from '@/data/exercicios';
 import { EQUIP_LABEL, GRUPO_LABEL, ORDEM_GRUPOS, type Exercicio, type Grupo } from '@/data/types';
-import { color, radius, sp, type } from '@/design/tokens';
+import { color, margem, radius, sp, traco, type } from '@/design/tokens';
 
 export interface FiltroProps {
   /** Ids marcados — quando definido, a lista entra em modo de seleção. */
@@ -55,22 +54,23 @@ export function ListaExercicios({ selecionados, onPress, rodape = 120, cabecalho
     <View style={{ flex: 1 }}>
       {cabecalho}
 
+      {/* Campo de formulário: régua embaixo, sem caixa. */}
       <View style={estilos.busca}>
-        <Ionicons name="search" size={16} color={color.textFaint} />
+        <Glifo nome="busca" tamanho={16} cor={color.tintaFraca} />
         <TextInput
           value={termo}
           onChangeText={setTermo}
           placeholder="Buscar exercício ou máquina"
-          placeholderTextColor={color.textGhost}
+          placeholderTextColor={color.tintaFantasma}
           style={estilos.input}
           autoCorrect={false}
           returnKeyType="search"
           clearButtonMode="while-editing"
         />
         {termo.length > 0 ? (
-          <Pressable hitSlop={8} onPress={() => setTermo('')}>
-            <Ionicons name="close-circle" size={16} color={color.textFaint} />
-          </Pressable>
+          <Pressavel hitSlop={12} onPress={() => setTermo('')} accessibilityLabel="Limpar busca">
+            <Glifo nome="fechar" tamanho={14} cor={color.tintaFraca} />
+          </Pressavel>
         ) : null}
       </View>
 
@@ -97,14 +97,14 @@ export function ListaExercicios({ selecionados, onPress, rodape = 120, cabecalho
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingBottom: rodape, paddingHorizontal: sp.xl }}
+        contentContainerStyle={{ paddingBottom: rodape }}
         showsVerticalScrollIndicator={false}
         initialNumToRender={14}
         windowSize={9}
         renderSectionHeader={({ section }) => (
           <View style={estilos.secao}>
-            <Rotulo>{section.title}</Rotulo>
-            <View style={estilos.tracoSecao} />
+            <Rotulo cor={color.tintaMid}>{section.title}</Rotulo>
+            <Regua peso="forte" style={{ marginTop: sp.xs }} />
           </View>
         )}
         renderItem={({ item }) => (
@@ -117,16 +117,15 @@ export function ListaExercicios({ selecionados, onPress, rodape = 120, cabecalho
         )}
         ListEmptyComponent={
           <Vazio
-            icone="search-outline"
             titulo="Nada encontrado"
             texto={`Nenhum exercício para "${termo}". Tente outro termo ou limpe o filtro.`}
           />
         }
         ListFooterComponent={
           total > 0 ? (
-            <Tx v="caption" cor={color.textGhost} center style={{ paddingTop: sp.xxl }}>
-              {total} EXERCÍCIOS
-            </Tx>
+            <Rotulo cor={color.tintaFantasma} style={estilos.total}>
+              {total} exercícios
+            </Rotulo>
           ) : null
         }
       />
@@ -148,28 +147,35 @@ export function LinhaExercicio({
   style?: ViewStyle;
 }) {
   return (
-    <Pressable
+    <Pressavel
       onPress={onPress}
-      style={({ pressed }) => [estilos.linha, pressed && { opacity: 0.6 }, style]}
+      escala={0.995}
+      fundo={marcado ? color.azulSuave : undefined}
+      fundoPressionado={color.papelBaixo}
+      accessibilityRole="button"
+      accessibilityState={modoSelecao ? { selected: !!marcado } : undefined}
+      style={[estilos.linha, style]}
     >
       <Miniatura ex={ex} />
       <View style={{ flex: 1, gap: 2 }}>
         <Tx v="bodyMed" numberOfLines={1}>
           {ex.nome}
         </Tx>
-        <Tx v="small" cor={color.textFaint} numberOfLines={1}>
+        <Tx v="small" cor={color.tintaFraca} numberOfLines={1}>
           {EQUIP_LABEL[ex.equip]}
           {ex.unilateral ? ' · unilateral' : ''}
         </Tx>
       </View>
       {modoSelecao ? (
-        <View style={[estilos.marca, marcado && estilos.marcaAtiva]}>
-          {marcado ? <Ionicons name="checkmark" size={14} color={color.bg} /> : null}
+        // Caixa de marcar quadrada — o círculo com check dentro é forma de
+        // biblioteca, não deste caderno.
+        <View style={[estilos.caixa, marcado && estilos.caixaAtiva]}>
+          {marcado ? <Glifo nome="confere" tamanho={13} cor={color.azulTexto} /> : null}
         </View>
       ) : (
-        <Ionicons name="chevron-forward" size={16} color={color.textGhost} />
+        <Glifo nome="avancar" tamanho={14} cor={color.tintaFantasma} />
       )}
-    </Pressable>
+    </Pressavel>
   );
 }
 
@@ -179,37 +185,31 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     gap: sp.md,
     height: 46,
-    marginHorizontal: sp.xl,
-    paddingHorizontal: sp.lg,
-    borderRadius: radius.lg,
-    backgroundColor: color.surface,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.line,
+    marginHorizontal: margem.pagina,
+    borderBottomWidth: traco.normal,
+    borderBottomColor: color.reguaForte,
   },
-  input: { flex: 1, color: color.text, ...type.body, padding: 0 },
-  chips: { gap: sp.sm, paddingHorizontal: sp.xl, paddingVertical: sp.lg },
-  secao: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.md,
-    paddingTop: sp.xl,
-    paddingBottom: sp.sm,
-  },
-  tracoSecao: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: color.line },
+  input: { flex: 1, color: color.tinta, ...type.body, padding: 0 },
+  chips: { gap: sp.sm, paddingHorizontal: margem.pagina, paddingVertical: sp.lg },
+  secao: { paddingTop: sp.xl, paddingBottom: sp.sm, paddingHorizontal: margem.pagina },
   linha: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp.lg,
+    gap: sp.md,
     paddingVertical: sp.md,
+    paddingHorizontal: margem.pagina,
+    borderBottomWidth: traco.fina,
+    borderBottomColor: color.regua,
   },
-  marca: {
+  caixa: {
     width: 24,
     height: 24,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: color.lineHi,
+    borderRadius: radius.sm,
+    borderWidth: traco.normal,
+    borderColor: color.reguaForte,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  marcaAtiva: { backgroundColor: color.accent, borderColor: color.accent },
+  caixaAtiva: { backgroundColor: color.azul, borderColor: color.azul },
+  total: { paddingTop: sp.xxl, paddingHorizontal: margem.pagina },
 });
