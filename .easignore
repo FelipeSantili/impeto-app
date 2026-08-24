@@ -53,3 +53,6 @@ example
 # ─── pastas nativas geradas ───────────────────────────────────────────────────
 /ios
 /android
+
+# Fonte do modelo 3D — nunca sobe para a build
+/modelo-fonte

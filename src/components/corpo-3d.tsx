@@ -1,8 +1,11 @@
+import { Asset } from 'expo-asset';
+import { File } from 'expo-file-system';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import { useCallback, useEffect, useRef } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Grupo } from '@/data/types';
 import type { Paleta } from '@/design/tokens';
 import { nivelDeCalor } from '@/design/tokens';
@@ -14,23 +17,30 @@ import { nivelDeCalor } from '@/design/tokens';
  * pergunta que desenho chapado não responde bem: ninguém entende onde termina o
  * dorsal e começa o redondo maior olhando uma silhueta de frente.
  *
- * ─── Como a malha é feita, e por quê assim ───────────────────────────────────
+ * ─── De onde vem a malha ─────────────────────────────────────────────────────
  *
- * Não há arquivo de modelo. Cada músculo é gerado em código como um TUBO
- * FUSIFORME varrido ao longo de uma curva — um ventre que engrossa no meio e
- * afina nas duas pontas, que é literalmente a forma de um músculo entre suas
- * duas inserções. Definir a anatomia como "esta curva, com estes raios" tem
- * três consequências práticas que um `.glb` não teria:
+ * De `assets/modelos/corpo.glb`: anatomia real, extraída do **Z-Anatomy**
+ * (CC BY-SA 4.0). O atlas original tem 155 MB, 3.390 malhas e 6,4 milhões de
+ * triângulos — corpo inteiro, com coração, artérias e nervos. O que entra aqui
+ * é o destilado: catorze malhas, 43 mil triângulos, 610 KB. Treze grupos de
+ * músculo mais `corpo`, que é o esqueleto e nunca acende.
  *
- *   · o app continua offline e o APK não engorda alguns megabytes;
- *   · corrigir a origem de um músculo é mover um ponto no código, versionado
- *     junto com o resto, em vez de reabrir um Blender;
- *   · cada grupo já nasce como malha SEPARADA, que é o requisito de verdade
- *     aqui — pintar um músculo de cada vez pela rampa térmica.
+ * O recorte tem duas armadilhas que custaram para achar, e estão registradas
+ * em MODELO-3D.md porque vão reaparecer se o modelo for regerado:
  *
- * O preço é honesto: isto é um ÉCORCHÉ, o modelo de estudo com os músculos
- * expostos. Tem a forma, a origem e a inserção certas; não tem a textura nem a
- * fibra de um scan anatômico.
+ *   · o Z-Anatomy marca ORIGEM e INSERÇÃO de cada músculo com manchinhas
+ *     coladas no osso, sufixadas `.o…` e `.e…`. Elas casam com o nome do
+ *     músculo e estão espalhadas pelo esqueleto inteiro — puxavam o ombro e o
+ *     antebraço até a altura dos pés;
+ *   · `extensor digitorum longus` é da PERNA, não do antebraço. Casar
+ *     `digitorum` sem qualificar mistura membro superior com inferior.
+ *
+ * ─── O écorché procedural continua aqui ──────────────────────────────────────
+ *
+ * Abaixo há um gerador que monta cada músculo como tubo fusiforme varrido ao
+ * longo de uma curva. Ele não é código morto: é o que aparece se o `.glb`
+ * faltar ou não carregar. Perder o arquivo degrada a fidelidade — não pode
+ * apagar a tela.
  *
  * ─── A regra de sempre ───────────────────────────────────────────────────────
  *
@@ -322,6 +332,77 @@ function corpoBase(): THREE.BufferGeometry[] {
   return g;
 }
 
+/**
+ * Carrega a anatomia real, extraída do Z-Anatomy.
+ *
+ * O arquivo tem catorze malhas nomeadas pelos grupos do app — treze de músculo
+ * mais `corpo`, que é o esqueleto e nunca acende. Já sai do processamento com
+ * 175 unidades de altura e centrado, então não há normalização a fazer aqui.
+ *
+ * Devolve `null` em qualquer falha, de propósito: perder o arquivo não pode
+ * abrir uma tela preta. O écorché procedural continua no código exatamente
+ * para esse caso.
+ */
+async function carregarAnatomia(): Promise<THREE.Object3D | null> {
+  try {
+    const asset = Asset.fromModule(require('@/assets/modelos/corpo.glb'));
+    await asset.downloadAsync();
+    const uri = asset.localUri ?? asset.uri;
+    if (!uri) return null;
+
+    // `bytes()` entrega Uint8Array direto. Passar por base64 aqui — que é o
+    // caminho mais divulgado — triplica o tamanho em memória e custa uma
+    // decodificação de alguns megabytes na thread de JS.
+    const dados = await new File(uri).bytes();
+    const buffer = dados.buffer.slice(
+      dados.byteOffset,
+      dados.byteOffset + dados.byteLength,
+    ) as ArrayBuffer;
+
+    return await new Promise((resolver, rejeitar) => {
+      new GLTFLoader().parse(buffer, '', (gltf) => resolver(gltf.scene), rejeitar);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Nome da malha → grupo. Sufixo depois de `.` ou `_` é ignorado. */
+function grupoDaMalha(nome: string): Grupo | null {
+  const chave = nome.toLowerCase().split(/[._\s-]/)[0];
+  return (GRUPOS_VALIDOS as readonly string[]).includes(chave) ? (chave as Grupo) : null;
+}
+
+const GRUPOS_VALIDOS = [
+  'peito', 'costas', 'ombros', 'biceps', 'triceps', 'antebraco', 'trapezio',
+  'lombar', 'quadriceps', 'posterior', 'gluteos', 'panturrilha', 'abdomen',
+] as const;
+
+/**
+ * O nome que aparece ao tocar o músculo.
+ *
+ * É o nome anatômico, não o rótulo do app: quem abre o modelo em 3D e toca numa
+ * peça quer saber que peça é aquela, e "Latíssimo do dorso" responde isso melhor
+ * que "Costas".
+ */
+const NOME_ANATOMICO: Record<Grupo, string> = {
+  peito: 'Peitoral maior',
+  costas: 'Latíssimo do dorso',
+  ombros: 'Deltoide',
+  biceps: 'Bíceps braquial',
+  triceps: 'Tríceps braquial',
+  antebraco: 'Flexores e extensores do antebraço',
+  trapezio: 'Trapézio',
+  lombar: 'Eretor da espinha',
+  quadriceps: 'Quadríceps femoral',
+  posterior: 'Isquiotibiais',
+  gluteos: 'Glúteos',
+  panturrilha: 'Tríceps sural',
+  abdomen: 'Reto abdominal e oblíquos',
+  corpo: 'Corpo',
+  cardio: 'Cardio',
+};
+
 export interface CorpoProps {
   /** Fração de esforço por grupo, 0..1. Ausente = não trabalhado. */
   intensidade: Map<Grupo, number>;
@@ -383,7 +464,7 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
   }, [intensidade, paleta]);
 
   const aoCriarContexto = useCallback(
-    (gl: ExpoWebGLRenderingContext) => {
+    async (gl: ExpoWebGLRenderingContext) => {
       const l = gl.drawingBufferWidth;
       const a = gl.drawingBufferHeight;
 
@@ -440,29 +521,55 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
         metalness: 0,
         flatShading: false,
       });
-      for (const g of corpoBase()) pivo.add(new THREE.Mesh(g, matBase));
-
       const alvos: THREE.Mesh[] = [];
-      for (const m of MUSCULOS) {
-        const lados: (1 | -1)[] = m.par ? [1, -1] : [1];
-        for (const s of lados) {
-          const via = m.via.map(([x, y, z]) => [x * s, y, z] as P3);
-          const geo = malhaFusiforme(via, m.raios, { segmentos: 30, lados: 18 });
-          if (m.achatar) achatar(geo, m.achatar);
-          const nivel = nivelDeCalor(intensidade.get(m.grupo) ?? 0);
-          const mat = new THREE.MeshStandardMaterial({
-            color: paleta.calor[nivel],
-            // Músculo é úmido: um pouco de brilho especular é o que dá a
-            // leitura de fibra em vez de massa de modelar fosca.
-            roughness: 0.48,
-            metalness: 0,
-            emissive: new THREE.Color(nivel > 0 ? paleta.calor[nivel] : 0x000000),
-            emissiveIntensity: nivel > 0 ? 0.05 * nivel : 0,
-          });
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.userData = { grupo: m.grupo, nome: m.nome };
-          pivo.add(mesh);
-          alvos.push(mesh);
+
+      /** Material de um músculo, no degrau da rampa que a intensidade pede. */
+      const matMusculo = (grupo: Grupo) => {
+        const nivel = nivelDeCalor(intensidade.get(grupo) ?? 0);
+        return new THREE.MeshStandardMaterial({
+          color: paleta.calor[nivel],
+          // Músculo é úmido: um pouco de brilho especular é o que dá a
+          // leitura de fibra em vez de massa de modelar fosca.
+          roughness: 0.48,
+          metalness: 0,
+          emissive: new THREE.Color(nivel > 0 ? paleta.calor[nivel] : 0x000000),
+          emissiveIntensity: nivel > 0 ? 0.05 * nivel : 0,
+        });
+      };
+
+      const anatomia = await carregarAnatomia();
+
+      if (anatomia) {
+        // Anatomia real: cada malha do arquivo já é um grupo, e o que não casa
+        // com nenhum é o esqueleto — estrutura, nunca acende.
+        anatomia.traverse((o) => {
+          const malha = o as THREE.Mesh;
+          if (!malha.isMesh) return;
+          const grupo = grupoDaMalha(malha.name);
+          if (grupo) {
+            malha.material = matMusculo(grupo);
+            malha.userData = { grupo, nome: NOME_ANATOMICO[grupo] };
+            alvos.push(malha);
+          } else {
+            malha.material = matBase;
+          }
+        });
+        pivo.add(anatomia);
+      } else {
+        // Sem o arquivo, o écorché gerado em código. Perder o modelo degrada a
+        // fidelidade; não pode apagar a tela.
+        for (const g of corpoBase()) pivo.add(new THREE.Mesh(g, matBase));
+        for (const m of MUSCULOS) {
+          const lados: (1 | -1)[] = m.par ? [1, -1] : [1];
+          for (const s of lados) {
+            const via = m.via.map(([x, y, z]) => [x * s, y, z] as P3);
+            const geo = malhaFusiforme(via, m.raios, { segmentos: 30, lados: 18 });
+            if (m.achatar) achatar(geo, m.achatar);
+            const mesh = new THREE.Mesh(geo, matMusculo(m.grupo));
+            mesh.userData = { grupo: m.grupo, nome: m.nome };
+            pivo.add(mesh);
+            alvos.push(mesh);
+          }
         }
       }
 

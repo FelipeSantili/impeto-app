@@ -53,3 +53,7 @@ example
 
 # Android Studio
 .idea/
+
+# Modelo cru do Z-Anatomy (155 MB): fonte, nao asset. O .glb processado
+# que o app usa vive em assets/modelos/ e esse sim e versionado.
+/modelo-fonte

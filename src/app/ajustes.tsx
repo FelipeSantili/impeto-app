@@ -288,6 +288,13 @@ export default function Ajustes() {
                 subtitulo: 'Registro de treino de academia',
                 opcoes: [
                   { texto: 'Demonstrações: free-exercise-db', glifo: 'lista', onPress: () => {} },
+                  // A CC BY-SA do Z-Anatomy EXIGE este crédito visível. Não é
+                  // cortesia: sem ele o uso do modelo fica fora da licença.
+                  {
+                    texto: 'Modelo 3D: Z-Anatomy — CC BY-SA 4.0',
+                    glifo: 'info',
+                    onPress: () => {},
+                  },
                 ],
               })
             }
