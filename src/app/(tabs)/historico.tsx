@@ -107,7 +107,15 @@ export default function Historico() {
                   <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1 }}>
                     {historico.length}
                   </Tx>
-                  <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1.3 }}>
+                  {/* O volume é a leitura que resume tudo: vai em acento, que
+                      é o topo da rampa. Os outros dois são contexto. */}
+                  <Tx
+                    v="numeroXG"
+                    cor={c.acento}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    style={{ flex: 1.3 }}
+                  >
                     {fmtVolume(totalVolume)}
                   </Tx>
                   <Tx v="numeroXG" tab numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1 }}>

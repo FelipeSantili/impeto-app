@@ -81,7 +81,9 @@ export function Aba({
 }) {
   const c = usarPaleta();
   const estilos = usarEstilos();
-  const cor = isFocused ? c.tinta : c.tintaFraca;
+  // A aba da vez é ACENTO, não tinta cheia: no vocabulário do app o acento é o
+  // que está ativo agora, e a doca é só mais um lugar onde isso vale.
+  const cor = isFocused ? c.acento : c.tintaFraca;
   return (
     <Pressavel
       {...rest}
@@ -93,7 +95,7 @@ export function Aba({
       accessibilityState={{ selected: !!isFocused }}
       style={estilos.aba}
     >
-      <View style={[estilos.barraAtiva, isFocused && { backgroundColor: c.tinta }]} />
+      <View style={[estilos.barraAtiva, isFocused && { backgroundColor: c.acento }]} />
       <Glifo nome={glifo} tamanho={19} cor={cor} />
       <Text
         numberOfLines={1}

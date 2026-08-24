@@ -18,7 +18,6 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AvisoAtualizacao } from '@/components/aviso-atualizacao';
 import { Folhas } from '@/components/folha';
-import { TecladoCarga } from '@/components/teclado';
 import { TemaProvider, usarPaleta } from '@/design/tema';
 import { useVerificarAtualizacao } from '@/lib/atualizacao';
 import { useTreino } from '@/store/treino';
@@ -108,9 +107,6 @@ function Moldura() {
       </Stack>
       <AvisoAtualizacao />
       <Folhas />
-      {/* Vive na raiz para poder cobrir qualquer tela: é ele que substitui o
-          teclado do sistema na entrada de carga. */}
-      <TecladoCarga />
     </>
   );
 }

@@ -50,3 +50,6 @@ example
 .agents/
 .claude/skills/
 .impeccable/config.local.json
+
+# Android Studio
+.idea/

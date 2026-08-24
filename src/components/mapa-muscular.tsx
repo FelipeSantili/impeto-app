@@ -377,11 +377,13 @@ function Figura({
   intensidade,
   atraso,
   largura,
+  rotulo = true,
 }: {
   vista: Vista;
   intensidade: Map<Grupo, number>;
   atraso: number;
   largura: number;
+  rotulo?: boolean;
 }) {
   const c = usarPaleta();
   const p = useSharedValue(0);
@@ -439,10 +441,54 @@ function Figura({
         </Animated.View>
       </View>
 
-      <Rotulo cor={c.tintaFraca} style={{ marginTop: sp.sm }}>
-        {vista === 'frente' ? 'Frente' : 'Costas'}
-      </Rotulo>
+      {rotulo ? (
+        <Rotulo cor={c.tintaFraca} style={{ marginTop: sp.sm }}>
+          {vista === 'frente' ? 'Frente' : 'Costas'}
+        </Rotulo>
+      ) : null}
     </View>
+  );
+}
+
+/**
+ * A prancha como MOSTRADOR, para o cabeçalho do treino em andamento.
+ *
+ * Frente e costas lado a lado em tamanho de instrumento. Nesta escala nenhum
+ * músculo é identificável — e não precisa ser: aqui ela responde "onde o treino
+ * de hoje está pegando" de relance, entre uma série e outra. Quem quer
+ * identificar toca e abre o modelo em três dimensões.
+ *
+ * As costas entram junto de propósito. Metade do treino de qualquer pessoa é
+ * dorsal, glúteo e posterior; um mostrador só de frente mentiria por omissão
+ * justamente nos dias de puxada e perna.
+ */
+export function PranchaMini({
+  musculos,
+  largura = 34,
+  sessaoId,
+}: {
+  musculos: MusculoTrabalhado[];
+  largura?: number;
+  sessaoId?: string;
+}) {
+  const intensidade = new Map<Grupo, number>();
+  for (const m of musculos) {
+    if (m.grupo === 'corpo' || m.grupo === 'cardio') continue;
+    intensidade.set(m.grupo, m.fracao);
+  }
+
+  return (
+    <Pressavel
+      onPress={() => router.push(sessaoId ? `/corpo?sessao=${sessaoId}` : '/corpo')}
+      escala={0.94}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel="Abrir o modelo em três dimensões dos músculos trabalhados"
+      style={estilos.mini}
+    >
+      <Figura vista="frente" intensidade={intensidade} atraso={0} largura={largura} rotulo={false} />
+      <Figura vista="costas" intensidade={intensidade} atraso={0} largura={largura} rotulo={false} />
+    </Pressavel>
   );
 }
 
@@ -498,4 +544,5 @@ export function MapaMuscular({
 const estilos = StyleSheet.create({
   raiz: { flexDirection: 'row', justifyContent: 'center', gap: sp.h1 },
   toque: { paddingVertical: sp.sm },
+  mini: { flexDirection: 'row', gap: sp.xs, alignItems: 'flex-end' },
 });

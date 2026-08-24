@@ -41,6 +41,9 @@ import { nivelDeCalor } from '@/design/tokens';
 /** Ponto no espaço do corpo: X à direita, Y para cima, Z à frente. */
 type P3 = [number, number, number];
 
+/** Altura do corpo, do pé (y=0) ao topo da cabeça. Enquadra a câmera. */
+const ALTURA = 175;
+
 /**
  * Estação de um músculo: onde a curva passa e qual é a espessura ali.
  * `r` é o semi-eixo circular; `achatado` estica a seção numa direção, que é o
@@ -181,20 +184,32 @@ const MUSCULOS: Musculo[] = [
   },
 ];
 
+/** Raio de uma estação: circular, ou elíptico `[largura, profundidade]`. */
+type Raio = number | [number, number];
+
 /**
  * Varre uma seção elíptica ao longo de uma curva, com raio variável.
  *
  * `computeFrenetFrames` do three faz transporte paralelo, não Frenet puro — o
  * quadro não gira sozinho em trechos quase retos, que é justamente o caso da
- * maioria destes músculos. Fosse Frenet de verdade, o tubo torceria em torno do
- * próprio eixo e o achatamento sairia em direções diferentes ao longo da peça.
+ * maioria destas peças. Fosse Frenet de verdade, o tubo torceria em torno do
+ * próprio eixo e a seção elíptica sairia em direções diferentes ao longo dela.
+ *
+ * `pontas` fecha as duas extremidades em ponta. É o que dá o afunilamento de
+ * tendão num músculo — e é exatamente o que o TRONCO não pode ter, porque ele
+ * continua no pescoço e na pelve em vez de terminar.
  */
-function malhaFusiforme(via: P3[], raios: number[], segmentos = 26, lados = 14) {
+function malhaFusiforme(
+  via: P3[],
+  raios: Raio[],
+  { segmentos = 34, lados = 20, pontas = true } = {},
+) {
   const curva = new THREE.CatmullRomCurve3(via.map((p) => new THREE.Vector3(...p)));
   const quadros = curva.computeFrenetFrames(segmentos, false);
 
   const posicoes: number[] = [];
   const indices: number[] = [];
+  const par = (r: Raio): [number, number] => (typeof r === 'number' ? [r, r] : r);
 
   for (let i = 0; i <= segmentos; i++) {
     const t = i / segmentos;
@@ -202,19 +217,28 @@ function malhaFusiforme(via: P3[], raios: number[], segmentos = 26, lados = 14) 
     const N = quadros.normals[i];
     const B = quadros.binormals[i];
 
-    // Interpola o raio entre as estações e fecha as duas pontas em zero, que é
-    // o que dá o afunilamento de tendão em vez de um cilindro cortado.
     const escala = (raios.length - 1) * t;
     const k = Math.min(raios.length - 2, Math.floor(escala));
     const f = escala - k;
-    const base = raios[k] + (raios[k + 1] - raios[k]) * f;
-    const ponta = Math.sin(Math.PI * Math.min(1, Math.max(0, t)) ** 0.55);
-    const r = base * Math.max(0.12, ponta);
+    const [an, ab] = par(raios[k]);
+    const [bn, bb] = par(raios[k + 1]);
+    // Suaviza a interpolação entre estações: linear deixa uma quina visível na
+    // silhueta exatamente onde duas estações se encontram.
+    const s = f * f * (3 - 2 * f);
+    let rn = an + (bn - an) * s;
+    let rb = ab + (bb - ab) * s;
+
+    if (pontas) {
+      const ponta = Math.sin(Math.PI * Math.min(1, Math.max(0, t)) ** 0.55);
+      const m = Math.max(0.1, ponta);
+      rn *= m;
+      rb *= m;
+    }
 
     for (let j = 0; j <= lados; j++) {
       const a = (j / lados) * Math.PI * 2;
-      const cs = Math.cos(a) * r;
-      const sn = Math.sin(a) * r;
+      const cs = Math.cos(a) * rn;
+      const sn = Math.sin(a) * rb;
       posicoes.push(
         centro.x + N.x * cs + B.x * sn,
         centro.y + N.y * cs + B.y * sn,
@@ -248,45 +272,51 @@ function achatar(geo: THREE.BufferGeometry, [sx, sy, sz]: P3) {
   geo.translate(c.x, c.y, c.z);
 }
 
-/** Cápsula orientada de um ponto a outro — os ossos por baixo dos músculos. */
-function osso(a: P3, b: P3, r: number) {
-  const va = new THREE.Vector3(...a);
-  const vb = new THREE.Vector3(...b);
-  const eixo = new THREE.Vector3().subVectors(vb, va);
-  const geo = new THREE.CapsuleGeometry(r, eixo.length(), 4, 10);
-  const q = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    eixo.clone().normalize(),
-  );
-  geo.applyQuaternion(q);
-  geo.translate((va.x + vb.x) / 2, (va.y + vb.y) / 2, (va.z + vb.z) / 2);
-  return geo;
-}
-
-function elipsoide(centro: P3, r: P3) {
-  const geo = new THREE.SphereGeometry(1, 20, 14);
+function elipsoide(centro: P3, r: P3, seg = 26) {
+  const geo = new THREE.SphereGeometry(1, seg, Math.round(seg * 0.7));
   geo.scale(r[0], r[1], r[2]);
   geo.translate(centro[0], centro[1], centro[2]);
   return geo;
 }
 
-/** O corpo por baixo: cabeça, tronco, ossos dos membros, mãos e pés. */
+/**
+ * O corpo por baixo dos músculos.
+ *
+ * A primeira versão empilhava cinco elipsoides e umas cápsulas: cada par se
+ * cruzava numa costura visível, e o conjunto lia como boneco de balões com
+ * salsichas em cima. Agora tronco, braços e pernas são cada um uma peça VARRIDA
+ * ÚNICA, com seção elíptica que muda de estação em estação — ombro largo e raso,
+ * cintura estreita, quadril médio. É o mesmo gerador dos músculos, sem as
+ * pontas fechadas, e é o que faz a silhueta ser contínua.
+ *
+ * O corpo é deliberadamente um pouco mais MAGRO que a posição dos músculos:
+ * assim eles se apoiam sobre ele em vez de afundar e sumir.
+ */
 function corpoBase(): THREE.BufferGeometry[] {
   const g: THREE.BufferGeometry[] = [
-    elipsoide([0, 162, 0], [11, 13, 11.5]), // cabeça
-    osso([0, 145, 0], [0, 152, 0], 5), // pescoço
-    elipsoide([0, 131, 0], [16, 15, 9.5]), // caixa torácica
-    elipsoide([0, 112, 0], [12, 12, 8]), // abdômen
-    elipsoide([0, 98, 0], [13.5, 10, 9]), // pelve
+    elipsoide([0, 162, 0], [10.4, 12.6, 11]), // cabeça
+    // Pescoço → tronco → pelve: uma peça só, sem costura no meio.
+    malhaFusiforme(
+      [[0, 150, 0], [0, 141, -0.5], [0, 131, -0.5], [0, 119, 0], [0, 110, 0], [0, 99, 0], [0, 92, 0]],
+      [[4.6, 4.6], [12.5, 8.2], [14.2, 8.6], [11.2, 7.4], [10.6, 7.2], [12.4, 8.2], [11.4, 7.6]],
+      { pontas: false },
+    ),
   ];
   for (const s of [-1, 1] as const) {
     g.push(
-      osso([s * 19, 139, 0], [s * 25, 111, 1], 3.4), // úmero
-      osso([s * 25, 111, 1], [s * 28, 87, 3], 2.6), // antebraço
-      elipsoide([s * 29, 80, 4], [3, 5.5, 1.8]), // mão
-      osso([s * 8, 96, 0], [s * 9.5, 54, 1], 4.6), // fêmur
-      osso([s * 9.5, 54, 1], [s * 10, 11, -1], 3), // tíbia
-      elipsoide([s * 10, 6.5, 3], [3.4, 3, 8]), // pé
+      // Braço inteiro, do ombro à mão, afinando no cotovelo e no punho.
+      malhaFusiforme(
+        [[s * 17, 141, 0], [s * 21, 126, 1], [s * 25, 111, 1], [s * 26.5, 99, 2], [s * 28, 87, 3], [s * 29, 80, 3.5]],
+        [[4.4, 4.4], [3.6, 3.6], [2.9, 3.1], [2.6, 2.7], [2.1, 2.3], [2.4, 1.6]],
+        { pontas: false, segmentos: 26 },
+      ),
+      // Perna inteira, do quadril ao tornozelo.
+      malhaFusiforme(
+        [[s * 8, 96, 0], [s * 9, 78, 1], [s * 9.5, 60, 1], [s * 9.5, 54, 1], [s * 10, 38, -0.5], [s * 10, 18, -1], [s * 10, 11, -1]],
+        [[6.6, 6.8], [5.6, 5.8], [4.2, 4.4], [4, 4.2], [3.6, 3.8], [2.3, 2.6], [2, 2.4]],
+        { pontas: false, segmentos: 30 },
+      ),
+      elipsoide([s * 10, 6.5, 3], [3.2, 2.8, 7.6], 18), // pé
     );
   }
   return g;
@@ -383,19 +413,30 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
       const pivo = new THREE.Group();
       scene.add(pivo);
 
-      // Luz de instrumento: uma chave alta à frente-direita, um preenchimento
-      // fraco atrás para a silhueta não fechar em preto quando gira.
-      scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-      const chave = new THREE.DirectionalLight(0xffffff, 1.5);
-      chave.position.set(40, 80, 90);
+      /*
+       * Luz de estúdio de três pontos, não de app.
+       *
+       * A ambiente é baixa de propósito: ambiente alta achata tudo, e era o que
+       * fazia os músculos parecerem adesivos colados no corpo. O volume vem da
+       * CHAVE alta à frente-direita, e a definição da borda vem da CONTRALUZ
+       * atrás — é ela que separa o contorno do fundo preto quando a figura gira
+       * de costas, que era o pior ângulo da versão anterior.
+       */
+      const hemi = new THREE.HemisphereLight(0xdfe6ea, 0x0a0b0c, 0.55);
+      scene.add(hemi);
+      const chave = new THREE.DirectionalLight(0xfff4e2, 1.8);
+      chave.position.set(55, 90, 80);
       scene.add(chave);
-      const contra = new THREE.DirectionalLight(0xffffff, 0.5);
-      contra.position.set(-60, 30, -70);
+      const preenche = new THREE.DirectionalLight(0xcfe0ee, 0.45);
+      preenche.position.set(-70, 20, 55);
+      scene.add(preenche);
+      const contra = new THREE.DirectionalLight(0xffffff, 1.1);
+      contra.position.set(-30, 60, -110);
       scene.add(contra);
 
       const matBase = new THREE.MeshStandardMaterial({
         color: paleta.silhueta,
-        roughness: 0.92,
+        roughness: 0.95,
         metalness: 0,
         flatShading: false,
       });
@@ -406,15 +447,17 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
         const lados: (1 | -1)[] = m.par ? [1, -1] : [1];
         for (const s of lados) {
           const via = m.via.map(([x, y, z]) => [x * s, y, z] as P3);
-          const geo = malhaFusiforme(via, m.raios);
+          const geo = malhaFusiforme(via, m.raios, { segmentos: 30, lados: 18 });
           if (m.achatar) achatar(geo, m.achatar);
           const nivel = nivelDeCalor(intensidade.get(m.grupo) ?? 0);
           const mat = new THREE.MeshStandardMaterial({
             color: paleta.calor[nivel],
-            roughness: 0.62,
+            // Músculo é úmido: um pouco de brilho especular é o que dá a
+            // leitura de fibra em vez de massa de modelar fosca.
+            roughness: 0.48,
             metalness: 0,
             emissive: new THREE.Color(nivel > 0 ? paleta.calor[nivel] : 0x000000),
-            emissiveIntensity: nivel > 0 ? 0.06 * nivel : 0,
+            emissiveIntensity: nivel > 0 ? 0.05 * nivel : 0,
           });
           const mesh = new THREE.Mesh(geo, mat);
           mesh.userData = { grupo: m.grupo, nome: m.nome };
@@ -423,21 +466,41 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
         }
       }
 
-      // Centraliza o corpo no pivô para que girar seja girar em torno DELE, e
-      // não em torno dos pés. `suporte.add` já desliga o pivô da cena.
-      pivo.position.set(0, -92, 0);
+      /*
+       * Centraliza o corpo no pivô: girar tem que ser girar em torno DELE, não
+       * em torno dos pés. O corpo vai de y=0 (pé) a y=173 (topo da cabeça),
+       * então o meio é 86,5 — errar isso faz a figura descrever um círculo em
+       * vez de girar no lugar.
+       */
+      pivo.position.set(0, -ALTURA / 2, 0);
       const suporte = new THREE.Group();
       suporte.add(pivo);
       scene.add(suporte);
 
-      camera.position.set(0, 0, 230);
+      /*
+       * Distância de enquadramento, calculada em vez de chutada.
+       *
+       * A versão anterior tinha a câmera cravada em z=230 com FOV de 32°: cabem
+       * 2·230·tan(16°) ≈ 132 unidades de altura, e o corpo tem 173. A cabeça e
+       * os pés ficavam FORA do quadro, o que é boa parte do "está estranho".
+       *
+       * Aqui a distância sai da altura que se quer enquadrar, com folga — e o
+       * `min` com a razão de aspecto garante que numa tela estreita o corpo não
+       * encoste nas laterais ao girar de perfil.
+       */
+      const meiaAltura = (ALTURA * 1.12) / 2;
+      const meiaLargura = 34;
+      const tg = Math.tan((camera.fov * Math.PI) / 360);
+      const dist = Math.max(meiaAltura / tg, meiaLargura / (tg * camera.aspect));
+
+      camera.position.set(0, 0, dist);
       camera.lookAt(0, 0, 0);
 
       const render = () => {
         const o = orbita.current;
         suporte.rotation.y = o.giroY;
         suporte.rotation.x = o.giroX;
-        camera.position.z = 230 / o.zoom;
+        camera.position.z = dist / o.zoom;
         camera.lookAt(0, 0, 0);
         renderer.render(scene, camera);
         gl.endFrameEXP();

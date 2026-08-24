@@ -89,21 +89,23 @@ export default function Inicio() {
     });
   }
 
-  const resumo =
-    semana.treinos === 0
-      ? 'Nenhum treino esta semana'
-      : `${semana.treinos} ${semana.treinos === 1 ? 'treino' : 'treinos'} · ${fmtVolume(semana.volume)} · ${fmtDuracaoCurta(semana.minutos * 60000)}`;
 
   return (
     <Tela scroll>
-      {/* Cabeçalho da página: marca à esquerda, data à direita, mesma base. */}
+      {/*
+        Cabeçalho de instrumento: marca à esquerda, carimbo de data à direita.
+        O LED só acende quando há sessão aberta — vermelho aqui diz ESTADO
+        ("está gravando"), e essa é a única coisa que ele pode dizer no app.
+      */}
       <View style={estilos.marca}>
-        <Glifo nome="raio" tamanho={16} cor={c.tinta} />
+        {ativa ? <View style={estilos.led} /> : <Glifo nome="raio" tamanho={15} cor={c.acento} />}
         <Rotulo cor={c.tinta} style={estilos.marcaTexto}>
           Ímpeto
         </Rotulo>
         <View style={{ flex: 1 }} />
-        <Rotulo cor={c.tintaFraca}>{dataDeHoje()}</Rotulo>
+        <Rotulo cor={ativa ? c.rec : c.tintaFraca}>
+          {ativa ? `REC · ${dataDeHoje()}` : dataDeHoje()}
+        </Rotulo>
         <BotaoGlifo
           glifo="ajustes"
           tamanho={32}
@@ -119,9 +121,28 @@ export default function Inicio() {
         direita={sequencia > 1 ? <Rotulo cor={c.acento}>{sequencia} dias seguidos</Rotulo> : null}
       >
         <LinhaSemana dias={semana.dias} hoje={hoje} />
-        <Tx v="small" cor={c.tintaMid} style={estilos.resumo}>
-          {resumo}
-        </Tx>
+
+        {/*
+          Leitura de instrumento no lugar de prosa.
+
+          Isto era uma linha corrida — "3 treinos · 14,2 t · 4h12". Em prosa,
+          ler o volume da semana exige varrer a frase inteira e achar o número
+          no meio dela. Em coluna rotulada, com o rótulo à esquerda e o valor
+          alinhado à direita em monoespaçada, cada leitura tem endereço fixo e
+          se acha sem ler.
+        */}
+        <View style={estilos.leituras}>
+          <Dado rotulo="Sessões" valor={String(semana.treinos)} />
+          <Dado
+            rotulo="Volume"
+            valor={semana.volume > 0 ? fmtVolume(semana.volume) : '--'}
+            forte={semana.volume > 0}
+          />
+          <Dado
+            rotulo="Tempo sob carga"
+            valor={semana.minutos > 0 ? fmtDuracaoCurta(semana.minutos * 60000) : '--'}
+          />
+        </View>
       </Secao>
 
       {/* A única decisão da tela. Barra cheia, largura total, canto reto. */}
@@ -210,6 +231,26 @@ export default function Inicio() {
         )}
       </Secao>
     </Tela>
+  );
+}
+
+/**
+ * Uma leitura: rótulo à esquerda, valor alinhado à direita.
+ *
+ * A peça mais repetida do app. O valor é monoespaçado e o rótulo destravado em
+ * caixa alta — assim duas leituras empilhadas alinham os dígitos sozinhas, sem
+ * largura fixa e sem `fontVariant`.
+ */
+function Dado({ rotulo, valor, forte }: { rotulo: string; valor: string; forte?: boolean }) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
+  return (
+    <View style={estilos.dado}>
+      <Rotulo cor={c.tintaFraca}>{rotulo}</Rotulo>
+      <Tx v="numero" cor={forte ? c.acento : c.tinta}>
+        {valor}
+      </Tx>
+    </View>
   );
 }
 
@@ -348,7 +389,16 @@ const usarEstilos = criarEstilos((c) => ({
     backgroundColor: c.acento,
     borderRadius: 1,
   },
-  resumo: { paddingHorizontal: margem.pagina, paddingTop: sp.sm },
+  leituras: { paddingHorizontal: margem.pagina, paddingTop: sp.md },
+  dado: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    height: 30,
+    borderBottomWidth: traco.fina,
+    borderBottomColor: c.regua,
+  },
+  led: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.rec },
   acao: { paddingHorizontal: margem.pagina, paddingTop: sp.h2 },
   rotina: {
     flexDirection: 'row',

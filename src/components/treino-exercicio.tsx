@@ -7,7 +7,6 @@ import { CabecaColuna, Pressavel, Regua, Rotulo, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { Glifo } from '@/components/glifos';
 import { abrirMenu, type OpcaoMenu } from '@/components/folha';
-import { abrirTeclado, usarAlvoTeclado } from '@/components/teclado';
 import { POR_ID } from '@/data/exercicios';
 import { TECNICAS, tecnicaDe } from '@/data/tecnicas';
 import { MEDIDA_LABEL, type Medida } from '@/data/types';
@@ -157,9 +156,6 @@ function BlocoExercicioBase({
           descanso={item.descanso}
           ativa={i === indiceAtivo}
           anterior={anterior?.[i] ?? null}
-          exercicio={ex?.nome ?? 'Exercício'}
-          rotulos={rotulos}
-          medida={medida}
         />
       ))}
 
@@ -187,9 +183,6 @@ function LinhaSerie({
   descanso,
   ativa,
   anterior,
-  exercicio,
-  rotulos,
-  medida,
 }: {
   uid: string;
   serie: Serie;
@@ -197,9 +190,6 @@ function LinhaSerie({
   descanso: number;
   ativa: boolean;
   anterior: Serie | null;
-  exercicio: string;
-  rotulos: { a: string; b: string };
-  medida: Medida;
 }) {
   const c = usarPaleta();
   const estilos = usarEstilos();
@@ -247,21 +237,6 @@ function LinhaSerie({
     }
   }
 
-  /** Abre o teclado de carga já apontando para a célula que foi tocada. */
-  function abrir(campo: 'peso' | 'reps') {
-    Haptics.selectionAsync();
-    abrirTeclado({
-      uid,
-      serieId: serie.id,
-      campo,
-      rotulos,
-      // Repetição é inteira; segundo e quilômetro aceitam decimal.
-      inteiroB: medida === 'peso_rep' || medida === 'rep',
-      exercicio,
-      numeroSerie: numero,
-      descanso,
-    });
-  }
 
   return (
     <Animated.View
@@ -302,8 +277,19 @@ function LinhaSerie({
         {dicaPeso && dicaReps ? `${dicaPeso} × ${dicaReps}` : '—'}
       </Tx>
 
-      <Celula valor={serie.peso} dica={dicaPeso} feita={feita} campo="peso" serieId={serie.id} onAbrir={abrir} />
-      <Celula valor={serie.reps} dica={dicaReps} feita={feita} campo="reps" serieId={serie.id} onAbrir={abrir} />
+      <CampoNumero
+        valor={serie.peso}
+        dica={dicaPeso}
+        feita={feita}
+        onChange={(v) => editarSerie(uid, serie.id, 'peso', v)}
+      />
+      <CampoNumero
+        valor={serie.reps}
+        dica={dicaReps}
+        feita={feita}
+        inteiro
+        onChange={(v) => editarSerie(uid, serie.id, 'reps', v)}
+      />
 
       <Pressavel
         onPress={concluir}
@@ -320,67 +306,58 @@ function LinhaSerie({
 }
 
 /**
- * Célula de valor — agora um MOSTRADOR, não um campo.
+ * Célula de valor: campo de formulário com régua embaixo, não caixa com fundo.
  *
- * Antes isto era um `TextInput` de 62px que chamava o teclado do sistema, e o
- * teclado do sistema subia tapando a própria linha que estava sendo editada.
- * Agora a célula só exibe, e o toque abre o teclado de carga do app, que mostra
- * o que você está editando no cabeçalho dele.
+ * Chama o teclado do sistema, de propósito. Houve aqui um teclado próprio, com
+ * incremento de anilha e navegação entre campos — foi retirado: ocupava metade
+ * da tela e ninguém pediu para reaprender a digitar um número. O teclado do
+ * telefone é o que a mão já sabe usar.
  *
- * Vazia, mostra o traço de mostrador sem leitura (`--`), não um zero: zero é um
- * valor, ausência não é. Preenchida, escreve em acento — acento é o que VOCÊ
- * escreveu. O sublinhado é a marca de "campo a preencher" e some quando a série
- * é dada por concluída, porque ali deixou de ser campo e virou registro.
+ * Vazia mostra a dica do treino anterior; preenchida escreve em ACENTO, porque
+ * acento é o que VOCÊ escreveu. Quando a série é dada por concluída a régua
+ * some — deixou de ser campo a preencher e virou registro.
  */
-function Celula({
+function CampoNumero({
   valor,
   dica,
   feita,
-  campo,
-  serieId,
-  onAbrir,
+  inteiro,
+  onChange,
 }: {
   valor: number | null;
   dica: string | null;
   feita: boolean;
-  campo: 'peso' | 'reps';
-  serieId: string;
-  onAbrir: (campo: 'peso' | 'reps') => void;
+  inteiro?: boolean;
+  onChange: (v: number | null) => void;
 }) {
   const c = usarPaleta();
   const estilos = usarEstilos();
-  const alvo = usarAlvoTeclado();
-  // Precisa casar a SÉRIE também: só o campo marcaria a mesma coluna em todas
-  // as linhas do exercício ao mesmo tempo.
-  const editando = alvo?.serieId === serieId && alvo?.campo === campo;
+  // O texto local preserva estados intermediários ("12," enquanto digita) que
+  // um número puro descartaria.
+  const [texto, setTexto] = useState<string | null>(null);
+  const mostrado = texto ?? (valor === null ? '' : fmtNumero(valor));
 
-  const vazio = valor === null;
   return (
-    <Pressavel
-      onPress={() => onAbrir(campo)}
-      escala={0.94}
-      // O alvo real é maior que a célula: a tabela é densa e o dedo é úmido.
-      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-      accessibilityRole="button"
-      accessibilityLabel={`${campo === 'peso' ? 'Carga' : 'Repetições'}: ${
-        vazio ? 'não preenchido' : fmtNumero(valor)
-      }. Toque para editar.`}
-      style={[
-        estilos.celula,
-        feita && estilos.celulaFeita,
-        editando && { borderBottomColor: c.acento },
-      ]}
-    >
-      <Tx
-        v="numero"
-        cor={vazio ? c.tintaFantasma : c.acento}
-        center
-        numberOfLines={1}
-        adjustsFontSizeToFit
-      >
-        {vazio ? (dica ?? '--') : fmtNumero(valor)}
-      </Tx>
-    </Pressavel>
+    <TextInput
+      value={mostrado}
+      onChangeText={(t) => {
+        const limpo = inteiro
+          ? t.replace(/[^0-9]/g, '')
+          : t.replace(',', '.').replace(/[^0-9.]/g, '');
+        setTexto(limpo);
+        if (limpo === '') return onChange(null);
+        const n = Number(limpo);
+        if (!Number.isNaN(n)) onChange(n);
+      }}
+      onBlur={() => setTexto(null)}
+      placeholder={dica ?? '--'}
+      placeholderTextColor={c.tintaFantasma}
+      keyboardType={inteiro ? 'number-pad' : 'decimal-pad'}
+      selectTextOnFocus
+      // A célula tem altura fixa: a fonte não pode crescer a ponto de cortar.
+      maxFontSizeMultiplier={1.2}
+      style={[estilos.campo, feita && estilos.campoFeito]}
+    />
   );
 }
 
@@ -431,15 +408,18 @@ const usarEstilos = criarEstilos((c) => ({
     color: c.rec,
     marginTop: -2,
   },
-  celula: {
+  campo: {
     width: COL.valor,
     height: 34,
-    justifyContent: 'center',
+    color: c.acento,
+    textAlign: 'center',
+    ...type.numero,
+    padding: 0,
     borderBottomWidth: traco.normal,
     borderBottomColor: c.reguaMid,
   },
   // Concluída, some o sublinhado: deixou de ser campo e virou registro.
-  celulaFeita: { borderBottomColor: 'transparent' },
+  campoFeito: { borderBottomColor: 'transparent' },
   check: {
     width: COL.check,
     height: 32,

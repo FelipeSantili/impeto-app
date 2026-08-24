@@ -9,11 +9,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Botao,
   BotaoGlifo,
-  CabecaColuna,
   Pressavel,
   Regua,
   Rotulo,
@@ -23,13 +29,52 @@ import {
 import { TiraDescanso } from '@/components/descanso';
 import { abrirConfirmacao, abrirMenu, abrirPrompt } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
+import { PranchaMini } from '@/components/mapa-muscular';
 import { BlocoExercicio } from '@/components/treino-exercicio';
 import { criarEstilos, usarPaleta } from '@/design/tema';
+import { curva } from '@/design/movimento';
 import { margem, sp, type } from '@/design/tokens';
-import { fmtDuracao, fmtVolume, ultimaExecucao, volumeSessao } from '@/lib/metricas';
+import {
+  fmtDuracao,
+  fmtVolume,
+  musculosDaSessao,
+  ultimaExecucao,
+  volumeSessao,
+} from '@/lib/metricas';
 import { useCinta } from '@/store/cinta';
 import { useDescanso } from '@/store/descanso';
 import { useTreino } from '@/store/treino';
+
+/**
+ * O LED de gravação.
+ *
+ * Pulsa devagar, como o de um aparelho de bancada — não pisca, que lê como
+ * alerta. Junto com a marca de recorde, é o único uso de vermelho no app: aqui
+ * ele diz ESTADO (a sessão está aberta), nunca importância.
+ */
+function Led() {
+  const c = usarPaleta();
+  const p = useSharedValue(1);
+  const reduzido = useReducedMotion();
+
+  useEffect(() => {
+    if (reduzido) return;
+    p.set(
+      withRepeat(withTiming(0.26, { duration: 1200, easing: curva.pulso }), -1, true),
+    );
+  }, [reduzido, p]);
+
+  const estilo = useAnimatedStyle(() => ({ opacity: p.get() }));
+
+  return (
+    <Animated.View
+      style={[
+        { width: 7, height: 7, borderRadius: 4, backgroundColor: c.rec },
+        estilo,
+      ]}
+    />
+  );
+}
 
 /**
  * Treino em andamento.
@@ -82,6 +127,9 @@ export default function TreinoAtivo() {
 
   const series = ativa.exercicios.reduce((t, e) => t + e.series.filter((s) => s.feita).length, 0);
   const volume = volumeSessao({ ...ativa, exercicios: ativa.exercicios });
+  // Recalculado a cada série marcada: é o que faz a prancha do cabeçalho
+  // esquentar ao vivo em vez de só existir no relatório do fim.
+  const musculos = musculosDaSessao(ativa);
 
   function concluir() {
     const feitas = ativa!.exercicios.some((e) => e.series.some((s) => s.feita));
@@ -176,53 +224,72 @@ export default function TreinoAtivo() {
         <BotaoGlifo glifo="reticencias" acessivel="Opções do treino" onPress={menu} />
       </View>
 
-      <TextInput
-        value={ativa.nome}
-        onChangeText={renomear}
-        style={estilos.titulo}
-        placeholder="Nome do treino"
-        placeholderTextColor={c.tintaFantasma}
-        returnKeyType="done"
-        maxFontSizeMultiplier={1.3}
-      />
-
-      {/* Faixa de totais: colunas rotuladas, valores em condensada tabular. */}
-      <CabecaColuna>
-        <Rotulo cor={c.tintaMid} style={{ flex: 1.3 }}>
-          Tempo
-        </Rotulo>
-        <Rotulo cor={c.tintaMid} style={{ flex: 1 }}>
-          Séries
-        </Rotulo>
-        <Rotulo cor={c.tintaMid} style={{ flex: 1.2 }}>
-          Volume
-        </Rotulo>
-        {bpm !== null ? (
-          <Rotulo cor={c.tintaMid} style={{ width: 52, textAlign: 'right' }}>
-            bpm
-          </Rotulo>
-        ) : null}
-      </CabecaColuna>
-      <View style={estilos.totais}>
-        <Tx v="numeroG" tab style={{ flex: 1.3 }}>
-          {fmtDuracao(agora - ativa.inicio)}
-        </Tx>
-        <Tx v="numeroG" tab style={{ flex: 1 }}>
-          {series}
-        </Tx>
-        <Tx v="numeroG" tab style={{ flex: 1.2 }}>
-          {fmtVolume(volume)}
-        </Tx>
-        {bpm !== null ? (
-          <View style={estilos.bpm}>
-            <Glifo nome="coracao" tamanho={11} cor={c.rec} />
-            <Tx v="numeroG" tab cor={c.rec}>
-              {bpm}
-            </Tx>
-          </View>
-        ) : null}
+      {/*
+        O LED de gravação. É a única coisa no app inteiro, junto com a marca de
+        recorde, que tem licença para usar vermelho — vermelho aqui diz ESTADO
+        (a sessão está aberta), não importância.
+      */}
+      <View style={estilos.linhaNome}>
+        <Led />
+        <TextInput
+          value={ativa.nome}
+          onChangeText={renomear}
+          style={estilos.titulo}
+          placeholder="Nome do treino"
+          placeholderTextColor={c.tintaFantasma}
+          returnKeyType="done"
+          maxFontSizeMultiplier={1.3}
+        />
       </View>
-      <Regua peso="forte" cor={c.tinta} />
+
+      {/*
+        Painel de leitura: o corpo à esquerda como mostrador, os totais em
+        coluna à direita. A prancha esquenta série a série e abre o modelo 3D
+        no toque — é o instrumento dizendo ONDE o treino está pegando enquanto
+        os números dizem QUANTO.
+      */}
+      <View style={estilos.painel}>
+        <PranchaMini musculos={musculos} largura={30} />
+
+        <View style={{ flex: 1 }}>
+          <View style={estilos.colunas}>
+            <Rotulo cor={c.tintaFraca} style={{ flex: 1.3 }}>
+              Tempo
+            </Rotulo>
+            <Rotulo cor={c.tintaFraca} style={{ flex: 1 }}>
+              Séries
+            </Rotulo>
+            <Rotulo cor={c.tintaFraca} style={{ flex: 1.2 }}>
+              Volume
+            </Rotulo>
+            {bpm !== null ? (
+              <Rotulo cor={c.tintaFraca} style={{ width: 46, textAlign: 'right' }}>
+                bpm
+              </Rotulo>
+            ) : null}
+          </View>
+          <View style={estilos.totais}>
+            <Tx v="numeroG" style={{ flex: 1.3 }}>
+              {fmtDuracao(agora - ativa.inicio)}
+            </Tx>
+            <Tx v="numeroG" style={{ flex: 1 }}>
+              {series}
+            </Tx>
+            <Tx v="numeroG" cor={volume > 0 ? c.acento : c.tinta} style={{ flex: 1.2 }}>
+              {fmtVolume(volume)}
+            </Tx>
+            {bpm !== null ? (
+              <View style={estilos.bpm}>
+                <Glifo nome="coracao" tamanho={11} cor={c.rec} />
+                <Tx v="numeroG" cor={c.rec}>
+                  {bpm}
+                </Tx>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
+      <Regua peso="forte" cor={c.reguaForte} />
 
       <ScrollView
         contentContainerStyle={{ paddingTop: sp.xl, paddingBottom: alturaRodape + 80 }}
@@ -290,20 +357,30 @@ const usarEstilos = criarEstilos((c) => ({
     alignItems: 'center',
     paddingHorizontal: sp.md,
   },
-  titulo: {
-    ...type.title,
-    color: c.tinta,
+  linhaNome: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.sm,
     paddingHorizontal: margem.pagina,
-    paddingVertical: 0,
     marginBottom: sp.md,
   },
-  totais: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    paddingHorizontal: margem.pagina,
-    paddingVertical: sp.sm,
+  titulo: {
+    ...type.title,
+    flex: 1,
+    color: c.tinta,
+    paddingVertical: 0,
   },
-  bpm: { width: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
+  // O mostrador do corpo e os totais no mesmo painel: onde e quanto, juntos.
+  painel: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: sp.md,
+    paddingHorizontal: margem.pagina,
+    paddingBottom: sp.md,
+  },
+  colunas: { flexDirection: 'row', alignItems: 'baseline', paddingBottom: 2 },
+  totais: { flexDirection: 'row', alignItems: 'baseline' },
+  bpm: { width: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
   addExercicio: {
     flexDirection: 'row',
     alignItems: 'center',
