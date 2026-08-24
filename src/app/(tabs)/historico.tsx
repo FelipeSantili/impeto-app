@@ -173,9 +173,9 @@ function GraficoVolume() {
                     {
                       height: altura,
                       // Semanas passadas cheias em tinta fraca, a corrente em
-                      // azul. Vazadas com contorno liam como caixa vazia, não
+                      // acento. Vazadas com contorno liam como caixa vazia, não
                       // como barra.
-                      backgroundColor: atual ? c.azul : c.reguaForte,
+                      backgroundColor: atual ? c.acento : c.reguaForte,
                     },
                   ]}
                 />

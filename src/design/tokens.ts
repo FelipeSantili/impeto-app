@@ -1,42 +1,45 @@
 /*
  * ─────────────────────────────────────────────────────────────────────────────
- * ÍMPETO — CONTRATO DE DIREÇÃO                              seed b78ebf1d/pick
+ * ÍMPETO — CONTRATO DE DIREÇÃO                                     TELEMETRIA
  * ─────────────────────────────────────────────────────────────────────────────
- * THESIS: Ímpeto é um registro escrito à mão, não um painel. Recusa o arranjo
- *   padrão da categoria — cartões escuros com um acento neon — e imprime o
- *   treino como tabela pautada, onde as colunas carregam a hierarquia e nada
- *   flutua.
+ * THESIS: o Ímpeto não é um app de treino, é um INSTRUMENTO DE MEDIÇÃO que por
+ *   acaso mede treino. Preto neutro sem matiz, fios de 1px, tudo alinhado em
+ *   coluna, tudo monoespaçado — e um LED vermelho que diz apenas uma coisa:
+ *   está gravando.
  *
- * OWN-WORLD: dois materiais do mesmo mundo, um por tema.
- *   CLARO  — o caderno: papel cinza de gramatura, tinta grafite, duas canetas.
- *   ESCURO — o quadro da academia: ardósia e giz, com giz azul e giz vermelho.
- *   Escuro não é o claro invertido: é outro objeto real da mesma parede. Azul é
- *   sempre o que VOCÊ escreveu (cargas, repetições, o ✓); vermelho é sempre o
- *   carimbo (recorde, correção). Réguas hairline no lugar de bordas de cartão;
- *   raio de canto 2–4px; zero sombra. Archivo para prosa, Barlow Condensed para
- *   todo número. Margem esquerda fixa em toda tela.
+ * AS DUAS CORES TÊM TRABALHOS QUE NÃO SE CONFUNDEM. Esta é a regra que
+ *   organiza o sistema inteiro:
  *
- * STORY: o usuário vê a sessão como uma página que é dele; acredita no registro
- *   porque ele mostra a estimativa como estimativa; e anota a próxima série sem
- *   pensar no app.
+ *     VERMELHO (`rec`) diz ESTADO — está rodando, ou não está. É binário.
+ *       Aparece em exatamente dois lugares: o LED de sessão aberta e a marca de
+ *       recorde. Em nenhum outro. Se ele começar a aparecer em botão, em ícone
+ *       de aba ou em destaque de texto, o sistema morre: vermelho que aparece
+ *       em todo lugar deixa de significar "atenção".
  *
- * FIRST VIEWPORT (Início): margem à esquerda; ÍMPETO em carimbo no alto à
- *   esquerda com o raio ao lado, data à direita na mesma linha de base. A
- *   semana como LINHA PAUTADA de sete células com as iniciais por cabeçalho —
- *   não sete bolinhas. Ação primária como barra sólida, retangular. ROTINAS
- *   como cabeçalho de seção sobre régua, cada rotina uma LINHA DE LIVRO-CAIXA:
- *   ordinal na margem, nome, coluna tabular à direita. Nenhum cartão.
+ *     ÂMBAR (`acento`) diz QUANTIDADE — é o topo da rampa térmica, não uma cor
+ *       independente. Tudo o que o usuário escreveu, tudo que está feito, tudo
+ *       que carrega carga alta é âmbar porque âmbar é o fim da escala.
  *
- * ESTADO SEM COR (ver `marca`): feita = escrita em azul + ✓; ativa = barra na
- *   margem; pendente = pontilhado de formulário; aquecimento = ordinal entre
- *   parênteses, porque livro-caixa põe entre parênteses o que não soma;
- *   técnica = sigla carimbada; recorde = traço vermelho na margem. Nada disso
- *   depende de matiz — exigência funcional: a academia às vezes está clara, às
- *   vezes escura, e agora o app também.
+ * RAMPA TÉRMICA (`calor`): a escala é o vocabulário de intensidade do app
+ *   inteiro — a prancha anatômica, o modelo 3D, as barras de carga muscular e o
+ *   estado "feito" saem todos dela. Vai do inerte ao âmbar passando por um
+ *   verde-azulado frio, porque uma rampa que começa cinza e termina laranja
+ *   passa por marrom no meio e fica suja.
  *
- * RISCO HONESTO: minimalismo pautado pode ficar mole — só hairline e ar. O
- *   corretivo é massa: a ação primária é barra cheia, os números monumentais
- *   são monumentais de verdade, e a régua de cabeçalho é régua, não sussurro.
+ * ESCURO É A CASA. Instrumento de bancada é escuro; o claro existe porque a
+ *   academia às vezes está com sol na tela, e legibilidade não é eixo de
+ *   estilo. No claro o âmbar escurece para ocre — a mesma posição na rampa,
+ *   a luminância que o fundo exige.
+ *
+ * GEOMETRIA: canto de 4 a 8px. Não é quadrado e não é macio: é a chanfradura
+ *   de um painel fresado. Densidade alta — a sessão é uma TABELA, com cabeça de
+ *   coluna e valores alinhados à direita.
+ *
+ * RISCO HONESTO: monoespaçada come largura, e densidade alta briga com dedo
+ *   suado. O corretivo é estrutural, não cosmético: a linha pode ser
+ *   visualmente magra, mas o alvo de toque nunca desce de 48dp — o ✓ tem
+ *   `hitSlop`, e a entrada de carga saiu da célula minúscula e foi para um
+ *   teclado próprio ao alcance do polegar.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -45,9 +48,9 @@ import { StyleSheet } from 'react-native';
 /**
  * Uma paleta.
  *
- * Os nomes são do PAPEL que a cor cumpre, não do material: `fundo` é papel no
- * claro e ardósia no escuro. Nomear pelo material ("papel") obrigaria a mentir
- * em um dos dois temas.
+ * Os nomes são do PAPEL que a cor cumpre, não do material nem do matiz:
+ * `acento` é âmbar no escuro e ocre no claro, e as duas coisas são "o topo da
+ * rampa". Nomear pelo matiz obrigaria a mentir em um dos dois temas.
  *
  * Todo par de contraste abaixo foi calculado, não estimado.
  */
@@ -66,121 +69,155 @@ export interface Paleta {
   reguaMid: string;
   reguaForte: string;
 
-  azul: string;
-  azulSuave: string;
-  azulLinha: string;
-  azulTexto: string;
+  /** Topo da rampa térmica. Diz QUANTIDADE — o que está feito, o que é alto. */
+  acento: string;
+  acentoSuave: string;
+  acentoLinha: string;
+  /** Tinta que fica POR CIMA do acento quando ele vira preenchimento. */
+  acentoTexto: string;
+  /** O acento com o dedo em cima: um degrau abaixo na rampa, nos dois temas. */
+  acentoPress: string;
 
-  vermelho: string;
-  vermelhoSuave: string;
-  vermelhoLinha: string;
+  /**
+   * O LED. Diz ESTADO, e só. Dois usos no app inteiro: sessão gravando e
+   * recorde batido. Qualquer terceiro uso é regressão.
+   */
+  rec: string;
+  recSuave: string;
+  recLinha: string;
 
-  /** Cor da silhueta na prancha anatômica — precisa contornar em ambos. */
+  /**
+   * Rampa térmica, do inerte ao topo. Índice 0 é "não trabalhado" e vale como
+   * cor de superfície; 1..5 são intensidade crescente.
+   */
+  calor: readonly [string, string, string, string, string, string];
+
+  /** Corpo da prancha anatômica: o que não é músculo nomeado. */
   silhueta: string;
   silhuetaTraco: string;
 
-  /** Tom da barra de status do sistema. */
+  /** Tom dos ícones da barra de status do sistema. */
   barraStatus: 'light' | 'dark';
   /** Véu atrás da folha modal. */
   veu: string;
 }
 
 /**
- * CLARO — o caderno.
+ * ESCURA — o instrumento na bancada.
  *
- * Cinza de gramatura, não creme: creme + serifa + terracota é um dos três
- * agrupamentos em que interface gerada por IA sempre cai.
+ * Preto NEUTRO, sem matiz nenhum: é o que separa "aparelho de medição" de
+ * "app escuro com acento". Qualquer viés de matiz no fundo faz a rampa térmica
+ * mentir, porque ela passa a ser lida contra uma cor em vez de contra o vazio.
  */
-export const CLARA: Paleta = {
-  fundo: '#E8E7E2',
-  fundoAlto: '#F2F1ED',
-  fundoBaixo: '#DBDAD3',
-  fundoBorda: '#D0CFC7',
+export const ESCURA: Paleta = {
+  fundo: '#0A0B0C',
+  fundoAlto: '#16191B',
+  fundoBaixo: '#050607',
+  fundoBorda: '#23282B',
 
-  tinta: '#191B1C', // 13,8:1
-  tintaMid: '#4A4E51', // 6,8:1
-  tintaFraca: '#62666B', // 4,6:1 — piso do que carrega significado
-  tintaFantasma: '#9A9C99', // só decoração
+  tinta: '#E9ECEE', // 15,8:1
+  tintaMid: '#9AA2A7', // 7,9:1
+  tintaFraca: '#6A7276', // 4,6:1 — piso do que carrega significado
+  tintaFantasma: '#3C4347', // só decoração
 
-  regua: 'rgba(25,27,28,0.13)',
-  reguaMid: 'rgba(25,27,28,0.24)',
-  reguaForte: 'rgba(25,27,28,0.42)',
+  regua: 'rgba(233,236,238,0.09)',
+  reguaMid: 'rgba(233,236,238,0.17)',
+  reguaForte: 'rgba(233,236,238,0.34)',
 
-  // 8,6:1 como texto sobre o fundo e 10,7:1 com o texto por cima quando vira
-  // preenchimento — atende aos dois papéis, como toda cor de ação precisa.
-  azul: '#23368C',
-  azulSuave: 'rgba(35,54,140,0.09)',
-  azulLinha: 'rgba(35,54,140,0.26)',
-  azulTexto: '#F2F1ED',
+  // 9,7:1 como texto sobre o fundo E 9,7:1 com o texto escuro por cima quando
+  // vira preenchimento — atende aos dois papéis, como toda cor de ação precisa.
+  acento: '#E8A13D',
+  acentoSuave: 'rgba(232,161,61,0.10)',
+  acentoLinha: 'rgba(232,161,61,0.32)',
+  acentoTexto: '#0A0B0C',
+  acentoPress: '#C4832A',
 
-  vermelho: '#B4231F', // 5,3:1
-  vermelhoSuave: 'rgba(180,35,31,0.10)',
-  vermelhoLinha: 'rgba(180,35,31,0.30)',
+  rec: '#FF3B30', // 5,5:1
+  recSuave: 'rgba(255,59,48,0.10)',
+  recLinha: 'rgba(255,59,48,0.34)',
 
-  silhueta: '#DCDAD2',
-  silhuetaTraco: 'rgba(25,27,28,0.34)',
+  calor: ['#16191B', '#26413F', '#3D6355', '#7A7A42', '#B9863A', '#E8A13D'] as const,
 
-  barraStatus: 'dark',
-  veu: 'rgba(30,32,28,0.42)',
+  silhueta: '#16191B',
+  silhuetaTraco: 'rgba(233,236,238,0.26)',
+
+  barraStatus: 'light',
+  veu: 'rgba(0,0,0,0.72)',
 };
 
 /**
- * ESCURO — o quadro da academia.
+ * CLARA — o mesmo instrumento com sol na tela.
  *
- * Ardósia levemente esverdeada e giz. Não é o preto-com-neon da categoria, e
- * de propósito não é o quase-preto violeta que este app tinha antes: era essa
- * exata combinação que dava a cara de gerado.
- *
- * O giz azul e o giz vermelho são claros o bastante para cumprir os DOIS
- * papéis sobre ardósia — texto (8,3:1 e 7,5:1) e preenchimento com texto
- * escuro por cima (8,6:1).
+ * Não é a escura invertida: é o que um painel branco de laboratório faz. O
+ * âmbar desce para ocre porque âmbar claro sobre branco tem 2:1 e sumiria — a
+ * POSIÇÃO na rampa é a mesma, a luminância é a que o fundo exige.
  */
-export const ESCURA: Paleta = {
-  fundo: '#1B1D1C',
-  fundoAlto: '#232624',
-  fundoBaixo: '#141615',
-  fundoBorda: '#2E312F',
+export const CLARA: Paleta = {
+  fundo: '#F3F4F4',
+  fundoAlto: '#FFFFFF',
+  fundoBaixo: '#E5E8E8',
+  fundoBorda: '#D3D8D9',
 
-  tinta: '#E9E9E4', // 13,9:1 — a mesma força do claro, espelhada
-  tintaMid: '#A6A9A4', // 7,1:1
-  tintaFraca: '#878B86', // 4,9:1 — piso
-  tintaFantasma: '#5A5E5A', // só decoração
+  tinta: '#0E1113', // 17,2:1
+  tintaMid: '#4C5457', // 7,6:1
+  tintaFraca: '#6B7376', // 4,6:1 — piso
+  tintaFantasma: '#A9B0B2', // só decoração
 
-  regua: 'rgba(233,233,228,0.14)',
-  reguaMid: 'rgba(233,233,228,0.26)',
-  reguaForte: 'rgba(233,233,228,0.44)',
+  regua: 'rgba(14,17,19,0.11)',
+  reguaMid: 'rgba(14,17,19,0.20)',
+  reguaForte: 'rgba(14,17,19,0.38)',
 
-  azul: '#8FAEF0', // 8,3:1
-  azulSuave: 'rgba(143,174,240,0.12)',
-  azulLinha: 'rgba(143,174,240,0.32)',
-  azulTexto: '#151719', // 8,6:1 sobre o azul
+  acento: '#8A5510', // 6,4:1 como texto; 6,0:1 com branco por cima
+  acentoSuave: 'rgba(138,85,16,0.09)',
+  acentoLinha: 'rgba(138,85,16,0.28)',
+  acentoTexto: '#FFFFFF',
+  acentoPress: '#6E4309',
 
-  vermelho: '#F0938A', // 7,5:1
-  vermelhoSuave: 'rgba(240,147,138,0.13)',
-  vermelhoLinha: 'rgba(240,147,138,0.34)',
+  rec: '#C1261C', // 6,1:1
+  recSuave: 'rgba(193,38,28,0.09)',
+  recLinha: 'rgba(193,38,28,0.30)',
 
-  silhueta: '#2F332F',
-  silhuetaTraco: 'rgba(233,233,228,0.30)',
+  calor: ['#E5E8E8', '#B6C7C2', '#8FAA98', '#A9945A', '#9C7326', '#8A5510'] as const,
 
-  barraStatus: 'light',
-  veu: 'rgba(0,0,0,0.58)',
+  silhueta: '#E5E8E8',
+  silhuetaTraco: 'rgba(14,17,19,0.30)',
+
+  barraStatus: 'dark',
+  veu: 'rgba(12,14,15,0.46)',
 };
+
+/**
+ * Posição na rampa térmica para uma fração de esforço (0..1).
+ *
+ * A raiz quadrada abre o meio da escala: sem ela, um grupo com 10% do esforço
+ * cairia no primeiro degrau e a prancha pareceria vazia num treino bem
+ * distribuído. `0.45` é o teto prático — acima disso um grupo já domina a
+ * sessão e não há por que distinguir mais.
+ */
+export function nivelDeCalor(fracao: number): number {
+  if (fracao <= 0) return 0;
+  const n = Math.sqrt(Math.min(1, fracao / 0.45));
+  return Math.max(1, Math.min(5, Math.round(n * 5)));
+}
+
+/** A cor da rampa para uma fração de esforço. Índice 0 = não trabalhado. */
+export function corDeCalor(p: Paleta, fracao: number): string {
+  return p.calor[nivelDeCalor(fracao)];
+}
 
 /**
  * Vocabulário de marcas de estado.
  *
- * Um livro-caixa não usa cor para dizer o que aconteceu com uma linha: usa
- * marca. Definido uma vez, usado igual em todas as telas — e igual nos dois
- * temas, que é o motivo de o app inteiro continuar legível trocando de tema.
+ * Um instrumento não usa só cor para dizer o que aconteceu com uma leitura:
+ * usa marca e posição. Definido uma vez, usado igual em todas as telas — e
+ * igual nos dois temas, que é o motivo de o app continuar legível trocando.
  */
 export const marca = {
-  /** Linha cumprida: escrita em azul, fundo mais claro, ✓ preenchido. */
-  feita: 'fundoAlto',
-  /** Linha da vez: barra de tinta na margem esquerda. */
-  larguraBarraAtiva: 3,
-  /** Linha impressa e não preenchida: pontilhado de formulário. */
-  pontilhado: '·····',
-  /** Não soma ao total — livro-caixa põe entre parênteses. */
+  /** Linha da vez: fio de acento na margem esquerda. */
+  larguraBarraAtiva: 2,
+  /** Leitura não preenchida: o traço vazio de um mostrador. */
+  vazio: '--',
+  /** Não soma ao total — livro de registro põe entre parênteses. */
   aquecimento: { abre: '(', fecha: ')' },
 } as const;
 
@@ -199,24 +236,29 @@ export const sp = {
 } as const;
 
 /**
- * Margem esquerda. Toda tela registra contra ela: é onde mora o ordinal da
- * linha, a barra da linha ativa e o carimbo de recorde.
+ * Margem lateral. A calha é a coluna reservada ao ordinal da série, ao fio da
+ * linha ativa e à marca de recorde.
  */
 export const margem = {
-  pagina: 20,
-  calha: 26,
+  pagina: 18,
+  calha: 24,
 } as const;
 
-/** Nem papel nem ardósia têm canto arredondado. O pouco que há é corte. */
+/**
+ * Canto de painel fresado: nem aresta viva, nem macio. O `pill` existe só para
+ * o seletor de incremento no teclado de carga.
+ */
 export const radius = {
   none: 0,
-  sm: 2,
-  md: 3,
-  lg: 4,
-  folha: 6,
+  sm: 4,
+  md: 6,
+  lg: 8,
+  xl: 12,
+  folha: 14,
+  pill: 999,
 } as const;
 
-/** Espessura de régua. Impressa é nítida; não é sussurro. */
+/** Espessura de fio. Fio de instrumento é nítido, não sussurro. */
 export const traco = {
   fina: StyleSheet.hairlineWidth,
   normal: 1,
@@ -224,63 +266,63 @@ export const traco = {
 } as const;
 
 export const font = {
+  /** Prosa e títulos de tela — o único lugar que escapa da monoespaçada. */
   regular: 'Archivo_400Regular',
   medium: 'Archivo_500Medium',
   semibold: 'Archivo_600SemiBold',
   bold: 'Archivo_700Bold',
-  /** Números e cabeçalhos de coluna: condensada lê como impressa em formulário. */
-  numRegular: 'BarlowCondensed_500Medium',
-  num: 'BarlowCondensed_600SemiBold',
-  numBold: 'BarlowCondensed_700Bold',
+  /** Todo dado, rótulo, coluna e número. A monoespaçada já é tabular. */
+  mono: 'IBMPlexMono_400Regular',
+  monoMed: 'IBMPlexMono_500Medium',
+  monoBold: 'IBMPlexMono_600SemiBold',
 } as const;
 
 /**
  * Escala tipográfica — idêntica nos dois temas.
  *
- * Duas famílias e um princípio: prosa em Archivo, TODO número em Barlow
- * Condensed. Hierarquia vem de tinta e entrelinha, não de inflar corpo; só
- * `monumento` escapa disso, e escapa de propósito.
+ * Um princípio: TODO dado em monoespaçada, prosa em Archivo. Monoespaçada não
+ * é estilo aqui — é o que faz coluna de carga alinhar sozinha, sem
+ * `fontVariant`, e o que faz um número mudando de 82,5 para 100 não empurrar a
+ * coluna inteira.
+ *
+ * Hierarquia vem de tinta e entrelinha, não de inflar corpo. Só `monumento`
+ * escapa disso, de propósito.
  */
 export const type = {
-  monumento: { fontFamily: font.num, fontSize: 104, lineHeight: 100, letterSpacing: -2 },
-  numeroXG: { fontFamily: font.num, fontSize: 44, lineHeight: 46, letterSpacing: -0.8 },
-  numeroG: { fontFamily: font.num, fontSize: 28, lineHeight: 30, letterSpacing: -0.4 },
-  numero: { fontFamily: font.num, fontSize: 20, lineHeight: 24, letterSpacing: -0.2 },
+  monumento: { fontFamily: font.monoBold, fontSize: 76, lineHeight: 78, letterSpacing: -3.4 },
+  numeroXG: { fontFamily: font.monoBold, fontSize: 36, lineHeight: 38, letterSpacing: -1.6 },
+  numeroG: { fontFamily: font.monoBold, fontSize: 24, lineHeight: 27, letterSpacing: -0.9 },
+  numero: { fontFamily: font.monoMed, fontSize: 16, lineHeight: 20, letterSpacing: -0.3 },
 
-  display: { fontFamily: font.semibold, fontSize: 30, lineHeight: 34, letterSpacing: -0.9 },
-  title: { fontFamily: font.semibold, fontSize: 22, lineHeight: 27, letterSpacing: -0.5 },
-  heading: { fontFamily: font.semibold, fontSize: 16, lineHeight: 21, letterSpacing: -0.2 },
-  body: { fontFamily: font.regular, fontSize: 15, lineHeight: 21, letterSpacing: -0.05 },
-  bodyMed: { fontFamily: font.medium, fontSize: 15, lineHeight: 21, letterSpacing: -0.05 },
-  small: { fontFamily: font.regular, fontSize: 13, lineHeight: 18 },
-  smallMed: { fontFamily: font.medium, fontSize: 13, lineHeight: 18 },
+  display: { fontFamily: font.semibold, fontSize: 27, lineHeight: 31, letterSpacing: -0.8 },
+  title: { fontFamily: font.semibold, fontSize: 20, lineHeight: 25, letterSpacing: -0.45 },
+  heading: { fontFamily: font.semibold, fontSize: 15, lineHeight: 20, letterSpacing: -0.2 },
+  body: { fontFamily: font.regular, fontSize: 15, lineHeight: 22, letterSpacing: -0.05 },
+  bodyMed: { fontFamily: font.medium, fontSize: 15, lineHeight: 22, letterSpacing: -0.05 },
+  small: { fontFamily: font.regular, fontSize: 13, lineHeight: 19 },
+  smallMed: { fontFamily: font.medium, fontSize: 13, lineHeight: 19 },
 
-  coluna: { fontFamily: font.num, fontSize: 12, lineHeight: 14, letterSpacing: 1.1 },
-  carimbo: { fontFamily: font.numBold, fontSize: 12, lineHeight: 14, letterSpacing: 1.5 },
-  caption: { fontFamily: font.medium, fontSize: 11, lineHeight: 14, letterSpacing: 0.3 },
-  mono: { fontFamily: font.num, fontSize: 16, lineHeight: 20 },
+  /** Cabeça de coluna e rótulo de campo: monoespaçada, caixa alta, destravada. */
+  coluna: { fontFamily: font.monoMed, fontSize: 10, lineHeight: 13, letterSpacing: 1.5 },
+  carimbo: { fontFamily: font.monoBold, fontSize: 10.5, lineHeight: 13, letterSpacing: 2.2 },
+  caption: { fontFamily: font.mono, fontSize: 10.5, lineHeight: 14, letterSpacing: 0.6 },
+  mono: { fontFamily: font.mono, fontSize: 13, lineHeight: 18, letterSpacing: 0.2 },
 } as const;
 
 /**
- * Nada flutua — não há sombra na interface.
+ * Nada flutua na interface — profundidade é fio e tom, não sombra.
  *
- * A única exceção é a folha modal, que é literalmente uma folha por cima da
- * página. Ela recebe deslocamento e desfoque de verdade; halo colorido de raio
- * zero é decoração, não profundidade.
+ * As exceções são as duas superfícies que de fato estão POR CIMA da página: a
+ * folha modal e o teclado de carga. Elas recebem deslocamento e desfoque de
+ * verdade; halo colorido de raio zero é decoração, não profundidade.
  */
 export function sombraFolha(p: Paleta) {
+  const escuro = p.barraStatus === 'light';
   return {
-    shadowColor: p === ESCURA ? '#000000' : '#2A2C26',
-    shadowOpacity: p === ESCURA ? 0.5 : 0.22,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: -6 },
-    elevation: 16,
+    shadowColor: '#000000',
+    shadowOpacity: escuro ? 0.62 : 0.2,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 18,
   } as const;
 }
-
-/** Durações. Nunca ease-in em interface: atrasa o instante que se está olhando. */
-export const motion = {
-  toque: 110,
-  estado: 180,
-  entrada: 240,
-} as const;

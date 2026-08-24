@@ -7,6 +7,7 @@ import { CabecaColuna, Pressavel, Regua, Rotulo, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { Glifo } from '@/components/glifos';
 import { abrirMenu, type OpcaoMenu } from '@/components/folha';
+import { abrirTeclado, usarAlvoTeclado } from '@/components/teclado';
 import { POR_ID } from '@/data/exercicios';
 import { TECNICAS, tecnicaDe } from '@/data/tecnicas';
 import { MEDIDA_LABEL, type Medida } from '@/data/types';
@@ -156,6 +157,9 @@ function BlocoExercicioBase({
           descanso={item.descanso}
           ativa={i === indiceAtivo}
           anterior={anterior?.[i] ?? null}
+          exercicio={ex?.nome ?? 'Exercício'}
+          rotulos={rotulos}
+          medida={medida}
         />
       ))}
 
@@ -183,6 +187,9 @@ function LinhaSerie({
   descanso,
   ativa,
   anterior,
+  exercicio,
+  rotulos,
+  medida,
 }: {
   uid: string;
   serie: Serie;
@@ -190,6 +197,9 @@ function LinhaSerie({
   descanso: number;
   ativa: boolean;
   anterior: Serie | null;
+  exercicio: string;
+  rotulos: { a: string; b: string };
+  medida: Medida;
 }) {
   const c = usarPaleta();
   const estilos = usarEstilos();
@@ -237,6 +247,22 @@ function LinhaSerie({
     }
   }
 
+  /** Abre o teclado de carga já apontando para a célula que foi tocada. */
+  function abrir(campo: 'peso' | 'reps') {
+    Haptics.selectionAsync();
+    abrirTeclado({
+      uid,
+      serieId: serie.id,
+      campo,
+      rotulos,
+      // Repetição é inteira; segundo e quilômetro aceitam decimal.
+      inteiroB: medida === 'peso_rep' || medida === 'rep',
+      exercicio,
+      numeroSerie: numero,
+      descanso,
+    });
+  }
+
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
@@ -276,19 +302,8 @@ function LinhaSerie({
         {dicaPeso && dicaReps ? `${dicaPeso} × ${dicaReps}` : '—'}
       </Tx>
 
-      <CampoNumero
-        valor={serie.peso}
-        dica={dicaPeso}
-        feita={feita}
-        onChange={(v) => editarSerie(uid, serie.id, 'peso', v)}
-      />
-      <CampoNumero
-        valor={serie.reps}
-        dica={dicaReps}
-        feita={feita}
-        inteiro
-        onChange={(v) => editarSerie(uid, serie.id, 'reps', v)}
-      />
+      <Celula valor={serie.peso} dica={dicaPeso} feita={feita} campo="peso" serieId={serie.id} onAbrir={abrir} />
+      <Celula valor={serie.reps} dica={dicaReps} feita={feita} campo="reps" serieId={serie.id} onAbrir={abrir} />
 
       <Pressavel
         onPress={concluir}
@@ -298,60 +313,74 @@ function LinhaSerie({
         accessibilityLabel={`Concluir série ${numero}`}
         style={[estilos.check, feita && estilos.checkFeito]}
       >
-        <Glifo nome="confere" tamanho={15} cor={feita ? c.azulTexto : c.tintaFantasma} />
+        <Glifo nome="confere" tamanho={15} cor={feita ? c.acentoTexto : c.tintaFantasma} />
       </Pressavel>
     </Animated.View>
   );
 }
 
 /**
- * Célula de valor: campo de formulário com régua embaixo, não caixa com fundo.
+ * Célula de valor — agora um MOSTRADOR, não um campo.
  *
- * Vazia mostra o pontilhado de campo não preenchido; preenchida escreve em
- * AZUL, porque azul é o que você escreveu. Quando a linha é dada por
- * concluída a régua some — deixou de ser campo a preencher e virou registro.
+ * Antes isto era um `TextInput` de 62px que chamava o teclado do sistema, e o
+ * teclado do sistema subia tapando a própria linha que estava sendo editada.
+ * Agora a célula só exibe, e o toque abre o teclado de carga do app, que mostra
+ * o que você está editando no cabeçalho dele.
+ *
+ * Vazia, mostra o traço de mostrador sem leitura (`--`), não um zero: zero é um
+ * valor, ausência não é. Preenchida, escreve em acento — acento é o que VOCÊ
+ * escreveu. O sublinhado é a marca de "campo a preencher" e some quando a série
+ * é dada por concluída, porque ali deixou de ser campo e virou registro.
  */
-function CampoNumero({
+function Celula({
   valor,
   dica,
   feita,
-  inteiro,
-  onChange,
+  campo,
+  serieId,
+  onAbrir,
 }: {
   valor: number | null;
   dica: string | null;
   feita: boolean;
-  inteiro?: boolean;
-  onChange: (v: number | null) => void;
+  campo: 'peso' | 'reps';
+  serieId: string;
+  onAbrir: (campo: 'peso' | 'reps') => void;
 }) {
   const c = usarPaleta();
   const estilos = usarEstilos();
-  // O texto local preserva estados intermediários ("12." enquanto digita) que
-  // um número puro descartaria.
-  const [texto, setTexto] = useState<string | null>(null);
-  const mostrado = texto ?? (valor === null ? '' : fmtNumero(valor));
+  const alvo = usarAlvoTeclado();
+  // Precisa casar a SÉRIE também: só o campo marcaria a mesma coluna em todas
+  // as linhas do exercício ao mesmo tempo.
+  const editando = alvo?.serieId === serieId && alvo?.campo === campo;
 
+  const vazio = valor === null;
   return (
-    <TextInput
-      value={mostrado}
-      onChangeText={(t) => {
-        const limpo = inteiro
-          ? t.replace(/[^0-9]/g, '')
-          : t.replace(',', '.').replace(/[^0-9.]/g, '');
-        setTexto(limpo);
-        if (limpo === '') return onChange(null);
-        const n = Number(limpo);
-        if (!Number.isNaN(n)) onChange(n);
-      }}
-      onBlur={() => setTexto(null)}
-      placeholder={dica ?? '·····'}
-      placeholderTextColor={c.tintaFantasma}
-      keyboardType={inteiro ? 'number-pad' : 'decimal-pad'}
-      selectTextOnFocus
-      // A célula tem altura fixa: a fonte não pode crescer a ponto de cortar.
-      maxFontSizeMultiplier={1.2}
-      style={[estilos.campo, feita && estilos.campoFeito]}
-    />
+    <Pressavel
+      onPress={() => onAbrir(campo)}
+      escala={0.94}
+      // O alvo real é maior que a célula: a tabela é densa e o dedo é úmido.
+      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={`${campo === 'peso' ? 'Carga' : 'Repetições'}: ${
+        vazio ? 'não preenchido' : fmtNumero(valor)
+      }. Toque para editar.`}
+      style={[
+        estilos.celula,
+        feita && estilos.celulaFeita,
+        editando && { borderBottomColor: c.acento },
+      ]}
+    >
+      <Tx
+        v="numero"
+        cor={vazio ? c.tintaFantasma : c.acento}
+        center
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {vazio ? (dica ?? '--') : fmtNumero(valor)}
+      </Tx>
+    </Pressavel>
   );
 }
 
@@ -367,10 +396,10 @@ const usarEstilos = criarEstilos((c) => ({
   menu: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   nota: {
     ...type.small,
-    color: c.azul,
+    color: c.acento,
     backgroundColor: c.fundoAlto,
     borderLeftWidth: 2,
-    borderLeftColor: c.azulLinha,
+    borderLeftColor: c.acentoLinha,
     paddingHorizontal: sp.md,
     paddingVertical: sp.sm,
     marginHorizontal: margem.pagina,
@@ -386,7 +415,7 @@ const usarEstilos = criarEstilos((c) => ({
     borderBottomColor: c.regua,
   },
   linhaFeita: { backgroundColor: c.fundoAlto },
-  linhaAtiva: { backgroundColor: c.azulSuave },
+  linhaAtiva: { backgroundColor: c.acentoSuave },
   barraAtiva: {
     position: 'absolute',
     left: 0,
@@ -399,20 +428,18 @@ const usarEstilos = criarEstilos((c) => ({
     ...type.carimbo,
     fontSize: 9,
     letterSpacing: 0.8,
-    color: c.vermelho,
+    color: c.rec,
     marginTop: -2,
   },
-  campo: {
+  celula: {
     width: COL.valor,
     height: 34,
-    color: c.azul,
-    textAlign: 'center',
-    ...type.numero,
-    padding: 0,
+    justifyContent: 'center',
     borderBottomWidth: traco.normal,
     borderBottomColor: c.reguaMid,
   },
-  campoFeito: { borderBottomColor: 'transparent' },
+  // Concluída, some o sublinhado: deixou de ser campo e virou registro.
+  celulaFeita: { borderBottomColor: 'transparent' },
   check: {
     width: COL.check,
     height: 32,
@@ -423,7 +450,7 @@ const usarEstilos = criarEstilos((c) => ({
     borderRadius: radius.sm,
     marginLeft: sp.xs,
   },
-  checkFeito: { backgroundColor: c.azul, borderColor: c.azul },
+  checkFeito: { backgroundColor: c.acento, borderColor: c.acento },
   addSerie: {
     flexDirection: 'row',
     alignItems: 'center',

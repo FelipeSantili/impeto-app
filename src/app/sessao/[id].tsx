@@ -1,6 +1,7 @@
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BarraAnimada, CarimboConcluido, Contador, Entrada } from '@/components/animado';
 import {
@@ -16,6 +17,7 @@ import {
   Vazio,
 } from '@/components/base';
 import { CartaoCompartilhar } from '@/components/cartao-compartilhar';
+import { CurvaFc } from '@/components/curva-fc';
 import { Miniatura } from '@/components/demo';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
@@ -30,6 +32,7 @@ import {
   conquistasDaSessao,
   duracaoMs,
   fmtData,
+  fmtDuracaoCurta,
   fmtHora,
   fmtNumero,
   fmtVolume,
@@ -39,14 +42,26 @@ import {
   volumeSessao,
   type Recorde,
 } from '@/lib/metricas';
+import { importarParaSessao } from '@/lib/relogio';
 import { lerCardio } from '@/lib/saude';
-import { useTreino } from '@/store/treino';
+import { useTreino, type Cardio } from '@/store/treino';
 
 // O recorde de força é medido em 1RM estimado, não em peso levantado de fato —
 // o rótulo precisa deixar isso explícito para o número não enganar.
 const RECORDE_TEXTO: Record<Recorde['tipo'], string> = {
   carga: 'Antes',
   forca: '1RM est. antes',
+};
+
+/**
+ * De onde vieram os batimentos. São três caminhos diferentes e o rótulo precisa
+ * distinguir os dois que passam pelo relógio: o Health Connect chega sozinho
+ * depois que o Mi Fitness sincroniza; o arquivo é um .tcx que você importou.
+ */
+const FONTE_TEXTO: Record<Cardio['fonte'], string> = {
+  cinta: 'Cinta',
+  saude: 'Health Connect',
+  relogio: 'Arquivo do relógio',
 };
 
 /**
@@ -75,6 +90,8 @@ export default function RelatorioSessao() {
 
   const refCartao = useRef<View | null>(null);
   const [compartilhando, setCompartilhando] = useState(false);
+  const [buscandoSaude, setBuscandoSaude] = useState(true);
+  const [importando, setImportando] = useState(false);
 
   const sessao = historico.find((s) => s.id === id);
 
@@ -87,10 +104,15 @@ export default function RelatorioSessao() {
   // Sem cinta, tentamos o Health Connect: o Mi Fitness pode ter sincronizado a
   // frequência do relógio para a janela deste treino.
   useEffect(() => {
-    if (!sessao || sessao.cardio) return;
+    if (!sessao || sessao.cardio) {
+      setBuscandoSaude(false);
+      return;
+    }
     let vivo = true;
     lerCardio(sessao.inicio, sessao.fim ?? Date.now()).then((d) => {
-      if (!vivo || !d || d.amostras === 0) return;
+      if (!vivo) return;
+      setBuscandoSaude(false);
+      if (!d || d.amostras === 0) return;
       anexarCardio(sessao.id, {
         media: d.fcMedia,
         maxima: d.fcMaxima,
@@ -102,6 +124,40 @@ export default function RelatorioSessao() {
       vivo = false;
     };
   }, [sessao, anexarCardio]);
+
+  /**
+   * Traz o .tcx do relógio para ESTE treino.
+   *
+   * Aqui não há adivinhação de par: o treino já está escolhido. Quando o
+   * arquivo é de outro horário a importação acontece mesmo assim — foi uma
+   * escolha explícita — mas o aviso aparece, porque isso quase sempre significa
+   * arquivo trocado.
+   */
+  async function importarRelogio() {
+    if (!sessao) return;
+    setImportando(true);
+    const r = await importarParaSessao(sessao.id);
+    setImportando(false);
+    if (r.erro) {
+      abrirConfirmacao({
+        titulo: 'Não deu certo',
+        descricao: r.erro,
+        confirmar: 'Entendi',
+        onConfirmar: () => {},
+      });
+      return;
+    }
+    if (!r.ok) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (r.aviso) {
+      abrirConfirmacao({
+        titulo: 'Importado — confira a data',
+        descricao: r.aviso,
+        confirmar: 'Entendi',
+        onConfirmar: () => {},
+      });
+    }
+  }
 
   async function compartilhar() {
     setCompartilhando(true);
@@ -143,6 +199,11 @@ export default function RelatorioSessao() {
     abrirMenu({
       titulo: sessao!.nome,
       opcoes: [
+        {
+          texto: sessao!.cardio ? 'Trocar dados do relógio' : 'Importar do relógio',
+          glifo: 'baixar',
+          onPress: importarRelogio,
+        },
         {
           texto: 'Salvar como rotina',
           glifo: 'lista',
@@ -249,49 +310,17 @@ export default function RelatorioSessao() {
         </View>
         <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />
 
-        {/* Frequência cardíaca — da cinta ou do relógio via Health Connect */}
-        {sessao.cardio ? (
-          <Entrada atraso={t(850)}>
-            <Secao
-              titulo="Frequência cardíaca"
-              espaco={sp.xxl}
-              direita={
-                <Rotulo cor={c.tintaFraca}>
-                  {sessao.cardio.fonte === 'cinta' ? 'Cinta' : 'Do relógio'}
-                </Rotulo>
-              }
-            >
-              <View style={estilos.cardio}>
-                <Glifo nome="coracao" tamanho={15} cor={c.vermelho} />
-                <Tx v="numero" tab>
-                  {sessao.cardio.media}
-                  <Tx v="small" cor={c.tintaFraca}>
-                    {' '}
-                    bpm médio
-                  </Tx>
-                  {'   '}
-                  {sessao.cardio.maxima}
-                  <Tx v="small" cor={c.tintaFraca}>
-                    {' '}
-                    máx
-                  </Tx>
-                  {sessao.cardio.calorias ? (
-                    <>
-                      {'   '}
-                      {sessao.cardio.calorias}
-                      <Tx v="small" cor={c.tintaFraca}>
-                        {' '}
-                        kcal
-                      </Tx>
-                    </>
-                  ) : null}
-                </Tx>
-              </View>
-            </Secao>
-          </Entrada>
-        ) : null}
+        {/* O que o corpo marcou: cinta, Health Connect ou .tcx do relógio. */}
+        <Entrada atraso={t(850)}>
+          <BlocoRelogio
+            cardio={sessao.cardio}
+            buscando={buscandoSaude}
+            importando={importando}
+            onImportar={importarRelogio}
+          />
+        </Entrada>
 
-        {/* Recordes — marcas superadas, carimbadas em vermelho na calha. */}
+        {/* Recordes — marcas superadas, carimbadas em rec na calha. */}
         {recordes.length > 0 ? (
           <Secao
             titulo="Recordes"
@@ -319,7 +348,7 @@ export default function RelatorioSessao() {
                       </Tx>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Tx v="numero" tab cor={c.vermelho}>
+                      <Tx v="numero" tab cor={c.rec}>
                         {fmtNumero(Math.round(r.valor))} kg
                       </Tx>
                       {ganho > 0 ? (
@@ -355,7 +384,7 @@ export default function RelatorioSessao() {
           >
             {/* A prancha primeiro: dá a leitura imediata de onde o treino pegou. */}
             <View style={estilos.prancha}>
-              <MapaMuscular musculos={musculos} atraso={t(1000)} largura={100} />
+              <MapaMuscular musculos={musculos} atraso={t(1000)} largura={100} sessaoId={sessao.id} />
             </View>
             <Regua />
 
@@ -373,7 +402,7 @@ export default function RelatorioSessao() {
                       altura={12}
                       // Densidade de tinta, não matiz: o grupo mais trabalhado é
                       // o mais cheio, não o de outra cor.
-                      cor={i === 0 ? c.azul : c.reguaForte}
+                      cor={i === 0 ? c.acento : c.reguaForte}
                     />
                     <Tx
                       v="numero"
@@ -422,7 +451,7 @@ export default function RelatorioSessao() {
                 </Pressavel>
 
                 {e.nota ? (
-                  <Tx v="small" cor={c.azul} style={estilos.nota}>
+                  <Tx v="small" cor={c.acento} style={estilos.nota}>
                     {e.nota}
                   </Tx>
                 ) : null}
@@ -441,14 +470,14 @@ export default function RelatorioSessao() {
                         >
                           {aquecimento ? `(${idx + 1})` : idx + 1}
                         </Tx>
-                        <Tx v="numero" tab cor={c.azul} style={{ width: 74 }}>
+                        <Tx v="numero" tab cor={c.acento} style={{ width: 74 }}>
                           {fmtNumero(s.peso) || '—'}
                           <Tx v="small" cor={c.tintaFraca}>
                             {' '}
                             {rotulos.a.toLowerCase()}
                           </Tx>
                         </Tx>
-                        <Tx v="numero" tab cor={c.azul} style={{ flex: 1 }}>
+                        <Tx v="numero" tab cor={c.acento} style={{ flex: 1 }}>
                           {fmtNumero(s.reps) || '—'}
                           <Tx v="small" cor={c.tintaFraca}>
                             {' '}
@@ -504,6 +533,149 @@ export default function RelatorioSessao() {
   );
 }
 
+/** Fatia uma lista em pedaços de até `n`. O último pedaço pode vir menor. */
+function emGrupos<T>(lista: T[], n: number): T[][] {
+  const saida: T[][] = [];
+  for (let i = 0; i < lista.length; i += n) saida.push(lista.slice(i, i + n));
+  return saida;
+}
+
+/**
+ * O que o relógio (ou a cinta) mediu.
+ *
+ * As colunas são MONTADAS a partir do que existe, não fixas. Cada fonte
+ * entrega um pedaço diferente: a cinta dá curva e máxima e nenhuma caloria; o
+ * .tcx de musculação do Mi Fitness dá calorias e média e nem máxima nem curva.
+ * Uma coluna fixa com travessão no lugar do número seria uma coluna afirmando
+ * ter medido algo que ninguém mediu.
+ *
+ * Sem nenhum dado, o bloco vira o convite para importar o arquivo — é o único
+ * lugar do app onde essa ação faz sentido sendo descoberta.
+ */
+function BlocoRelogio({
+  cardio,
+  buscando,
+  importando,
+  onImportar,
+}: {
+  cardio?: Cardio;
+  buscando: boolean;
+  importando: boolean;
+  onImportar: () => void;
+}) {
+  const c = usarPaleta();
+  const estilos = usarEstilos();
+
+  if (!cardio) {
+    return (
+      <Secao titulo="Do relógio" espaco={sp.xxl}>
+        <Pressavel
+          onPress={onImportar}
+          disabled={importando || buscando}
+          escala={0.995}
+          fundoPressionado={c.fundoBaixo}
+          accessibilityRole="button"
+          accessibilityLabel="Importar arquivo do relógio"
+          style={estilos.importar}
+        >
+          <Glifo nome="coracao" tamanho={15} cor={c.tintaFantasma} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Tx v="smallMed">
+              {buscando ? 'Procurando no Health Connect…' : 'Importar arquivo do relógio'}
+            </Tx>
+            <Tx v="small" cor={c.tintaFraca}>
+              {buscando
+                ? 'O Mi Fitness pode ainda não ter sincronizado.'
+                : 'O .tcx exportado pelo Mi Fitness traz frequência, calorias e duração.'}
+            </Tx>
+          </View>
+          {importando || buscando ? (
+            <ActivityIndicator size="small" color={c.tintaMid} />
+          ) : (
+            <Glifo nome="avancar" tamanho={13} cor={c.tintaFantasma} />
+          )}
+        </Pressavel>
+        <Regua />
+      </Secao>
+    );
+  }
+
+  const campos: { rotulo: string; valor: string }[] = [];
+  if (cardio.media != null) campos.push({ rotulo: 'Médio', valor: `${cardio.media} bpm` });
+  if (cardio.maxima != null) campos.push({ rotulo: 'Máximo', valor: `${cardio.maxima} bpm` });
+  if (cardio.calorias != null) {
+    campos.push({ rotulo: 'Calorias', valor: `${cardio.calorias} kcal` });
+  }
+  if (cardio.distanciaKm != null) {
+    campos.push({ rotulo: 'Distância', valor: `${fmtNumero(Number(cardio.distanciaKm.toFixed(2)))} km` });
+  }
+  if (cardio.duracaoSeg != null) {
+    campos.push({ rotulo: 'No relógio', valor: fmtDuracaoCurta(cardio.duracaoSeg * 1000) });
+  }
+
+  return (
+    <Secao
+      titulo={cardio.media != null ? 'Frequência cardíaca' : 'Do relógio'}
+      espaco={sp.xxl}
+      direita={
+        <View style={estilos.fonte}>
+          <Glifo nome="coracao" tamanho={11} cor={c.rec} />
+          <Rotulo cor={c.tintaFraca}>{FONTE_TEXTO[cardio.fonte]}</Rotulo>
+        </View>
+      }
+    >
+      {/*
+        Três por linha, no máximo. Uma corrida com o TCX completo produz cinco
+        colunas — média, máxima, calorias, distância e tempo —, e cinco números
+        em corpo de placar na largura de um celular viram tipografia espremida.
+      */}
+      {emGrupos(campos, 3).map((grupo, i) => (
+        <View key={i}>
+          <CabecaColuna>
+            {grupo.map((x) => (
+              <Rotulo key={x.rotulo} cor={c.tintaMid} style={{ flex: 1 }}>
+                {x.rotulo}
+              </Rotulo>
+            ))}
+          </CabecaColuna>
+          <View style={estilos.totaisRelogio}>
+            {grupo.map((x) => (
+              <Tx
+                key={x.rotulo}
+                v="numero"
+                tab
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={{ flex: 1 }}
+              >
+                {x.valor}
+              </Tx>
+            ))}
+          </View>
+        </View>
+      ))}
+
+      {cardio.curva?.length ? (
+        <View style={estilos.curva}>
+          <CurvaFc curva={cardio.curva} />
+        </View>
+      ) : null}
+
+      {/*
+        O Mi Fitness grava dois números de caloria: o total do período e só o
+        esforço. Mostrar o total sem dizer isso faria o treino parecer mais
+        caro do que foi.
+      */}
+      {cardio.caloriasAtivas != null ? (
+        <Tx v="small" cor={c.tintaFraca} style={estilos.notaRelogio}>
+          Do total, {cardio.caloriasAtivas} kcal foram de esforço — o resto é o gasto que o corpo
+          teria parado.
+        </Tx>
+      ) : null}
+    </Secao>
+  );
+}
+
 function Total({
   valor,
   sufixo = '',
@@ -548,12 +720,21 @@ const usarEstilos = criarEstilos((c) => ({
     paddingHorizontal: margem.pagina,
     paddingVertical: sp.md,
   },
-  cardio: {
+  fonte: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  totaisRelogio: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
+    alignItems: 'baseline',
     paddingHorizontal: margem.pagina,
     paddingVertical: sp.md,
+  },
+  curva: { paddingHorizontal: margem.pagina, paddingBottom: sp.md },
+  notaRelogio: { paddingHorizontal: margem.pagina, paddingBottom: sp.md },
+  importar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    paddingVertical: sp.lg,
+    paddingHorizontal: margem.pagina,
   },
   linhaRec: {
     flexDirection: 'row',
@@ -563,8 +744,8 @@ const usarEstilos = criarEstilos((c) => ({
     paddingHorizontal: margem.pagina,
   },
   calhaRec: { width: 6, alignItems: 'flex-start' },
-  // Marca de correção do professor: um traço vermelho na margem da linha.
-  marcaRec: { width: 3, height: 26, backgroundColor: c.vermelho },
+  // Marca de correção do professor: um traço rec na margem da linha.
+  marcaRec: { width: 3, height: 26, backgroundColor: c.rec },
   estreias: { paddingHorizontal: margem.pagina, paddingTop: sp.lg },
   prancha: { paddingVertical: sp.xxl, backgroundColor: c.fundoAlto },
   blocoMusculos: { paddingHorizontal: margem.pagina, paddingTop: sp.lg, gap: sp.md },
@@ -586,7 +767,7 @@ const usarEstilos = criarEstilos((c) => ({
     paddingVertical: sp.sm,
     backgroundColor: c.fundoAlto,
     borderLeftWidth: 2,
-    borderLeftColor: c.azulLinha,
+    borderLeftColor: c.acentoLinha,
   },
   tabela: { paddingHorizontal: margem.pagina, paddingBottom: sp.md },
   linhaSerie: {

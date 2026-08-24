@@ -2,12 +2,12 @@
   "expo": {
     "name": "Ímpeto",
     "slug": "forja",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "impeto",
     "userInterfaceStyle": "automatic",
-    "backgroundColor": "#E8E7E2",
+    "backgroundColor": "#0A0B0C",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.impeto.app"
@@ -15,12 +15,12 @@
     "android": {
       "package": "com.impeto.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E8E7E2",
+        "backgroundColor": "#0A0B0C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 3,
+      "versionCode": 4,
       "permissions": [
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
@@ -39,12 +39,12 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#E8E7E2",
-          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#F3F4F4",
+          "image": "./assets/images/splash-icon-claro.png",
           "imageWidth": 120,
           "resizeMode": "contain",
           "dark": {
-            "backgroundColor": "#1B1D1C",
+            "backgroundColor": "#0A0B0C",
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 120,
             "resizeMode": "contain"
@@ -55,7 +55,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/android-icon-monochrome.png",
-          "color": "#3A52B8"
+          "color": "#E8A13D"
         }
       ],
       "react-native-health-connect",

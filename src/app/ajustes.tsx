@@ -9,6 +9,7 @@ import { Glifo, type NomeGlifo } from '@/components/glifos';
 import { criarEstilos, usarPaleta, usarTema, type Preferencia } from '@/design/tema';
 import { margem, radius, sp, traco } from '@/design/tokens';
 import { exportar, importar } from '@/lib/backup';
+import { importarDoRelogio } from '@/lib/relogio';
 import {
   abrirAjustesSaude,
   pedirPermissoes,
@@ -69,6 +70,52 @@ export default function Ajustes() {
       return;
     }
     cinta.procurar();
+  }
+
+  /**
+   * Importa um ou vários .tcx de uma vez e encaixa cada um no seu treino.
+   *
+   * O relatório de volta é detalhado de propósito: como o casamento é
+   * automático, quem importa precisa saber quantos arquivos acharam par e
+   * quantos não — senão a ação parece ter funcionado e não fez nada.
+   */
+  async function aoImportarRelogio() {
+    setOcupado(true);
+    const r = await importarDoRelogio();
+    setOcupado(false);
+    if (!r.ok) return;
+
+    const linhas: string[] = [];
+    if (r.aplicados) {
+      linhas.push(
+        r.aplicados === 1
+          ? '1 treino recebeu os dados do relógio.'
+          : `${r.aplicados} treinos receberam os dados do relógio.`,
+      );
+    }
+    if (r.repetidos) {
+      linhas.push(
+        r.repetidos === 1
+          ? '1 arquivo já tinha sido importado.'
+          : `${r.repetidos} arquivos já tinham sido importados.`,
+      );
+    }
+    if (r.semPar.length) {
+      linhas.push(
+        `Sem treino correspondente no histórico: ${r.semPar.join(', ')}. O arquivo encaixa num treino já registrado — ele não cria um.`,
+      );
+    }
+    if (r.ilegiveis.length) {
+      linhas.push(`Não são .tcx do relógio: ${r.ilegiveis.join(', ')}.`);
+    }
+
+    if (r.aplicados) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    abrirConfirmacao({
+      titulo: r.aplicados ? 'Dados do relógio importados' : 'Nada foi importado',
+      descricao: linhas.join('\n\n') || 'Nenhum arquivo tinha dados aproveitáveis.',
+      confirmar: 'Pronto',
+      onConfirmar: () => {},
+    });
   }
 
   async function aoExportar() {
@@ -170,23 +217,44 @@ export default function Ajustes() {
                     fundoPressionado={c.fundoBaixo}
                     style={estilos.dispositivo}
                   >
-                    <Glifo nome="pulso" tamanho={15} cor={c.azul} />
+                    <Glifo nome="pulso" tamanho={15} cor={c.acento} />
                     <Tx v="smallMed" style={{ flex: 1 }} numberOfLines={1}>
                       {d.nome}
                     </Tx>
-                    <Rotulo cor={c.azul}>Conectar</Rotulo>
+                    <Rotulo cor={c.acento}>Conectar</Rotulo>
                   </Pressavel>
                   <Regua />
                 </View>
               ))
             : null}
 
+          <Linha
+            glifo="relogio"
+            titulo="Importar do relógio"
+            subtitulo="Arquivos .tcx do Mi Fitness · encaixa no treino do mesmo horário"
+            carregando={ocupado}
+            onPress={aoImportarRelogio}
+          />
+
           {Platform.OS === 'android' ? (
             <Tx v="small" cor={c.tintaFraca} style={estilos.nota}>
               O Redmi Watch fala um protocolo próprio e não aparece na busca de cintas. Os dados
-              dele chegam pelo Health Connect, depois que o Mi Fitness sincroniza.
+              dele chegam de dois jeitos: sozinhos, pelo Health Connect, depois que o Mi Fitness
+              sincroniza; ou pelo arquivo, quando você exporta a atividade como .tcx.
             </Tx>
           ) : null}
+
+          {/*
+            O caminho da exportação é área privada do Mi Fitness — desde o
+            Android 11 nenhum gerenciador de arquivos entra em `Android/data`,
+            e o seletor deste botão também não. Dizer onde o arquivo está sem
+            dizer isso deixaria a instrução impossível de seguir.
+          */}
+          <Tx v="small" cor={c.tintaFraca} style={estilos.nota}>
+            O Mi Fitness salva em Android/data/com.xiaomi.wearable/files/ExportTrack, que o Android
+            esconde de todos os apps. Para importar, ligue o celular ao computador e mova os .tcx
+            dessa pasta para Download — daí o seletor acima enxerga.
+          </Tx>
         </Secao>
 
         <Secao titulo="Backup">
@@ -321,14 +389,14 @@ function Linha({
         style={estilos.linha}
       >
         <View style={estilos.calha}>
-          <Glifo nome={glifo} tamanho={18} cor={ativo ? c.azul : c.tintaMid} />
+          <Glifo nome={glifo} tamanho={18} cor={ativo ? c.acento : c.tintaMid} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
             <Tx v="bodyMed" numberOfLines={1}>
               {titulo}
             </Tx>
-            {ativo ? <Carimbo texto="Ativo" cor={c.azul} /> : null}
+            {ativo ? <Carimbo texto="Ativo" cor={c.acento} /> : null}
           </View>
           <Tx v="small" cor={c.tintaFraca} numberOfLines={2}>
             {subtitulo}

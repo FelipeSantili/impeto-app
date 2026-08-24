@@ -59,7 +59,7 @@ export function TiraDescanso({ bottom }: { bottom: number }) {
       style={[estilos.tira, { bottom }]}
     >
       <Regua peso="forte" />
-      <ReguaProgresso fracao={fracao} altura={2} cor={c.azul} />
+      <ReguaProgresso fracao={fracao} altura={2} cor={c.acento} />
       <View style={estilos.corpo}>
         <View style={{ flex: 1 }}>
           <Rotulo cor={c.tintaFraca}>Descanso</Rotulo>

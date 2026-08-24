@@ -215,8 +215,8 @@ export default function TreinoAtivo() {
         </Tx>
         {bpm !== null ? (
           <View style={estilos.bpm}>
-            <Glifo nome="coracao" tamanho={11} cor={c.vermelho} />
-            <Tx v="numeroG" tab cor={c.vermelho}>
+            <Glifo nome="coracao" tamanho={11} cor={c.rec} />
+            <Tx v="numeroG" tab cor={c.rec}>
               {bpm}
             </Tx>
           </View>

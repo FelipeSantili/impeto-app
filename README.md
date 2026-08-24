@@ -5,6 +5,36 @@ rotinas e mostra a demonstração de cada exercício.
 
 Feito em React Native (Expo SDK 54) — roda em **Android e iPhone**.
 
+## Continuar em outro computador
+
+```bash
+git clone https://github.com/FelipeSantili/impeto-app.git
+cd impeto-app
+npm install
+npx expo start
+```
+
+Só isso. Não há variável de ambiente, chave nem arquivo de configuração fora do
+repositório — o app não tem conta nem servidor, e tudo que ele guarda fica no
+aparelho.
+
+Para gerar APK a partir da nova máquina, falta só entrar na conta da Expo:
+
+```bash
+npm install -g eas-cli
+eas login
+```
+
+O vínculo com o projeto já está no `app.json` (`extra.eas.projectId`), então
+`eas build` funciona direto, sem `eas init`.
+
+**O que NÃO vem no clone:** as skills de design em `.agents/` e `.claude/skills/`
+estão no `.gitignore`, porque `.claude/skills` são symlinks com caminho absoluto
+da máquina de origem e chegariam quebrados. O que está versionado é o
+`skills-lock.json`, que registra de qual repositório e com qual hash cada skill
+veio — é a partir dele que se reinstala. O app compila e roda sem elas; são
+ferramenta de autoria, não dependência.
+
 ## Rodar no celular
 
 ```bash
@@ -45,6 +75,12 @@ Rate Service, padrão aberto do Bluetooth, então não precisa do app do fabrica
 É o único caminho com **frequência ao vivo**: aparece no topo da tela de treino,
 batendo em tempo real.
 
+**Importar do relógio (.tcx)** — o segundo caminho para os dados do Redmi Watch,
+para quando o Health Connect não trouxe nada. O Mi Fitness exporta cada atividade
+como um arquivo TCX; o Ímpeto lê e **encaixa no treino já registrado**, casando pela
+sobreposição das janelas de tempo. Dá para escolher vários arquivos de uma vez.
+Detalhes e armadilhas em [Arquivo .tcx do Mi Fitness](#arquivo-tcx-do-mi-fitness).
+
 **Backup em JSON** — exporta rotinas e histórico num arquivo que você guarda onde
 quiser. A importação soma ao que existe e ignora ids repetidos, então reimportar o
 mesmo arquivo não duplica treinos.
@@ -58,6 +94,50 @@ acontece periodicamente, não em tempo real.
 
 Na prática: o relógio serve para enriquecer o **relatório depois do treino**. Para ver
 os batimentos durante a série, é preciso uma cinta.
+
+### Arquivo .tcx do Mi Fitness
+
+TCX é o formato da Garmin (Training Center Database v2), mas o que o Mi Fitness
+escreve é uma versão frouxa dele. Num treino de musculação o arquivo INTEIRO tem
+622 bytes e é isto:
+
+```xml
+<Activity Sport="">
+  <Id>2026-08-06T16:10:56.000Z</Id>    <!-- início, sempre em UTC -->
+  <Calories>541</Calories>             <!-- totais; não existe no esquema oficial -->
+  <Lap>
+    <TotalTimeSeconds>3527</TotalTimeSeconds>
+    <Calories>429</Calories>           <!-- só as ativas -->
+    <HeartRateBpm>98</HeartRateBpm>    <!-- média; no esquema seria <Value>98</Value> -->
+  </Lap>
+</Activity>
+```
+
+Ou seja: **média sim, máxima não, curva não**, esporte em branco e `<Lap>` sem o
+atributo `StartTime` que o esquema exige. Em atividade ao ar livre o mesmo app
+escreve o TCX completo, com `<Trackpoint>` de poucos em poucos segundos — daí saem
+máxima, distância e a curva de frequência. `lib/tcx.ts` lê as duas formas e devolve
+`null` no que não veio, nunca zero: zero é uma medida, e a ausência de medida não é.
+
+Por isso o bloco do relatório monta as **colunas a partir do que existe**. Uma coluna
+fixa com travessão no lugar do número afirmaria ter medido algo que ninguém mediu.
+
+**A armadilha do caminho.** O Mi Fitness salva em
+`Android/data/com.xiaomi.wearable/files/ExportTrack/`, que desde o Android 11 é área
+privada do app: nenhum gerenciador de arquivos entra lá, o seletor de documentos não
+enxerga, e o MTP do Windows tampouco — a pasta simplesmente não aparece. Para
+importar, o arquivo precisa primeiro sair de lá. O caminho que funciona é ligar o
+celular ao computador e mover os `.tcx` para `Download/` pelo Explorer.
+
+**Como o par é achado.** Pela sobreposição das janelas de tempo — é o único critério
+que não depende de nome de arquivo nem de fuso horário. Sem sobreposição, aceita o
+treino do mesmo dia que começou até seis horas de distância. Nada é criado: arquivo
+sem treino correspondente é relatado, não vira treino vazio no histórico.
+
+**Como os dados se juntam.** O arquivo manda nos campos que traz e o que já estava lá
+sobrevive no resto. Treino feito com a cinta (que tem curva e máxima) mais o arquivo
+do relógio (que tem calorias) fica mais completo do que com qualquer um dos dois
+sozinho. O nome do arquivo fica gravado, então reimportar o mesmo não duplica.
 
 ## Compatibilidade do Expo Go
 
@@ -199,18 +279,21 @@ src/
     treino.tsx    treino em andamento
     selecionar.tsx  seletor múltiplo de exercícios
     modelos.tsx · modelo/[id].tsx    vitrine e detalhe dos treinos prontos
-    ajustes.tsx   conexões (Health Connect, cinta) e backup
+    ajustes.tsx   conexões (Health Connect, cinta, .tcx do relógio) e backup
     exercicio/[id].tsx · rotina/[id].tsx · sessao/[id].tsx
   components/
     base.tsx      vocabulário do caderno: texto, botões, régua, seção, linha,
                   cabeça de coluna, carimbo, pressionável
     glifos.tsx    as 26 marcas desenhadas do app (não há biblioteca de ícones)
     demo · folha · descanso · animado · mapa-muscular · cartao-compartilhar
+    curva-fc.tsx  a curva de frequência do treino, quando a fonte manda amostras
   data/           catálogo, modelos prontos, tipos e execução por família de movimento
   design/
     tokens.ts   contrato de direção, as DUAS paletas, tipografia, marcas
     tema.tsx    TemaProvider, usarPaleta e criarEstilos (folhas por tema)
   lib/            metricas, saude (Health Connect), backup, atualizacao, compartilhar
+    tcx.ts        leitor dos arquivos .tcx do Mi Fitness (as duas formas dele)
+    relogio.ts    escolhe os arquivos e casa cada um com o treino do histórico
   store/          estado persistido (zustand + AsyncStorage): treino, cinta,
                   descanso, selecao, atualizacao, tema
 ```

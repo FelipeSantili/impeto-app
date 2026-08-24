@@ -35,13 +35,31 @@ export interface ExercicioTreino {
   descanso: number;
 }
 
-/** Frequência cardíaca do treino, vinda da cinta ou do Health Connect. */
+/**
+ * Frequência cardíaca do treino, vinda da cinta, do Health Connect ou de um
+ * arquivo .tcx exportado pelo relógio.
+ *
+ * Quase tudo é opcional porque cada fonte entrega um pedaço diferente: a cinta
+ * dá a curva batida a batida e nenhuma caloria; o .tcx de musculação do Mi
+ * Fitness dá calorias e média, mas nem máxima nem curva. Campo ausente é dado
+ * que não existe — nunca zero.
+ */
 export interface Cardio {
-  media: number;
-  maxima: number;
+  media?: number | null;
+  maxima?: number | null;
   calorias?: number | null;
+  /** Só as calorias de esforço, quando a fonte separa das totais. */
+  caloriasAtivas?: number | null;
+  /** Duração cronometrada pelo relógio, em segundos. */
+  duracaoSeg?: number | null;
+  /** Distância medida pelo relógio. Só vem em atividade ao ar livre. */
+  distanciaKm?: number | null;
+  /** Curva de FC reamostrada em pontos igualmente espaçados no tempo. */
+  curva?: number[];
   /** De onde vieram os dados — muda o rótulo mostrado no relatório. */
-  fonte: 'cinta' | 'saude';
+  fonte: 'cinta' | 'saude' | 'relogio';
+  /** Nome do .tcx de origem. Impede reimportar o mesmo arquivo em cima. */
+  arquivo?: string;
 }
 
 export interface Sessao {
@@ -279,14 +297,41 @@ export const useTreino = create<Estado>()(
       alternarFeita: (alvo, serieId) => {
         let virouFeita = false;
         set((s) =>
-          mapAtiva(s, alvo, (e) => ({
-            ...e,
-            series: e.series.map((x) => {
-              if (x.id !== serieId) return x;
-              virouFeita = !x.feita;
-              return { ...x, feita: !x.feita };
-            }),
-          })),
+          mapAtiva(s, alvo, (e) => {
+            const i = e.series.findIndex((x) => x.id === serieId);
+            if (i < 0) return e;
+
+            const atual = e.series[i];
+            virouFeita = !atual.feita;
+            const series = [...e.series];
+            series[i] = { ...atual, feita: virouFeita };
+
+            /*
+             * A carga marcada desce para a próxima série.
+             *
+             * Quem treina repete a carga: você ajusta uma vez no primeiro
+             * trabalho do exercício e as seguintes saem iguais. Antes, cada
+             * série nascia vazia e caía no desempenho da SESSÃO PASSADA, o que
+             * está errado no dia em que você sobe ou desce a carga — a
+             * sugestão continuava mostrando a semana anterior enquanto você já
+             * tinha decidido outra coisa hoje.
+             *
+             * Só preenche campo VAZIO, e só na série imediatamente seguinte: o
+             * que você digitou à mão em uma série adiante é uma decisão, não um
+             * espaço em branco esperando palpite. Como cada série propaga ao
+             * ser marcada, a carga cascateia sozinha pelo exercício inteiro sem
+             * nunca sobrescrever nada.
+             */
+            const prox = series[i + 1];
+            if (virouFeita && prox && !prox.feita) {
+              const herdada = { ...prox };
+              if (herdada.peso === null) herdada.peso = atual.peso;
+              if (herdada.reps === null) herdada.reps = atual.reps;
+              series[i + 1] = herdada;
+            }
+
+            return { ...e, series };
+          }),
         );
         return virouFeita;
       },

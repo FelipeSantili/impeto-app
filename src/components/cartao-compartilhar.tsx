@@ -15,9 +15,23 @@ import {
   seriesFeitas,
   volumeSessao,
 } from '@/lib/metricas';
-import type { Sessao } from '@/store/treino';
+import type { Cardio, Sessao } from '@/store/treino';
 
 const MARGEM = 26;
+
+/**
+ * A linha de cardio do rodapé, com o que a fonte de fato mediu.
+ *
+ * Devolve string vazia quando não sobrou nada — o cartão então cede o espaço à
+ * contagem de exercícios em vez de imprimir um coração sozinho.
+ */
+function resumoCardio(cardio: Cardio): string {
+  const partes: string[] = [];
+  if (cardio.media != null) partes.push(`${cardio.media} bpm médio`);
+  if (cardio.maxima != null) partes.push(`${cardio.maxima} máx`);
+  if (cardio.calorias != null) partes.push(`${cardio.calorias} kcal`);
+  return partes.join(' · ');
+}
 
 /**
  * Cartão de treino para compartilhar — uma folha do caderno destacada.
@@ -97,16 +111,21 @@ export function CartaoCompartilhar({
 
       <View style={estilos.prancha}>
         {/* atraso 0: a captura acontece com a prancha já em densidade cheia. */}
-        <MapaMuscular musculos={musculos} atraso={0} largura={104} />
+        <MapaMuscular musculos={musculos} atraso={0} largura={104} interativo={false} />
       </View>
 
       <Regua />
       <View style={estilos.rodape}>
-        {sessao.cardio ? (
+        {/*
+          Máxima e calorias entram só quando existem: a exportação de
+          musculação do Mi Fitness traz apenas a média, e um "undefined máx"
+          sairia impresso na imagem que vai para fora do app.
+        */}
+        {sessao.cardio && resumoCardio(sessao.cardio) ? (
           <View style={estilos.cardio}>
-            <Glifo nome="coracao" tamanho={11} cor={c.vermelho} />
+            <Glifo nome="coracao" tamanho={11} cor={c.rec} />
             <Tx v="small" tab cor={c.tintaMid}>
-              {sessao.cardio.media} bpm médio · {sessao.cardio.maxima} máx
+              {resumoCardio(sessao.cardio)}
             </Tx>
           </View>
         ) : (

@@ -22,7 +22,8 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Glifo, type NomeGlifo } from '@/components/glifos';
 import { criarEstilos, usarPaleta } from '@/design/tema';
-import { margem, motion, radius, sp, traco, type as typeScale, type Paleta } from '@/design/tokens';
+import { dur } from '@/design/movimento';
+import { margem, radius, sp, traco, type as typeScale, type Paleta } from '@/design/tokens';
 
 /**
  * Vocabulário do registro.
@@ -196,11 +197,11 @@ export function Pressavel({
       // O retorno começa no press-in: esperar o toque completar para mostrar
       // algo é exatamente a latência que o usuário percebe.
       onPressIn={(e) => {
-        p.set(withTiming(1, { duration: motion.toque, easing: SAIDA }));
+        p.set(withTiming(1, { duration: dur.toque, easing: SAIDA }));
         rest.onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        p.set(withTiming(0, { duration: motion.toque, easing: SAIDA }));
+        p.set(withTiming(0, { duration: dur.toque, easing: SAIDA }));
         rest.onPressOut?.(e);
       }}
       onPress={(e) => {
@@ -239,10 +240,10 @@ function tons(c: Paleta): Record<Tom, { fundo: string; tinta: string; borda?: st
   return {
     // A ação primária é uma BARRA CHEIA, retangular. É a massa que impede a
     // página de ficar mole — e o único preenchimento saturado da tela.
-    tinta: { fundo: c.azul, tinta: c.azulTexto },
+    tinta: { fundo: c.acento, tinta: c.acentoTexto },
     contorno: { fundo: 'transparent', tinta: c.tinta, borda: c.reguaForte },
     texto: { fundo: 'transparent', tinta: c.tintaMid },
-    perigo: { fundo: 'transparent', tinta: c.vermelho, borda: c.vermelhoLinha },
+    perigo: { fundo: 'transparent', tinta: c.rec, borda: c.recLinha },
   };
 }
 
@@ -520,7 +521,7 @@ export function Linha({
 }) {
   const c = usarPaleta();
   const estilos = usarEstilos();
-  const repouso = ativa ? c.azulSuave : feita ? c.fundoAlto : undefined;
+  const repouso = ativa ? c.acentoSuave : feita ? c.fundoAlto : undefined;
 
   const conteudo = (
     <>
@@ -651,7 +652,7 @@ export function Vazio({
 export function Carimbo({ texto, cor }: { texto: string; cor?: string }) {
   const c = usarPaleta();
   const estilos = usarEstilos();
-  const tom = cor ?? c.vermelho;
+  const tom = cor ?? c.rec;
   return (
     <View style={[estilos.carimbo, { borderColor: tom }]}>
       <Text

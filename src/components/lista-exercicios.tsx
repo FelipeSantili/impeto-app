@@ -154,7 +154,7 @@ export function LinhaExercicio({
     <Pressavel
       onPress={onPress}
       escala={0.995}
-      fundo={marcado ? c.azulSuave : undefined}
+      fundo={marcado ? c.acentoSuave : undefined}
       fundoPressionado={c.fundoBaixo}
       accessibilityRole="button"
       accessibilityState={modoSelecao ? { selected: !!marcado } : undefined}
@@ -174,7 +174,7 @@ export function LinhaExercicio({
         // Caixa de marcar quadrada — o círculo com check dentro é forma de
         // biblioteca, não deste caderno.
         <View style={[estilos.caixa, marcado && estilos.caixaAtiva]}>
-          {marcado ? <Glifo nome="confere" tamanho={13} cor={c.azulTexto} /> : null}
+          {marcado ? <Glifo nome="confere" tamanho={13} cor={c.acentoTexto} /> : null}
         </View>
       ) : (
         <Glifo nome="avancar" tamanho={14} cor={c.tintaFantasma} />
@@ -214,6 +214,6 @@ const usarEstilos = criarEstilos((c) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  caixaAtiva: { backgroundColor: c.azul, borderColor: c.azul },
+  caixaAtiva: { backgroundColor: c.acento, borderColor: c.acento },
   total: { paddingTop: sp.xxl, paddingHorizontal: margem.pagina },
 }));

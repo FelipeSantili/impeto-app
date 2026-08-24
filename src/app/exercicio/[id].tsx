@@ -72,8 +72,8 @@ export default function DetalheExercicio() {
               accessibilityLabel="Adicionar ao treino"
               style={estilos.addTreino}
             >
-              <Glifo nome="mais" tamanho={14} cor={c.azulTexto} />
-              <Rotulo cor={c.azulTexto}>Adicionar</Rotulo>
+              <Glifo nome="mais" tamanho={14} cor={c.acentoTexto} />
+              <Rotulo cor={c.acentoTexto}>Adicionar</Rotulo>
             </Pressavel>
           ) : undefined
         }
@@ -115,7 +115,7 @@ export default function DetalheExercicio() {
           ))}
 
           <View style={estilos.aviso}>
-            <Glifo nome="alerta" tamanho={15} cor={c.vermelho} />
+            <Glifo nome="alerta" tamanho={15} cor={c.rec} />
             <Tx v="small" cor={c.tintaMid} style={{ flex: 1 }}>
               {familia.erro}
             </Tx>
@@ -172,7 +172,7 @@ export default function DetalheExercicio() {
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     {r.series.slice(0, 4).map((s) => (
-                      <Tx key={s.id} v="small" tab cor={c.azul}>
+                      <Tx key={s.id} v="small" tab cor={c.acento}>
                         {fmtNumero(s.peso)} × {fmtNumero(s.reps)}
                       </Tx>
                     ))}
@@ -227,7 +227,7 @@ const usarEstilos = criarEstilos((c) => ({
     gap: 5,
     height: 34,
     paddingHorizontal: sp.md,
-    backgroundColor: c.azul,
+    backgroundColor: c.acento,
     borderRadius: radius.sm,
   },
   passo: {
@@ -243,9 +243,9 @@ const usarEstilos = criarEstilos((c) => ({
     marginTop: sp.lg,
     marginHorizontal: margem.pagina,
     padding: sp.md,
-    backgroundColor: c.vermelhoSuave,
+    backgroundColor: c.recSuave,
     borderLeftWidth: 2,
-    borderLeftColor: c.vermelho,
+    borderLeftColor: c.rec,
   },
   marca: {
     flexDirection: 'row',

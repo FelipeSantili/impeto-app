@@ -116,7 +116,7 @@ export default function Inicio() {
       <Secao
         titulo="Semana"
         espaco={sp.xxl}
-        direita={sequencia > 1 ? <Rotulo cor={c.azul}>{sequencia} dias seguidos</Rotulo> : null}
+        direita={sequencia > 1 ? <Rotulo cor={c.acento}>{sequencia} dias seguidos</Rotulo> : null}
       >
         <LinhaSemana dias={semana.dias} hoje={hoje} />
         <Tx v="small" cor={c.tintaMid} style={estilos.resumo}>
@@ -153,8 +153,8 @@ export default function Inicio() {
               hitSlop={10}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
             >
-              <Rotulo cor={c.azul}>Modelos</Rotulo>
-              <Glifo nome="avancar" tamanho={11} cor={c.azul} />
+              <Rotulo cor={c.acento}>Modelos</Rotulo>
+              <Glifo nome="avancar" tamanho={11} cor={c.acento} />
             </Pressavel>
             <BotaoGlifo
               glifo="mais"
@@ -217,7 +217,7 @@ export default function Inicio() {
  * A semana como linha pautada.
  *
  * Sete células de largura igual, separadas por régua fina, com as iniciais por
- * cabeçalho de coluna. Um dia treinado recebe um BLOCO DE TINTA AZUL — azul é
+ * cabeçalho de coluna. Um dia treinado recebe um BLOCO DE TINTA AZUL — acento é
  * o que você escreveu, a mesma regra da tabela de séries. Hoje é a célula
  * emoldurada. Nenhum ponto, nenhum anel.
  */
@@ -345,7 +345,7 @@ const usarEstilos = criarEstilos((c) => ({
   blocoFeito: {
     width: 16,
     height: 16,
-    backgroundColor: c.azul,
+    backgroundColor: c.acento,
     borderRadius: 1,
   },
   resumo: { paddingHorizontal: margem.pagina, paddingTop: sp.sm },

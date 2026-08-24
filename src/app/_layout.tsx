@@ -5,10 +5,10 @@ import {
   Archivo_700Bold,
 } from '@expo-google-fonts/archivo';
 import {
-  BarlowCondensed_500Medium,
-  BarlowCondensed_600SemiBold,
-  BarlowCondensed_700Bold,
-} from '@expo-google-fonts/barlow-condensed';
+  IBMPlexMono_400Regular,
+  IBMPlexMono_500Medium,
+  IBMPlexMono_600SemiBold,
+} from '@expo-google-fonts/ibm-plex-mono';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -18,6 +18,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AvisoAtualizacao } from '@/components/aviso-atualizacao';
 import { Folhas } from '@/components/folha';
+import { TecladoCarga } from '@/components/teclado';
 import { TemaProvider, usarPaleta } from '@/design/tema';
 import { useVerificarAtualizacao } from '@/lib/atualizacao';
 import { useTreino } from '@/store/treino';
@@ -30,9 +31,11 @@ export default function RootLayout() {
     Archivo_500Medium,
     Archivo_600SemiBold,
     Archivo_700Bold,
-    BarlowCondensed_500Medium,
-    BarlowCondensed_600SemiBold,
-    BarlowCondensed_700Bold,
+    // Toda coluna de dado do app é monoespaçada: alinhar carga não depende de
+    // `fontVariant`, e um valor mudando de 82,5 para 100 não empurra a coluna.
+    IBMPlexMono_400Regular,
+    IBMPlexMono_500Medium,
+    IBMPlexMono_600SemiBold,
   });
   const hidratado = useTreino((s) => s.hidratado);
   useVerificarAtualizacao();
@@ -94,12 +97,20 @@ function Moldura() {
         <Stack.Screen name="exercicio/[id]" />
         <Stack.Screen name="rotina/[id]" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="sessao/[id]" />
+        {/* O modelo 3D: sobe por cima da prancha que o abriu, e volta pra ela. */}
+        <Stack.Screen
+          name="corpo"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
         <Stack.Screen name="modelos" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="modelo/[id]" />
         <Stack.Screen name="ajustes" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
       <AvisoAtualizacao />
       <Folhas />
+      {/* Vive na raiz para poder cobrir qualquer tela: é ele que substitui o
+          teclado do sistema na entrada de carga. */}
+      <TecladoCarga />
     </>
   );
 }

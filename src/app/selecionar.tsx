@@ -54,7 +54,7 @@ export default function Selecionar() {
                 Adicionar
               </Tx>
               {marcados.length > 0 ? (
-                <Rotulo cor={c.azul}>{marcados.length} marcados</Rotulo>
+                <Rotulo cor={c.acento}>{marcados.length} marcados</Rotulo>
               ) : null}
             </View>
             <Regua peso="forte" cor={c.tinta} style={{ marginHorizontal: margem.pagina }} />

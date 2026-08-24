@@ -2,219 +2,321 @@
 
 <!-- Escrito a partir do que foi construído, não do que foi planejado. -->
 
-O mundo visual tem **dois materiais do mesmo lugar**, um por tema:
+O Ímpeto não é um app de treino: é um **instrumento de medição** que por acaso
+mede treino. Preto neutro sem matiz, fios de 1px, coluna alinhada, tudo
+monoespaçado — e um LED vermelho que diz uma coisa só: está gravando.
 
-- **Claro — o caderno.** Papel de gramatura, tinta grafite, caneta azul e vermelha.
-- **Escuro — o quadro da academia.** Ardósia e giz, com giz azul e giz vermelho.
+A direção se chama **Telemetria**, e nasceu do cruzamento de duas propostas: o
+instrumento de bancada (densidade, monoespaçada, precisão) e o corpo como mapa
+(a rampa térmica, a prancha anatômica). Da segunda ficou o que ela tinha de
+próprio — a escala de calor e a figura humana; da primeira, tudo o mais.
 
-Escuro **não é o claro invertido**: é outro objeto real da mesma parede. Os papéis
-não mudam de um para o outro — azul é sempre o que VOCÊ escreveu (cargas,
-repetições, o ✓, a ação primária), vermelho é sempre o carimbo (recorde, sigla de
-técnica, remoção).
+## A regra que organiza o sistema inteiro
 
-A regra que organiza tudo: **estado se diz por marca e posição, nunca por cor.**
-Isso não é estilo — é requisito. A academia às vezes está sob luz fluorescente
-forte e às vezes quase escura, então nada que carregue significado pode depender
-de matiz nem de contraste sutil. É também o que faz o app continuar legível ao
-trocar de tema.
+**As duas cores têm trabalhos que não se confundem.**
 
-## Como a troca de tema funciona
+| cor | diz | onde aparece |
+|---|---|---|
+| **`rec`** vermelho | **ESTADO** — está rodando, ou não. Binário. | O LED de sessão aberta e a marca de recorde. **Em nenhum outro lugar.** |
+| **`acento`** âmbar | **QUANTIDADE** — é o topo da rampa térmica, não uma cor independente. | Tudo que você escreveu, tudo que está feito, tudo que é alto. |
 
-Duas peças, e as duas existem por um motivo concreto.
+Se o vermelho começar a aparecer em botão, em ícone de aba ou em destaque de
+texto, o sistema morre — vermelho que aparece em todo lugar deixa de significar
+"atenção". Foi por isso que o campo `cor` das dez técnicas de série foi
+**removido** de [src/data/tecnicas.ts](src/data/tecnicas.ts): dez cores pastel
+identificando técnicas destruiriam a regra. Técnica se identifica pela sigla.
 
-**`criarEstilos`** — `StyleSheet.create` roda uma vez, quando o módulo carrega, e
-**copia** os valores de cor para dentro do objeto. Mutar a paleta depois não muda
-nada, e remontar a árvore também não, porque o módulo não é reavaliado. Por isso
-toda folha de estilo do app é função da paleta, criada uma vez por tema e
-memoizada:
+## A rampa térmica
+
+`calor` é uma escala de seis degraus, do inerte ao âmbar, e é o **vocabulário de
+intensidade do app inteiro**: a prancha anatômica, o modelo 3D, as barras de
+carga muscular e o estado "feito" saem todos dela.
 
 ```ts
-const usarEstilos = criarEstilos((c) => ({
-  linha: { backgroundColor: c.fundoAlto },
-}));
-
-function Componente() {
-  const estilos = usarEstilos();
-}
+corDeCalor(paleta, fracao) // fração de esforço 0..1 → cor
+nivelDeCalor(fracao)       // → 0..5, para quem precisa do degrau
 ```
 
-**`TemaProvider`** — o app inteiro lê a paleta por **contexto**, e só o provider
-assina o store. Isso não é preferência de arquitetura: a primeira versão fazia
-cada componente chamar `useTemaStore`, e como `usarPaleta` e `usarEstilos` andam
-juntos, davam de duas a cinco assinaturas do mesmo store por componente. Com o
-`persist` hidratando de forma assíncrona, isso desalinha a lista de hooks de quem
-re-renderiza nessa janela: o índice escorrega para um slot que não é de efeito,
-`prevDeps` vem `undefined`, e o `useEffect` seguinte estoura com *"Cannot read
-properties of undefined (reading 'length')"* — derrubando a árvore inteira antes
-do primeiro quadro, sem nada na tela e sem erro visível no console.
+A raiz quadrada dentro de `nivelDeCalor` abre o meio da escala: sem ela um grupo
+com 10% do esforço cairia no primeiro degrau e a prancha pareceria vazia num
+treino bem distribuído. `0,45` é o teto prático — acima disso o grupo já domina
+a sessão.
 
-O layout raiz **não lê a paleta**: ele só segura a splash até os stores
-hidratarem. Quem pinta é o `<Moldura>`, abaixo do provider.
+A rampa passa por um verde-azulado frio antes de chegar ao âmbar. Uma rampa que
+vai direto de cinza a laranja passa por marrom no meio e fica suja.
 
-Ambos em [src/design/tema.tsx](src/design/tema.tsx).
+Um músculo âmbar quer dizer a mesma coisa em qualquer lugar do app. É por isso
+que a tela do modelo 3D mostra a régua da rampa no rodapé: sem ela a cor seria
+decoração.
 
 ## Cores
 
 As duas paletas vivem em [src/design/tokens.ts](src/design/tokens.ts), com as
-mesmas chaves. Nenhum hex fora dali.
+mesmas chaves. Nenhum hex fora dali — o que é o que torna a troca de mundo
+viável em um arquivo só.
 
-Os nomes são do **papel** que a cor cumpre, não do material: `fundo` é papel no
-claro e ardósia no escuro. Nomear pelo material obrigaria a mentir num dos dois.
-
-| | claro (caderno) | escuro (quadro) |
+| | escuro (a casa) | claro (com sol na tela) |
 |---|---|---|
-| `fundo` | `#E8E7E2` cinza de gramatura, **não** creme | `#1B1D1C` ardósia |
-| `fundoAlto` | `#F2F1ED` | `#232624` |
-| `fundoBaixo` | `#DBDAD3` faixa de cabeçalho de coluna | `#141615` |
-| `tinta` | `#191B1C` · **13,8:1** | `#E9E9E4` giz · **13,9:1** |
-| `tintaMid` | `#4A4E51` · 6,8:1 | `#A6A9A4` · 7,1:1 |
-| `tintaFraca` | `#62666B` · **4,6:1** | `#878B86` · **4,9:1** |
-| `tintaFantasma` | `#9A9C99` só decoração | `#5A5E5A` |
-| `azul` | `#23368C` · 8,6:1 | `#8FAEF0` giz azul · 8,3:1 |
-| `vermelho` | `#B4231F` · 5,3:1 | `#F0938A` giz vermelho · 7,5:1 |
+| `fundo` | `#0A0B0C` preto **neutro** | `#F3F4F4` |
+| `fundoAlto` | `#16191B` | `#FFFFFF` |
+| `tinta` | `#E9ECEE` · **15,8:1** | `#0E1113` · **17,2:1** |
+| `tintaMid` | `#9AA2A7` · 7,9:1 | `#4C5457` · 7,6:1 |
+| `tintaFraca` | `#6A7276` · **4,6:1** | `#6B7376` · **4,6:1** |
+| `acento` | `#E8A13D` âmbar · 9,7:1 | `#8A5510` ocre · 6,4:1 |
+| `rec` | `#FF3B30` · 5,5:1 | `#C1261C` · 6,1:1 |
 
-`tintaFraca` é o **piso**: abaixo dele nada carrega significado, nos dois temas.
+`tintaFraca` é o **piso**: abaixo dele nada carrega significado.
 
-O azul atende aos dois papéis que uma cor de ação precisa atender — texto sobre
-o fundo *e* preenchimento com texto por cima (10,7:1 no claro, 8,6:1 no escuro).
+O fundo escuro é neutro **de propósito**. Qualquer viés de matiz faz a rampa
+térmica mentir, porque ela passa a ser lida contra uma cor em vez de contra o
+vazio — e é isso que separa "aparelho de medição" de "app escuro com acento".
 
-Réguas (`regua`, `reguaMid`, `reguaForte`) são a tinta com transparência, não
-cinzas próprios — assim acompanham o fundo em vez de brigar com ele.
+No claro o âmbar desce para ocre. Âmbar claro sobre branco tem 2:1 e sumiria: a
+**posição na rampa** é a mesma, a luminância é a que o fundo exige.
 
 ## Tipografia
 
-Idêntica nos dois temas. Duas famílias, um princípio: **prosa em Archivo, todo
-número em Barlow Condensed.** Condensada lê como impressa em formulário e deixa
-número grande caber em coluna estreita. Ambas trazem `tnum` (verificado no
-binário), então `fontVariant: ['tabular-nums']` alinha de verdade.
+**Todo dado em IBM Plex Mono, prosa em Archivo.** Monoespaçada não é estilo
+aqui — é o que faz coluna de carga alinhar sozinha, sem `fontVariant`, e o que
+faz um valor mudando de 82,5 para 100 não empurrar a coluna inteira.
 
-Hierarquia vem de tinta e entrelinha, não de inflar corpo. Só `monumento` escapa
-disso, de propósito.
+Archivo escapa só nos títulos de tela e na prosa corrida (execução de exercício,
+descrições). Monoespaçada em texto longo é castigo.
 
 | | uso |
 |---|---|
-| `monumento` 104 | reservado ao número que se lê a um braço de distância |
-| `numeroXG` 44 · `numeroG` 28 · `numero` 20 | totais, células de carga e repetição |
-| `display` 30 · `title` 22 · `heading` 16 | títulos, sempre **alinhados à esquerda** |
-| `body` / `bodyMed` 15 · `small` / `smallMed` 13 | prosa |
-| `coluna` 12 · `carimbo` 12 | cabeçalho de coluna e carimbo, sempre em caixa alta |
+| `monumento` 76 | o número que se lê a um braço de distância |
+| `numeroXG` 36 · `numeroG` 24 · `numero` 16 | leituras, células, teclas |
+| `display` 27 · `title` 20 · `heading` 15 | títulos, sempre à esquerda |
+| `body` / `bodyMed` 15 · `small` / `smallMed` 13 | prosa, em Archivo |
+| `coluna` 10 · `carimbo` 10,5 | cabeça de coluna e carimbo, sempre caixa alta |
 
-Todo valor grande em coluna leva `numberOfLines={1}` + `adjustsFontSizeToFit`: o
-cartão de compartilhar vira imagem, e uma quebra de linha ali desmonta a
-composição.
+Barlow Condensed foi **removida** do projeto: a monoespaçada assumiu todo o
+papel dela.
 
-## Estrutura
+## Geometria e estrutura
 
-- **Não existe cartão.** Seções se separam por **régua** e espaço. `Cartao` foi
-  removido do vocabulário; no lugar entraram `Secao`, `Linha`, `CabecaColuna` e
-  `Regua`.
-- **Margem fixa** (`margem.pagina` 20, `margem.calha` 26). A calha é a coluna
-  reservada ao ordinal, à barra da linha ativa e ao carimbo de recorde. Toda tela
-  registra contra ela.
-- **Canto reto.** `radius` vai de 0 a 4 — nem papel nem ardósia são arredondados.
-  Não há `pill`.
-- **Zero sombra**, com uma exceção honesta: a folha modal, que é literalmente uma
-  folha sobre a página.
-- Composição assimétrica: título à esquerda, meta carimbada à direita na mesma
-  linha de base.
+- **Canto de 4 a 8px** (`radius`). Não é quadrado e não é macio: é a chanfradura
+  de um painel fresado.
+- **Densidade alta.** A sessão é uma **tabela**, com cabeça de coluna e valores
+  alinhados. Linha de 48px.
+- **Zero sombra**, com duas exceções honestas: a folha modal e o teclado de
+  carga — as duas superfícies que de fato estão *por cima* da página.
+- **Margem fixa** (`margem.pagina` 18, `margem.calha` 24).
 
-## Vocabulário de marcas
+### O risco desta direção, e o corretivo
 
-| estado | marca |
-|---|---|
-| feita | escrita em azul, fundo `fundoAlto`, ✓ preenchido |
-| ativa | **barra de tinta** de 3px na margem |
-| pendente | pontilhado de campo não preenchido, régua embaixo da célula |
-| aquecimento | ordinal **entre parênteses** — livro-caixa marca assim a linha que não soma |
-| técnica | sigla carimbada em vermelho |
-| recorde | traço vermelho na margem, como correção de professor |
+Monoespaçada come largura, e densidade alta briga com dedo suado. O corretivo é
+estrutural, não cosmético:
 
-Nenhuma dessas marcas precisa de cor para ser entendida. É por isso que o app
-sobrevive à troca de tema sem reinterpretação.
+- o ✓ tem `hitSlop`, e a célula de valor tem `hitSlop` assimétrico;
+- **a entrada de carga saiu da célula** e foi para um teclado próprio.
 
-## Prancha anatômica
+## Movimento
 
-[src/components/mapa-muscular.tsx](src/components/mapa-muscular.tsx) desenha a
-figura de frente e de costas com a **forma real de cada músculo**: peitoral em
-leque, deltoide em capuz sobre o ombro, dorsal em asa da axila à cintura,
-quadríceps em gota até o joelho, trapézio em losango.
+[src/design/movimento.ts](src/design/movimento.ts). A personalidade vem antes de
+qualquer valor: **instrumento não tem elasticidade.** A curva padrão do app é
+`linear`, o que em quase todo outro produto seria erro — a varredura de um
+scanner corre em velocidade constante porque está medindo, não porque está
+animada.
 
-Dois princípios:
+Molas existem e têm endereço: só o selo de exercício fechado e a marca de
+recorde. Ali o movimento comemora, não mede.
 
-- **Os músculos SÃO o corpo**, não pintura sobre uma silhueta. O que não foi
-  trabalhado fica no tom neutro, contornado — a prancha já se lê como anatomia
-  mesmo sem nenhum destaque.
-- **Intensidade é densidade de tinta, nunca matiz.** Cada músculo destacado leva
-  um contorno na cor do corpo, e a opacidade vai só no preenchimento: sem isso o
-  contorno desbotaria junto e grupos vizinhos que se encostam (deltoide e
-  peitoral, glúteo e isquiotibial) virariam uma mancha só.
+### A regra que não se negocia
 
-Todo traçado é autorado uma vez, na metade esquerda, e espelhado — corrigir um
-lado e esquecer o outro seria questão de tempo.
+O estado muda no `onPressIn`. A animação **acompanha** o que já aconteceu, nunca
+decide quando acontece. Um ✓ que espera 500ms de varredura para registrar a
+série é um bug, não um efeito.
+
+### Escalonamento por raridade
+
+"Retorno em tudo" só não cansa se o tamanho do retorno for proporcional à
+raridade do evento.
+
+| faixa | evento | tempo |
+|---|---|---|
+| constante | toque, digitação | 90–140ms |
+| frequente | concluir série, descanso | 320–500ms |
+| raro | exercício fechado, recorde | 520ms–1,6s |
+
+Trocar de aba não anima nada além da própria marca da aba: acontece dezenas de
+vezes por sessão.
+
+## A prancha anatômica
+
+[src/components/mapa-muscular.tsx](src/components/mapa-muscular.tsx) — **33
+regiões**, cada uma desenhada da origem à inserção do músculo real. Proporção
+pelo cânone de oito cabeças, ombro em 2,3 cabeças.
+
+O que faz a diferença entre prancha e boneco:
+
+- o peitoral em **duas porções** (clavicular e esternal), convergindo na axila;
+- o **serrátil** em dedos entrelaçados sobre as costelas;
+- o reto abdominal **segmentado** pelas intersecções tendíneas;
+- o quadríceps em três ventres, com o **vasto medial** descendo mais — a gota
+  logo acima do joelho;
+- o **sartório** cruzando a coxa na diagonal;
+- o trapézio de costas como losango inteiro e o dorsal em asa: juntos, o V.
+
+Dois princípios que não mudaram:
+
+- **Os músculos SÃO o corpo**, não pintura sobre uma silhueta. A prancha se lê
+  como anatomia mesmo numa sessão vazia; o treino apenas *acende* partes de um
+  desenho que já estava inteiro.
+- Cada músculo aceso leva um **contorno na cor do corpo**. Sem ele, vizinhos que
+  se encostam viram uma mancha só no momento em que ambos acendem.
+
+Todo traçado é autorado uma vez, na metade esquerda, e espelhado.
+
+## O modelo 3D
+
+[src/components/corpo-3d.tsx](src/components/corpo-3d.tsx), aberto tocando a
+prancha, na rota [src/app/corpo.tsx](src/app/corpo.tsx).
+
+A prancha responde "quais músculos"; o modelo responde "**onde**", que é uma
+pergunta que desenho chapado não responde bem.
+
+**Não há arquivo de modelo.** Cada músculo é gerado em código como um tubo
+fusiforme varrido ao longo de uma curva — um ventre que engrossa no meio e afina
+nas pontas, que é a forma de um músculo entre suas duas inserções. Três
+consequências práticas:
+
+- o app continua offline e o APK não engorda megabytes;
+- corrigir a origem de um músculo é mover um ponto no código, versionado;
+- cada grupo já nasce como malha **separada**, que é o requisito real: pintar um
+  músculo de cada vez pela rampa térmica.
+
+O preço é honesto: isto é um **écorché**, o modelo de estudo. Tem a forma, a
+origem e a inserção certas; não tem a textura de um scan anatômico.
+
+Detalhes que custaram para acertar:
+
+- `computeFrenetFrames` do three faz **transporte paralelo**, não Frenet puro —
+  o quadro não gira sozinho em trechos quase retos. Fosse Frenet de verdade, o
+  tubo torceria e o achatamento sairia em direções diferentes ao longo da peça.
+- O achatamento das lâminas (peitoral, dorsal, trapézio) é aplicado **em torno
+  do centro da própria peça**; escalar direto a moveria de lugar.
+- O three espera um `<canvas>` do DOM e o `expo-gl` entrega só o contexto. O
+  objeto `canvas` no `onContextCreate` é o mínimo que o `WebGLRenderer` toca —
+  sem ele o construtor quebra antes do primeiro quadro.
+- O laço de render **precisa** morrer no desmonte. Sem a bandeira `vivo`, o
+  `requestAnimationFrame` segue desenhando numa cena desmontada depois que o
+  modal fecha: o contexto GL some, o three desenha nele mesmo assim, e o app
+  trava sem erro visível.
+- O giro de apresentação existe só para dizer que a figura é girável. **Para no
+  primeiro toque e não volta** — 60 quadros por segundo enquanto o usuário
+  estuda a anatomia parada só esquentaria o aparelho.
+
+## O teclado de carga
+
+[src/components/teclado.tsx](src/components/teclado.tsx). A célula da tabela
+virou **mostrador**; o toque abre um painel embaixo, ao alcance do polegar.
+
+Por que a entrada saiu de dentro da linha:
+
+1. o alvo era pequeno — 62×34 entre duas outras, com o dedo úmido;
+2. o teclado do sistema subia e **tapava a linha que estava sendo editada**;
+3. o teclado do sistema não sabe nada sobre musculação: não tem incremento de
+   anilha, não pula de campo e não conclui a série.
+
+O painel cobre boa parte da tela, e isso é aceitável por um motivo específico:
+ele **mostra o que você está editando** no próprio cabeçalho. Não há nada atrás
+dele que você precise ver — o contrário exato do que tornava o teclado do
+sistema ruim aqui.
+
+O caminho quente inteiro sem fechar o teclado: **KG → REPS → CONCLUIR → KG da
+próxima série.**
+
+## A carga desce para a próxima série
+
+Em `alternarFeita`, [src/store/treino.ts](src/store/treino.ts).
+
+Quem treina repete a carga: você ajusta uma vez no primeiro trabalho e as
+seguintes saem iguais. Antes, cada série nascia vazia e caía no desempenho da
+**sessão passada** — o que está errado no dia em que você sobe ou desce a carga,
+porque a sugestão continuava mostrando a semana anterior enquanto você já tinha
+decidido outra coisa hoje.
+
+Duas travas:
+
+- só preenche campo **vazio** — o que você digitou à mão numa série adiante é
+  uma decisão, não um espaço em branco esperando palpite;
+- só a série **imediatamente seguinte**. Como cada série propaga ao ser marcada,
+  a carga cascateia sozinha pelo exercício inteiro sem sobrescrever nada.
+
+## Como a troca de tema funciona
+
+Duas peças, e as duas existem por um motivo concreto — nada disto mudou na
+refatoração, e **não se mexe nele**: mexer aqui já derrubou a árvore inteira uma
+vez neste projeto.
+
+**`criarEstilos`** — `StyleSheet.create` roda uma vez, quando o módulo carrega, e
+**copia** os valores de cor para dentro do objeto. Mutar a paleta depois não muda
+nada, e remontar a árvore também não. Por isso toda folha de estilo do app é
+função da paleta, criada uma vez por tema e memoizada.
+
+**`TemaProvider`** — o app inteiro lê a paleta por **contexto**, e só o provider
+assina o store. A primeira versão fazia cada componente chamar `useTemaStore`, e
+como `usarPaleta` e `usarEstilos` andam juntos, davam de duas a cinco
+assinaturas do mesmo store por componente. Com o `persist` hidratando de forma
+assíncrona, isso desalinha a lista de hooks de quem re-renderiza nessa janela: o
+índice escorrega para um slot que não é de efeito, `prevDeps` vem `undefined`, e
+o `useEffect` seguinte estoura com *"Cannot read properties of undefined
+(reading 'length')"* — derrubando a árvore inteira antes do primeiro quadro, sem
+nada na tela e sem erro no console.
+
+Ambos em [src/design/tema.tsx](src/design/tema.tsx).
 
 ## Marcas desenhadas
 
 Não há conjunto de ícones pronto. [src/components/glifos.tsx](src/components/glifos.tsx)
-desenha 26 glifos na mesma grade de 24, com **ponta reta e junta em esquadria** —
-ponta arredondada é a assinatura das bibliotecas prontas. Um só peso de traço em
-todo o app, reescalado opticamente.
-
-## Movimento
-
-Um momento autoral, não efeitos espalhados.
-
-- **O carimbo de conclusão** é esse momento: desce de escala 1,7 → 1 com mola,
-  crava a −3,5° porque carimbo humano não sai reto, e dispara o háptico no quadro
-  em que encosta — não quando a animação acaba.
-- **Toque**: escala 0,97 em 110ms com ease-out forte (`cubic-bezier(.23,1,.32,1)`),
-  na thread de UI. Opacidade sozinha lê como morto.
-- **Abas não deslizam** e não vibram: acontecem dezenas de vezes por sessão.
-- **Háptico é reservado ao que confirma algo.** Sem valor, `Pressavel` não vibra.
-- `useReducedMotion` desliga deslocamento e escala em todo componente animado.
-
-O `Pressavel` **nunca** usa a forma de função do `style` do Pressable: dentro de
-um componente animado do Reanimated ela é descartada inteira, e o botão perde
-fundo, direção e espaçamento. Estado de toque vive na `useAnimatedStyle`.
+desenha 26 glifos na mesma grade de 24, com ponta reta e junta em esquadria —
+ponta arredondada é a assinatura das bibliotecas prontas.
 
 ## Números em português
 
 `fmtVolume` e `fmtNumero` usam **vírgula decimal** e espaço antes da unidade
 (`82,5 kg`, `5,0 t`). `fmtDuracaoCurta` é compacta (`1h05`, `45min`) porque a
-forma antiga (`1h 5min`) quebrava em duas linhas nas colunas de total.
+forma antiga quebrava em duas linhas nas colunas de total.
+
+## Consequência de build
+
+`expo-gl` e `three` são dependências **nativas**, e `runtimeVersion.policy` é
+`fingerprint`. Isso significa que:
+
+- **um APK novo é obrigatório**;
+- instalações na build anterior **param de receber EAS Update** até instalarem a
+  nova.
+
+Foi o único custo de build de toda a refatoração — o resto (paleta, tipografia,
+movimento, prancha, teclado, propagação de carga) sai por OTA.
 
 ## O que foi recusado, e por quê
 
-O visual anterior era preto `#09080C` com violeta `#A78BFA` e halo radial. Cada
-peça dele estava na lista de assinaturas de interface gerada:
-
 | recusado | motivo |
 |---|---|
-| violeta sobre quase-preto com brilho | é literalmente a impressão digital mais comum de design gerado por IA; `#A78BFA` é o `violet-400` do Tailwind |
-| Inter | tipografia padrão de software gerado |
-| Ionicons + `sparkles` para "modelos" | conjunto padrão, metáfora clichê |
-| cartão com borda e canto de 22px como estrutura da página | o recipiente preguiçoso |
-| tudo centralizado | simetria total, nenhuma tensão |
-| marca dentro de círculo tingido | o componente mais gerado que existe |
-| anel de progresso e halo radial | anel fingindo ser conteúdo, halo fingindo ser profundidade |
-| um `FadeInDown` idêntico em toda seção | efeito espalhado no lugar de um momento |
-| degradê na barra da semana corrente | decoração sem função |
-| borda tracejada em estado vazio | o vazio genérico |
-| interruptor sol/lua para o tema | o par de ícones mais gerado que existe — e um interruptor de duas posições não sabe dizer "siga o sistema" |
-
-O tema escuro **não** voltou ao preto-com-neon: a ardósia é o oposto deliberado
-daquilo, e o giz azul é claro justamente para não virar acento neon sobre preto.
+| roxo lavanda sobre quase-preto com brilho | a assinatura mais reconhecível de interface gerada por IA; `#A78BFA` sobre `#09080C` já tinha sido recusado neste projeto uma vez |
+| fundo escuro com viés de matiz | faz a rampa térmica ser lida contra uma cor em vez do vazio |
+| dez cores pastel identificando técnicas de série | destruiria a regra das duas cores; sigla resolve |
+| `TextInput` na célula da tabela | teclado do sistema tapa a linha que se está editando |
+| mola em movimento de interface | instrumento não tem elasticidade; mola fica para o que comemora |
+| `.glb` de anatomia | megabytes no APK e uma correção de anatomia vira sessão de Blender |
+| giro automático permanente no 3D | 60 quadros por segundo com o usuário parado, olhando |
 
 ## Verificação
 
-O alvo é Android. O `expo export --platform web` serve só como banco de provas
+O alvo é Android. `expo export --platform web` serve só como banco de provas
 visual, e tem três armadilhas registradas:
 
 1. O bundle web do SDK 54 emite `import.meta` sem transformar (vem do middleware
-   `devtools` do zustand, que acompanha o `persist`). Corrige-se servindo o script
-   como `type="module"`. Nativo não é afetado.
+   `devtools` do zustand, que acompanha o `persist`). Corrige-se servindo o
+   script como `type="module"`. Nativo não é afetado.
 2. O headless do Edge **não abre janela menor que ~492px**. Sem travar
    `html/body/#root` em 412px por CSS, toda captura "de celular" mente.
 3. Uma tela em branco no web export raramente é falta de conteúdo — é a árvore
    caindo. Vale capturar `window.onerror` em fase de captura antes de investigar
-   qualquer outra coisa, e comparar com um build do commit anterior para saber se
-   a regressão é sua.
+   qualquer outra coisa.
+
+O modelo 3D **não** aparece no banco de provas web: `expo-gl` é nativo. Ele só
+pode ser verificado em aparelho.

@@ -155,11 +155,11 @@ function CorpoMenu({ config, fechar }: { config: ConfigMenu; fechar: () => void 
                   <Glifo
                     nome={o.glifo}
                     tamanho={17}
-                    cor={o.destrutiva ? c.vermelho : c.tintaMid}
+                    cor={o.destrutiva ? c.rec : c.tintaMid}
                   />
                 ) : null}
               </View>
-              <Tx v="bodyMed" cor={o.destrutiva ? c.vermelho : c.tinta}>
+              <Tx v="bodyMed" cor={o.destrutiva ? c.rec : c.tinta}>
                 {o.texto}
               </Tx>
             </Pressavel>
@@ -263,7 +263,7 @@ const usarEstilos = criarEstilos((c) => ({
   opcaoGlifo: { width: 20, alignItems: 'center' },
   campo: {
     ...type.body,
-    color: c.azul,
+    color: c.acento,
     height: 50,
     backgroundColor: c.fundo,
     borderWidth: traco.normal,

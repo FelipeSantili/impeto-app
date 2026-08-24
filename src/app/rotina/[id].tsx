@@ -117,7 +117,7 @@ export default function EditorRotina() {
         {existente ? (
           <BotaoGlifo
             glifo="lixo"
-            cor={c.vermelho}
+            cor={c.rec}
             acessivel="Apagar rotina"
             onPress={() =>
               abrirConfirmacao({

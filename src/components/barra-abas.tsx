@@ -39,23 +39,23 @@ export function Doca({
           onPress={() => router.push('/treino')}
           style={estilos.retomar}
           escala={1}
-          fundo={c.azul}
-          fundoPressionado="#1B2B73"
+          fundo={c.acento}
+          fundoPressionado={c.acentoPress}
           accessibilityRole="button"
           accessibilityLabel={`Retomar treino ${ativa.nome}`}
         >
-          <Tx v="smallMed" cor={c.azulTexto} style={{ flex: 1 }} numberOfLines={1}>
+          <Tx v="smallMed" cor={c.acentoTexto} style={{ flex: 1 }} numberOfLines={1}>
             {ativa.nome}
           </Tx>
           <Text
             style={[
               typeScale.carimbo,
-              { color: c.azulTexto, fontSize: 11, textTransform: 'uppercase' },
+              { color: c.acentoTexto, fontSize: 11, textTransform: 'uppercase' },
             ]}
           >
             Retomar
           </Text>
-          <Glifo nome="avancar" tamanho={13} cor={c.azulTexto} />
+          <Glifo nome="avancar" tamanho={13} cor={c.acentoTexto} />
         </Pressavel>
       ) : null}
 
@@ -143,8 +143,8 @@ const usarEstilos = criarEstilos((c) => ({
     gap: sp.sm,
     height: 44,
     paddingHorizontal: margem.pagina,
-    backgroundColor: c.azul,
+    backgroundColor: c.acento,
     borderTopWidth: traco.normal,
-    borderTopColor: c.azul,
+    borderTopColor: c.acento,
   },
 }));
