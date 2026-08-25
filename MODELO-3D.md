@@ -39,30 +39,40 @@ e nunca é pintado. Os treze são os mesmos de `Grupo` em
 [src/data/types.ts](src/data/types.ts) — se um grupo nascer lá, precisa nascer
 aqui.
 
-### O modo cru — `corpo-completo.glb`
+### Por que o modelo cru foi recusado
 
-Existe um segundo caminho, ligado pela constante `MODELO_CRU` em
-[src/components/corpo-3d.tsx](src/components/corpo-3d.tsx): o export do Blender
-**sem passar pelo destilador**, com esqueleto e musculatura completos. Ele existe
-porque a decimação por grade abre buracos e farpas no meio do corpo, e nenhuma
-cor conserta geometria rasgada.
+Houve uma tentativa de embarcar `corpo-completo.glb` — o export do Blender com
+esqueleto e musculatura completos, sem passar pelo destilador. O motivo era bom: a
+decimação por grade abre buracos e farpas no meio do corpo, e cor nenhuma conserta
+geometria rasgada. Foi ao aparelho, em APK, e foi recusada por duas razões que
+valem ficar escritas.
 
-Aí os nomes são os do Z-Anatomy, em latim anatômico, e a classificação é feita em
-tempo de execução por `grupoAnatomico` — as **mesmas regras** de
-[ferramentas/destilar-modelo.mjs](ferramentas/destilar-modelo.mjs), para que os
-dois arquivos pintem a mesma anatomia com a mesma cor. Medido no arquivo atual:
-685 malhas acendem nos treze grupos, 1.493 ficam escuras.
+**A primeira é estética, e é a que decidiu.** As farpas do destilado viraram
+característica: o corpo lascado tem cara própria, e o modelo íntegro, ao lado dele,
+ficou sem graça. É a razão que manda — o defeito virou assinatura.
 
-Os dois vocabulários **não se misturam**, e a função escolhe um pelo arquivo em
-vez de tentar adivinhar. O motivo é concreto: a regra do destilado olha a
-primeira palavra do nome, e "Posterior cricoarytenoid muscle" — que é garganta —
-começa com `posterior`, que aqui é posterior de coxa. Misturar acenderia o
-pescoço no dia de perna.
+**A segunda é técnica, e é instrutiva: o corpo cru não acende.** O arquivo traz o
+envelope de FÁSCIA completo, e fáscia envolve músculo por fora. São 76 peças e 281
+mil triângulos de envoltório, cobrindo exatamente as regiões que o app pinta:
 
-O que ele custa, também medido: 2.178 malhas em cena, 2,8 milhões de triângulos
-desenhados (os nós reaproveitam malhas espelhadas, então o desenho conta mais que
-o arquivo), 31,9 MB. São 2.178 chamadas de desenho por quadro contra catorze do
-destilado — é teste de geometria, não configuração para uso diário.
+| região | o que está por cima do músculo |
+|---|---|
+| Coxa | Fascia lata + trato iliotibial (48 mil triângulos cada lado, as maiores peças do arquivo) |
+| Perna | Fáscia crural |
+| Abdômen | Fáscia abdominal de revestimento, fáscia transversal |
+| Braço · antebraço · ombro | Fáscia braquial, antebraquial, deltóidea |
+
+Fáscia não é músculo — "Deltoid fascia" não é o deltoide — então ela fica escura,
+como deve. Só que ela fica escura POR CIMA: os 685 grupos coloridos existiam,
+corretos, embaixo de uma lona cinza. O destilado acende porque o destilador descarta
+fáscia, e aí a superfície externa é o próprio músculo.
+
+Quem for tentar de novo tem duas saídas: descartar as peças de envoltório na carga
+(mesma regra `NAO_MUSCULO` do destilador, mas removendo em vez de só não pintar),
+ou pintar a fáscia com a cor do grupo que ela veste. E terá de resolver o custo:
+2.178 malhas em cena, 2,8 milhões de triângulos por quadro, 31,9 MB — contra
+catorze malhas e 57 mil do destilado. São 2.178 chamadas de desenho onde o telefone
+quer algumas centenas.
 
 ### Geometria
 
