@@ -14,10 +14,17 @@ import type { Grupo } from '@/data/types';
 import { usarPaleta } from '@/design/tema';
 import { curva, dur } from '@/design/movimento';
 import { corDeCalor, sp } from '@/design/tokens';
-import type { MusculoTrabalhado } from '@/lib/metricas';
+import { intensidadePorGrupo, type MusculoTrabalhado } from '@/lib/metricas';
 
 /**
  * PRANCHA ANATÔMICA
+ *
+ * Sobrou para UM lugar: o cartão de compartilhar, que vira imagem. O relatório
+ * e o cabeçalho do treino passaram a mostrar o corpo em três dimensões — um
+ * corpo que gira mostra os dois lados e o volume, que é o que duas figuras
+ * chapadas nunca deram. O cartão não pode segui-los porque é capturado como
+ * bitmap, e capturar conteúdo de GL é uma corrida que ninguém precisa correr
+ * para gerar uma imagem estática.
  *
  * Não é uma silhueta com manchas por cima: os músculos SÃO o corpo. O que não
  * foi trabalhado fica no tom da prancha, contornado — de modo que a figura já
@@ -450,48 +457,6 @@ function Figura({
   );
 }
 
-/**
- * A prancha como MOSTRADOR, para o cabeçalho do treino em andamento.
- *
- * Frente e costas lado a lado em tamanho de instrumento. Nesta escala nenhum
- * músculo é identificável — e não precisa ser: aqui ela responde "onde o treino
- * de hoje está pegando" de relance, entre uma série e outra. Quem quer
- * identificar toca e abre o modelo em três dimensões.
- *
- * As costas entram junto de propósito. Metade do treino de qualquer pessoa é
- * dorsal, glúteo e posterior; um mostrador só de frente mentiria por omissão
- * justamente nos dias de puxada e perna.
- */
-export function PranchaMini({
-  musculos,
-  largura = 34,
-  sessaoId,
-}: {
-  musculos: MusculoTrabalhado[];
-  largura?: number;
-  sessaoId?: string;
-}) {
-  const intensidade = new Map<Grupo, number>();
-  for (const m of musculos) {
-    if (m.grupo === 'corpo' || m.grupo === 'cardio') continue;
-    intensidade.set(m.grupo, m.fracao);
-  }
-
-  return (
-    <Pressavel
-      onPress={() => router.push(sessaoId ? `/corpo?sessao=${sessaoId}` : '/corpo')}
-      escala={0.94}
-      hitSlop={10}
-      accessibilityRole="button"
-      accessibilityLabel="Abrir o modelo em três dimensões dos músculos trabalhados"
-      style={estilos.mini}
-    >
-      <Figura vista="frente" intensidade={intensidade} atraso={0} largura={largura} rotulo={false} />
-      <Figura vista="costas" intensidade={intensidade} atraso={0} largura={largura} rotulo={false} />
-    </Pressavel>
-  );
-}
-
 export function MapaMuscular({
   musculos,
   atraso = 0,
@@ -508,13 +473,7 @@ export function MapaMuscular({
   sessaoId?: string;
 }) {
   const c = usarPaleta();
-
-  const intensidade = new Map<Grupo, number>();
-  for (const m of musculos) {
-    // 'corpo' e 'cardio' não têm região própria; pintá-los seria inventar dado.
-    if (m.grupo === 'corpo' || m.grupo === 'cardio') continue;
-    intensidade.set(m.grupo, m.fracao);
-  }
+  const intensidade = intensidadePorGrupo(musculos);
 
   const prancha = (
     <View style={estilos.raiz}>
@@ -544,5 +503,4 @@ export function MapaMuscular({
 const estilos = StyleSheet.create({
   raiz: { flexDirection: 'row', justifyContent: 'center', gap: sp.h1 },
   toque: { paddingVertical: sp.sm },
-  mini: { flexDirection: 'row', gap: sp.xs, alignItems: 'flex-end' },
 });

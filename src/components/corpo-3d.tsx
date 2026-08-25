@@ -1,12 +1,20 @@
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
-import { useCallback, useEffect, useRef } from 'react';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
+import { Pressavel, Rotulo } from '@/components/base';
 import type { Grupo } from '@/data/types';
+import { usarPaleta } from '@/design/tema';
 import type { Paleta } from '@/design/tokens';
-import { nivelDeCalor } from '@/design/tokens';
+import { nivelDeCalor, sp } from '@/design/tokens';
 import { carregarGLB } from '@/lib/gltf';
+import {
+  chaveDaIntensidade,
+  intensidadePorGrupo,
+  type MusculoTrabalhado,
+} from '@/lib/metricas';
 
 /**
  * MODELO ANATÔMICO EM TRÊS DIMENSÕES
@@ -356,6 +364,30 @@ async function carregarAnatomia(): Promise<THREE.Object3D | null> {
   }
 }
 
+/**
+ * A anatomia lida do disco uma vez só, por toda a vida do app.
+ *
+ * Agora há mais de um corpo em cena ao mesmo tempo — o do cabeçalho do treino,
+ * o do relatório, o do modal — e cada contexto GL precisa da sua própria árvore
+ * de objetos. O que ele NÃO precisa é do arquivo de novo: ler 637 KB e
+ * reconstruir 43 mil triângulos custa tempo visível, e custava uma vez por tela.
+ *
+ * `clone()` copia o grafo mas COMPARTILHA a `BufferGeometry`, então o preço de
+ * um corpo a mais é um punhado de objetos, não uma cópia da malha. Os materiais
+ * são trocados no clone logo adiante, e é por isso que o original nunca é
+ * tocado — quem clonar depois recebe o arquivo como ele veio.
+ *
+ * Guarda-se a PROMESSA, não o resultado: duas telas montando ao mesmo tempo
+ * esperam a mesma leitura em vez de dispararem duas.
+ */
+let anatomiaLida: Promise<THREE.Object3D | null> | null = null;
+
+async function anatomiaClonada(): Promise<THREE.Object3D | null> {
+  anatomiaLida ??= carregarAnatomia();
+  const base = await anatomiaLida;
+  return base ? base.clone(true) : null;
+}
+
 /** Nome da malha → grupo. Sufixo depois de `.` ou `_` é ignorado. */
 function grupoDaMalha(nome: string): Grupo | null {
   const chave = nome.toLowerCase().split(/[._\s-]/)[0];
@@ -392,6 +424,21 @@ const NOME_ANATOMICO: Record<Grupo, string> = {
   cardio: 'Cardio',
 };
 
+/** Ângulo em que a figura começa: de frente seria um desenho, não um corpo. */
+const GIRO_INICIAL = 0.35;
+
+/**
+ * Quanto o giro de apresentação anda antes de parar, quando não há órbita.
+ *
+ * No modal ele roda até o primeiro toque, e isso está certo: quem abriu o modal
+ * está olhando para ele. Embutido não existe toque que o interrompa — o toque
+ * abre o modal — e um laço de sessenta quadros por segundo pendurado no
+ * cabeçalho de um treino de quarenta minutos é bateria queimada para dizer uma
+ * coisa que meia volta já disse. Trinta e cinco graus bastam para a silhueta
+ * mudar e a figura se declarar tridimensional.
+ */
+const GIRO_EMBUTIDO = 0.62;
+
 /** De onde veio a geometria que está em cena. */
 export type FonteDoModelo = 'anatomia' | 'reserva';
 
@@ -409,6 +456,18 @@ export interface CorpoProps {
   onFonte?: (fonte: FonteDoModelo) => void;
   /** Gira sozinho enquanto ninguém encosta. */
   girarSozinho?: boolean;
+  /**
+   * Órbita pelo dedo. Desligada no corpo embutido, que vive dentro de uma
+   * rolagem — um `Pan` ali engoliria o arrastar vertical da página.
+   */
+  orbitavel?: boolean;
+  /**
+   * Cor com que o palco é limpo. Precisa ser a cor de QUEM ESTÁ ATRÁS, não a do
+   * fundo da página: embutido no relatório o corpo mora num cartão `fundoAlto`,
+   * e limpar com `fundo` desenharia um retângulo mais escuro dentro do cartão.
+   * Ausente = o fundo da paleta, que é o certo em tela cheia.
+   */
+  fundo?: string;
 }
 
 export function Corpo3D({
@@ -417,6 +476,8 @@ export function Corpo3D({
   onTocar,
   onFonte,
   girarSozinho = true,
+  orbitavel = true,
+  fundo,
 }: CorpoProps) {
   const cena = useRef<{
     scene: THREE.Scene;
@@ -439,7 +500,7 @@ export function Corpo3D({
 
   // Estado da órbita fora do React: o laço de render lê isto 60 vezes por
   // segundo, e passar por estado faria uma re-renderização por quadro.
-  const orbita = useRef({ giroY: 0.35, giroX: 0, zoom: 1, tocando: false, mexeu: false });
+  const orbita = useRef({ giroY: GIRO_INICIAL, giroX: 0, zoom: 1, tocando: false, mexeu: false });
   const medida = useRef({ l: 0, a: 0 });
 
   // O laço de render não pode sobreviver à tela. Sem esta bandeira o
@@ -500,7 +561,7 @@ export function Corpo3D({
 
       const renderer = new THREE.WebGLRenderer({ canvas, context: gl as never, antialias: true });
       renderer.setSize(l, a);
-      renderer.setClearColor(paleta.fundo, 1);
+      renderer.setClearColor(fundo ?? paleta.fundo, 1);
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(32, l / a, 1, 1000);
@@ -509,29 +570,64 @@ export function Corpo3D({
       scene.add(pivo);
 
       /*
-       * Luz de estúdio de três pontos, não de app.
+       * Luz de estúdio de três pontos, não de app — e dentro de um ORÇAMENTO.
        *
-       * A ambiente é baixa de propósito: ambiente alta achata tudo, e era o que
-       * fazia os músculos parecerem adesivos colados no corpo. O volume vem da
-       * CHAVE alta à frente-direita, e a definição da borda vem da CONTRALUZ
-       * atrás — é ela que separa o contorno do fundo preto quando a figura gira
-       * de costas, que era o pior ângulo da versão anterior.
+       * A soma das luzes que batem numa superfície virada para a chave precisa
+       * ficar perto de 1. A versão anterior somava 2,2, e o resultado é o que
+       * qualquer render superexposto faz: o âmbar do degrau mais alto da rampa
+       * estourava em branco justo onde a luz é mais forte — ou seja, o músculo
+       * MAIS trabalhado era o único a perder a cor, que é exatamente o dado que
+       * a rampa existe para transmitir.
+       *
+       * O caminho óbvio para isso seria mapeamento de tons, e é o caminho errado
+       * aqui: ACES e companhia reescrevem matiz e luminância da imagem inteira,
+       * e a promessa deste arquivo é que âmbar aqui é o MESMO âmbar da prancha
+       * 2D e das barras de carga. Manter a luz no orçamento preserva a rampa;
+       * comprimir a imagem depois, não.
+       *
+       * A ambiente segue baixa de propósito: ambiente alta achata tudo, e era o
+       * que fazia os músculos parecerem adesivos colados no corpo.
        */
-      const hemi = new THREE.HemisphereLight(0xdfe6ea, 0x0a0b0c, 0.55);
+      // A cor de baixo é a do que está atrás da figura: é o chão devolvendo luz,
+      // e cravá-la em preto deixava o tema claro com um corpo sujo por baixo.
+      const hemi = new THREE.HemisphereLight(0xdfe6ea, new THREE.Color(fundo ?? paleta.fundo), 0.42);
       scene.add(hemi);
-      const chave = new THREE.DirectionalLight(0xfff4e2, 1.8);
+      const chave = new THREE.DirectionalLight(0xfff4e2, 0.86);
       chave.position.set(55, 90, 80);
       scene.add(chave);
-      const preenche = new THREE.DirectionalLight(0xcfe0ee, 0.45);
+      const preenche = new THREE.DirectionalLight(0xcfe0ee, 0.26);
       preenche.position.set(-70, 20, 55);
       scene.add(preenche);
-      const contra = new THREE.DirectionalLight(0xffffff, 1.1);
+      // A contraluz é a que menos soma com a chave — pega o corpo de raspão, do
+      // outro lado — então pode ser generosa. É ela que desenha o contorno.
+      const contra = new THREE.DirectionalLight(0xffffff, 0.9);
       contra.position.set(-30, 60, -110);
       scene.add(contra);
 
+      /*
+       * O corpo precisa de mais separação aqui do que na prancha 2D.
+       *
+       * A prancha desenha a silhueta com PREENCHIMENTO (`silhueta`) mais TRAÇO
+       * (`silhuetaTraco`), e quem a descola do fundo é o traço — os dois tokens
+       * ficam a menos de um degrau de luminância do fundo de propósito. Em três
+       * dimensões não há traço: sobra o preenchimento, e `silhueta` sobre
+       * `fundo` dá 1,1:1. É o corpo sumindo no vazio, e era metade do "está
+       * estranho" que sobrava mesmo depois de a malha certa aparecer.
+       *
+       * Em vez de inventar uma cor fora da paleta, empurra-se `silhueta` na
+       * direção de `tinta` — o extremo oposto do fundo, na mesma paleta. No
+       * tema escuro isso clareia, no claro escurece, e nos dois o corpo ganha
+       * volume sem sair do vocabulário.
+       *
+       * A rugosidade cai junto: preto fosco não reflete nada e continua um
+       * buraco por mais luz que se jogue em cima. Com algum brilho especular —
+       * que NÃO é multiplicado pelo albedo — a contraluz consegue desenhar a
+       * borda, que é o trabalho que o traço fazia na prancha.
+       */
+      const corDoCorpo = new THREE.Color(paleta.silhueta).lerp(new THREE.Color(paleta.tinta), 0.16);
       const matBase = new THREE.MeshStandardMaterial({
-        color: paleta.silhueta,
-        roughness: 0.95,
+        color: corDoCorpo,
+        roughness: 0.62,
         metalness: 0,
         flatShading: false,
       });
@@ -552,7 +648,7 @@ export function Corpo3D({
         });
       };
 
-      const anatomia = await carregarAnatomia();
+      const anatomia = await anatomiaClonada();
 
       if (anatomia) {
         // Anatomia real: cada malha do arquivo já é um grupo, e o que não casa
@@ -640,11 +736,42 @@ export function Corpo3D({
       camera.position.set(0, 0, dist);
       camera.lookAt(0, 0, 0);
 
+      /*
+       * PLANOS DE RECORTE COLADOS NO CORPO — e refeitos a cada quadro.
+       *
+       * Esta é a correção da casca estilhaçada que cobria a figura inteira, e
+       * ela não tem nada a ver com a malha nem com o material.
+       *
+       * O expo-gl pede `EGL_DEPTH_SIZE 16` no Android — dezesseis bits, cravado
+       * em GLContext.java, sem opção de configurar. A resolução do buffer de
+       * profundidade à distância z é
+       *
+       *     Δz = z² · (far − near) / (2¹⁶ · far · near)
+       *
+       * e com os `near = 1` / `far = 1000` que estavam aqui, a 335 de
+       * distância, isso dá 1,7 unidade: dezessete MILÍMETROS num corpo de
+       * 175 cm. Músculo e osso estão a MUITO menos que isso um do outro — o
+       * teste de profundidade empata em toda superfície sobreposta e o GPU
+       * decide o vencedor pixel a pixel. Daí o mosaico.
+       *
+       * Colados no corpo, os mesmos dezesseis bits dão 0,03 mm: quinhentas
+       * vezes melhor, de graça, mudando dois números.
+       *
+       * Refeitos a cada quadro porque o pinçar aproxima a câmera — planos
+       * calculados uma vez só recortariam o corpo ao ampliar. O piso de
+       * `d · 0,02` existe para o near nunca chegar a zero, que é onde a
+       * projeção perspectiva explode.
+       */
+      const raio = tam.length() / 2;
       const render = () => {
         const o = orbita.current;
         suporte.rotation.y = o.giroY;
         suporte.rotation.x = o.giroX;
-        camera.position.z = dist / o.zoom;
+        const d = dist / o.zoom;
+        camera.position.z = d;
+        camera.near = Math.max(d - raio, d * 0.02);
+        camera.far = d + raio;
+        camera.updateProjectionMatrix();
         camera.lookAt(0, 0, 0);
         renderer.render(scene, camera);
         gl.endFrameEXP();
@@ -661,7 +788,8 @@ export function Corpo3D({
       const laco = () => {
         if (!vivo.current) return;
         const o = orbita.current;
-        const apresentando = girarSozinho && !o.mexeu;
+        const apresentando =
+          girarSozinho && !o.mexeu && (orbitavel || o.giroY < GIRO_INICIAL + GIRO_EMBUTIDO);
         if (apresentando) o.giroY += 0.0035;
         render();
         if (apresentando || o.tocando) requestAnimationFrame(laco);
@@ -669,7 +797,7 @@ export function Corpo3D({
       };
       laco();
     },
-    [paleta, intensidade, girarSozinho],
+    [paleta, intensidade, girarSozinho, orbitavel, fundo],
   );
 
   /** Religa o laço quando o dedo encosta depois de a cena ter parado. */
@@ -751,11 +879,72 @@ export function Corpo3D({
 
   const gestos = Gesture.Simultaneous(arrastar, pincar, tocar);
 
+  const palco = (
+    <View style={{ flex: 1 }} onLayout={aoMedir} collapsable={false}>
+      <GLView style={{ flex: 1 }} onContextCreate={aoCriarContexto} />
+    </View>
+  );
+
+  // Sem órbita, nada de GestureDetector: embutido o corpo vive DENTRO de uma
+  // rolagem, e um `Pan` ali engole o arrastar vertical da página inteira. Quem
+  // quer girar abre o modal, que é onde girar é a única coisa a fazer.
+  return orbitavel ? <GestureDetector gesture={gestos}>{palco}</GestureDetector> : palco;
+}
+
+/**
+ * O corpo EMBUTIDO: o mesmo modelo como mostrador dentro de outra tela.
+ *
+ * Dá meia volta para dizer que é tridimensional, para, e abre o modal no toque.
+ * É a mesma peça do relatório e do cabeçalho do treino — muda só a altura.
+ */
+export function CorpoEmbutido({
+  musculos,
+  sessaoId,
+  altura,
+  largura,
+  fundo,
+  dica,
+  rotulo = 'Abrir o modelo em três dimensões dos músculos trabalhados',
+}: {
+  musculos: MusculoTrabalhado[];
+  /** Qual sessão o modal deve mostrar. Ausente = a que está em curso. */
+  sessaoId?: string;
+  altura: number;
+  /** Ausente = ocupa a largura que o pai der. */
+  largura?: number;
+  /** A cor de quem está atrás. Ver `CorpoProps.fundo`. */
+  fundo?: string;
+  /** Texto de affordance sob a figura. Ausente = nenhum. */
+  dica?: string;
+  rotulo?: string;
+}) {
+  const c = usarPaleta();
+
+  // Memoizado pelo CONTEÚDO, não pela identidade do array. O cabeçalho do
+  // treino se redesenha a cada segundo por causa do cronômetro, e
+  // `musculosDaSessao` devolve um array novo em cada um: comparar por
+  // identidade repintaria o modelo sessenta vezes por minuto sem nenhuma cor
+  // ter mudado.
+  const chave = chaveDaIntensidade(musculos);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const intensidade = useMemo(() => intensidadePorGrupo(musculos), [chave]);
+
   return (
-    <GestureDetector gesture={gestos}>
-      <View style={{ flex: 1 }} onLayout={aoMedir} collapsable={false}>
-        <GLView style={{ flex: 1 }} onContextCreate={aoCriarContexto} />
+    <Pressavel
+      onPress={() => router.push(sessaoId ? `/corpo?sessao=${sessaoId}` : '/corpo')}
+      escala={0.985}
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      style={largura === undefined ? undefined : { width: largura }}
+    >
+      <View style={{ height: altura }}>
+        <Corpo3D intensidade={intensidade} paleta={c} orbitavel={false} fundo={fundo} />
       </View>
-    </GestureDetector>
+      {dica ? (
+        <Rotulo cor={c.acento} style={{ marginTop: sp.md, textAlign: 'center' }}>
+          {dica}
+        </Rotulo>
+      ) : null}
+    </Pressavel>
   );
 }

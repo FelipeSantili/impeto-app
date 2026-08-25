@@ -191,6 +191,39 @@ export function musculosDaSessao(s: Sessao): MusculoTrabalhado[] {
     .sort((a, b) => b.series - a.series);
 }
 
+/**
+ * O mesmo esforço na forma que os desenhos pedem: grupo → fração, 0..1.
+ *
+ * `corpo` e `cardio` ficam de fora. Nenhum dos dois tem região no corpo — um é
+ * o esqueleto, o outro é o coração acelerado — e pintar uma região para eles
+ * seria inventar dado num desenho cujo trabalho é justamente não inventar.
+ *
+ * Existe aqui, e não em cada tela, porque a prancha 2D, a prancha mini, o
+ * modelo 3D e o cartão de compartilhar faziam esta mesma conversão cada um por
+ * conta — quatro cópias do mesmo laço, e quatro lugares para esquecer o filtro.
+ */
+export function intensidadePorGrupo(musculos: MusculoTrabalhado[]): Map<Grupo, number> {
+  const m = new Map<Grupo, number>();
+  for (const x of musculos) {
+    if (x.grupo === 'corpo' || x.grupo === 'cardio') continue;
+    m.set(x.grupo, x.fracao);
+  }
+  return m;
+}
+
+/**
+ * Chave estável do conteúdo de uma intensidade.
+ *
+ * O cabeçalho do treino se redesenha a cada segundo por causa do cronômetro, e
+ * `musculosDaSessao` devolve um array novo em cada um deles. Comparar por
+ * identidade faria o modelo 3D repintar sessenta vezes por minuto sem nenhuma
+ * cor ter mudado; comparar por esta chave faz ele repintar quando o esforço
+ * muda, que é uma vez por série marcada.
+ */
+export function chaveDaIntensidade(musculos: MusculoTrabalhado[]): string {
+  return musculos.map((m) => `${m.grupo}:${m.fracao.toFixed(4)}`).join('|');
+}
+
 export type TipoRecorde = 'carga' | 'forca';
 
 export interface Recorde {

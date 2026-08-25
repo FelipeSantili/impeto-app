@@ -26,10 +26,10 @@ import {
   Tx,
   Vazio,
 } from '@/components/base';
+import { CorpoEmbutido } from '@/components/corpo-3d';
 import { TiraDescanso } from '@/components/descanso';
 import { abrirConfirmacao, abrirMenu, abrirPrompt } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
-import { PranchaMini } from '@/components/mapa-muscular';
 import { BlocoExercicio } from '@/components/treino-exercicio';
 import { criarEstilos, usarPaleta } from '@/design/tema';
 import { curva } from '@/design/movimento';
@@ -244,12 +244,17 @@ export default function TreinoAtivo() {
 
       {/*
         Painel de leitura: o corpo à esquerda como mostrador, os totais em
-        coluna à direita. A prancha esquenta série a série e abre o modelo 3D
-        no toque — é o instrumento dizendo ONDE o treino está pegando enquanto
-        os números dizem QUANTO.
+        coluna à direita. O corpo esquenta série a série e abre o modal no
+        toque — é o instrumento dizendo ONDE o treino está pegando enquanto os
+        números dizem QUANTO.
+
+        Uma figura só onde antes havia duas: a prancha precisava de frente E
+        costas porque é chapada, e o modelo mostra os dois lados sozinho. Ele
+        dá um terço de volta ao montar e para — a órbita fica no modal, que é
+        onde há espaço para ela.
       */}
       <View style={estilos.painel}>
-        <PranchaMini musculos={musculos} largura={30} />
+        <CorpoEmbutido musculos={musculos} largura={48} altura={80} />
 
         <View style={{ flex: 1 }}>
           <View style={estilos.colunas}>

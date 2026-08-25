@@ -8,7 +8,7 @@ import { Corpo3D, type FonteDoModelo } from '@/components/corpo-3d';
 import { GRUPO_LABEL, type Grupo } from '@/data/types';
 import { criarEstilos, usarPaleta } from '@/design/tema';
 import { margem, nivelDeCalor, radius, sp, traco } from '@/design/tokens';
-import { musculosDaSessao } from '@/lib/metricas';
+import { intensidadePorGrupo, musculosDaSessao } from '@/lib/metricas';
 import { useTreino } from '@/store/treino';
 
 /**
@@ -42,15 +42,7 @@ export default function TelaCorpo() {
     return alvo ? musculosDaSessao(alvo) : [];
   }, [idSessao, historico, ativa]);
 
-  const intensidade = useMemo(() => {
-    const m = new Map<Grupo, number>();
-    for (const x of musculos) {
-      // 'corpo' e 'cardio' não têm região no modelo; pintá-los seria inventar.
-      if (x.grupo === 'corpo' || x.grupo === 'cardio') continue;
-      m.set(x.grupo, x.fracao);
-    }
-    return m;
-  }, [musculos]);
+  const intensidade = useMemo(() => intensidadePorGrupo(musculos), [musculos]);
 
   const listados = musculos.filter((m) => m.grupo !== 'corpo' && m.grupo !== 'cardio');
 

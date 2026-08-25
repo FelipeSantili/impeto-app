@@ -17,11 +17,11 @@ import {
   Vazio,
 } from '@/components/base';
 import { CartaoCompartilhar } from '@/components/cartao-compartilhar';
+import { CorpoEmbutido } from '@/components/corpo-3d';
 import { CurvaFc } from '@/components/curva-fc';
 import { Miniatura } from '@/components/demo';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
-import { MapaMuscular } from '@/components/mapa-muscular';
 import { POR_ID } from '@/data/exercicios';
 import { tecnicaDe } from '@/data/tecnicas';
 import { GRUPO_LABEL, MEDIDA_LABEL } from '@/data/types';
@@ -382,10 +382,22 @@ export default function RelatorioSessao() {
             titulo="Músculos trabalhados"
             direita={<Rotulo cor={c.tintaFraca}>Séries efetivas</Rotulo>}
           >
-            {/* A prancha primeiro: dá a leitura imediata de onde o treino pegou. */}
-            <View style={estilos.prancha}>
-              <MapaMuscular musculos={musculos} atraso={t(1000)} largura={100} sessaoId={sessao.id} />
-            </View>
+            {/*
+              O corpo primeiro: dá a leitura imediata de ONDE o treino pegou,
+              antes de qualquer número. Era a prancha 2D — duas figuras chapadas,
+              frente e costas, porque desenho plano não mostra os dois lados. Um
+              corpo que gira não precisa das duas: mostra os dois lados e mais o
+              volume, que é justamente o que separa dorsal de redondo maior.
+            */}
+            <Entrada atraso={t(1000)} style={estilos.prancha}>
+              <CorpoEmbutido
+                musculos={musculos}
+                sessaoId={sessao.id}
+                altura={280}
+                fundo={c.fundoAlto}
+                dica="Toque para girar em 3D"
+              />
+            </Entrada>
             <Regua />
 
             <View style={estilos.blocoMusculos}>

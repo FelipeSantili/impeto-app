@@ -163,6 +163,56 @@ componente registra no log e avisa a tela por `onFonte`, e a tela diz que está
 exibindo o esquema. Um `catch {}` vazio esconde exatamente a classe de falha
 mais difícil de achar — a que deixa tudo com cara de estar funcionando.
 
+### A armadilha do buffer de profundidade — 16 bits, e cravados
+
+O `expo-gl` pede `EGL_DEPTH_SIZE, 16` ao criar o contexto no Android. Está
+escrito em `GLContext.java`, não é configurável, e é a diferença entre um render
+limpo e uma casca estilhaçada cobrindo a figura inteira.
+
+A resolução de um buffer de profundidade à distância `z` é
+
+```
+Δz = z² · (far − near) / (2^bits · far · near)
+```
+
+Com os `near = 1` / `far = 1000` que qualquer exemplo de three sugere, e a
+câmera a 335 unidades do corpo, isso dá **1,7 unidade — dezessete milímetros**
+num corpo de 175 cm. Músculo e osso estão a muito menos que isso um do outro: o
+teste de profundidade empata em toda superfície sobreposta, e o GPU escolhe o
+vencedor pixel a pixel. O resultado parece defeito de malha, e não é.
+
+A correção não envolve geometria nem material — só dois números. Colando os
+planos no corpo (`near = d − raio`, `far = d + raio`, com `d` a distância da
+câmera), os mesmos dezesseis bits dão **0,03 mm**: quinhentas vezes melhor.
+
+Duas consequências que valem lembrar:
+
+- os planos são recalculados **a cada quadro**, porque o pinçar aproxima a
+  câmera — calculados uma vez só, recortariam o corpo ao ampliar;
+- nada disso aparece no desktop. Um navegador dá 24 bits de profundidade, onde
+  o mesmo `near = 1` já resolveria 0,07 mm. O bug só existe no aparelho, que é
+  o pior lugar para descobri-lo.
+
+### O orçamento de luz
+
+A soma das luzes que batem numa superfície virada para a chave fica perto de 1,
+de propósito. Superexpor estoura o âmbar do topo da rampa em branco — ou seja, o
+músculo MAIS trabalhado é o único a perder a cor, que é exatamente o dado que a
+rampa existe para transmitir.
+
+O caminho óbvio para isso seria mapeamento de tons, e é o caminho errado aqui:
+ACES e companhia reescrevem matiz e luminância da imagem inteira, e a promessa
+do modelo é que âmbar aqui é o MESMO âmbar da prancha 2D e das barras de carga.
+Manter a luz no orçamento preserva a rampa; comprimir a imagem depois, não.
+
+Pela mesma razão o corpo não usa `silhueta` cru. Na prancha 2D quem descola a
+silhueta do fundo é o TRAÇO, e em três dimensões não há traço: `silhueta` sobre
+`fundo` dá 1,1:1 de contraste. A cor do corpo é `silhueta` empurrada 16% na
+direção de `tinta` — o extremo oposto do fundo, na mesma paleta —, e a
+rugosidade cai para 0,62 para que a contraluz consiga desenhar a borda. Brilho
+especular não é multiplicado pelo albedo, e é por isso que preto fosco continua
+um buraco por mais luz que se jogue nele.
+
 ### Sobre os bytes
 
 `File.bytes()` devolve um `Uint8Array` direto, sem passar por base64 — o que
@@ -182,3 +232,29 @@ que entrou em cena. É o que faz o mesmo código enquadrar o `.glb` e o esquema 
 reserva, que têm proporções diferentes — e o que faz um `.glb` regerado com
 outro recorte continuar cabendo no quadro sem ninguém reajustar constante
 nenhuma.
+
+## Onde o corpo aparece
+
+Em três lugares, todos a mesma peça:
+
+| lugar | tamanho | comportamento |
+|---|---|---|
+| `/corpo` (modal) | tela cheia | órbita, pinça, toque identifica o músculo |
+| relatório da sessão | 280 pt | um terço de volta e para; toque abre o modal |
+| cabeçalho do treino | 48 × 80 pt | idem, e esquenta a cada série marcada |
+
+Os dois embutidos não têm órbita de propósito: vivem dentro de rolagem, e um
+`Pan` ali engoliria o arrastar vertical da página. Também não giram para sempre
+— sem toque que os interrompa, um laço de sessenta quadros por segundo num
+cabeçalho que vive quarenta minutos é bateria queimada para dizer o que meia
+volta já disse.
+
+O arquivo é lido do disco **uma vez por sessão do app**. Cada contexto GL precisa
+da sua árvore de objetos, mas não do arquivo de novo: `clone()` compartilha a
+`BufferGeometry`, então o segundo e o terceiro corpo custam um punhado de
+objetos em vez de 43 mil triângulos reconstruídos.
+
+O **cartão de compartilhar** continua com a prancha 2D, e vai continuar: ele é
+capturado como bitmap, e capturar conteúdo de GL é uma corrida entre o carregar
+do modelo e o disparo da captura que ninguém precisa correr para gerar uma
+imagem estática.

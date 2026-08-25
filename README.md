@@ -287,7 +287,8 @@ src/
                   cabeça de coluna, carimbo, pressionável
     glifos.tsx    as 26 marcas desenhadas do app (não há biblioteca de ícones)
     demo · folha · descanso · animado · mapa-muscular · cartao-compartilhar
-    corpo-3d.tsx  o modelo anatômico do Z-Anatomy; receita em MODELO-3D.md
+    corpo-3d.tsx  o modelo anatômico do Z-Anatomy, em tela cheia e embutido
+                  no relatório e no treino; receita em MODELO-3D.md
     curva-fc.tsx  a curva de frequência do treino, quando a fonte manda amostras
   data/           catálogo, modelos prontos, tipos e execução por família de movimento
   design/
