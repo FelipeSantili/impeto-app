@@ -11,23 +11,35 @@ import { useSelecao } from '@/store/selecao';
 import { useTreino } from '@/store/treino';
 
 /**
- * Seletor múltiplo de exercícios.
+ * Seletor de exercícios.
  *
  * Sem `?destino`, adiciona ao treino em andamento. Com `?destino=rotina`,
  * devolve a seleção pela rota de edição de rotina.
+ *
+ * Com `?trocar`, a tela vira SUBSTITUIÇÃO: um toque só resolve, sem rodapé de
+ * confirmação, porque trocar é escolher um — e o valor de `trocar` diz quem
+ * sai (o `uid` da linha no treino, ou a posição na rotina em edição).
  */
 export default function Selecionar() {
   const c = usarPaleta();
   const estilos = usarEstilos();
   const insets = useSafeAreaInsets();
-  const { destino } = useLocalSearchParams<{ destino?: string }>();
+  const { destino, trocar } = useLocalSearchParams<{ destino?: string; trocar?: string }>();
   const addExercicios = useTreino((s) => s.addExercicios);
+  const substituirExercicio = useTreino((s) => s.substituirExercicio);
   const entregar = useSelecao((s) => s.entregar);
   const [marcados, setMarcados] = useState<string[]>([]);
 
+  const trocando = !!trocar;
   const conjunto = new Set(marcados);
 
   function alternar(id: string) {
+    if (trocando) {
+      if (destino === 'rotina') entregar([id], Number(trocar));
+      else substituirExercicio(trocar, id);
+      router.back();
+      return;
+    }
     setMarcados((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
   }
 
@@ -51,7 +63,7 @@ export default function Selecionar() {
                 <BotaoGlifo glifo="fechar" acessivel="Fechar" onPress={() => router.back()} />
               </View>
               <Tx v="title" style={{ flex: 1 }}>
-                Adicionar
+                {trocando ? 'Trocar' : 'Adicionar'}
               </Tx>
               {marcados.length > 0 ? (
                 <Rotulo cor={c.acento}>{marcados.length} marcados</Rotulo>

@@ -97,6 +97,7 @@ interface Estado {
   addExercicios: (exIds: string[]) => void;
   removerExercicio: (uid: string) => void;
   moverExercicio: (uid: string, dir: -1 | 1) => void;
+  substituirExercicio: (uid: string, novoExId: string) => void;
   setNota: (uid: string, nota: string) => void;
   setDescanso: (uid: string, seg: number) => void;
 
@@ -261,6 +262,55 @@ export const useTreino = create<Estado>()(
           if (i < 0 || j < 0 || j >= lista.length) return {};
           [lista[i], lista[j]] = [lista[j], lista[i]];
           return { ativa: { ...s.ativa, exercicios: lista } };
+        }),
+
+      /*
+       * Troca o exercício de uma linha do treino por outro — a variação que
+       * você escolheu porque a máquina estava ocupada.
+       *
+       * Viajam para o exercício novo as séries EM BRANCO: mesma quantidade,
+       * mesma técnica, valores zerados. Carga de outro exercício não vale aqui,
+       * e a coluna "anterior" passa a mostrar o histórico do exercício novo
+       * sozinha. A anotação também não viaja — "pino 4, banco na altura 3" era
+       * daquela máquina.
+       *
+       * Série já MARCADA não viaja de jeito nenhum: ela é registro do que foi
+       * feito, e trocar o nome em cima dela seria mentir no relatório. Quando
+       * existe alguma, a linha se parte em duas — o que foi feito continua no
+       * exercício antigo, o que falta segue no novo, logo abaixo.
+       */
+      substituirExercicio: (alvo, novoExId) =>
+        set((s) => {
+          if (!s.ativa || !POR_ID[novoExId]) return {};
+          const lista = s.ativa.exercicios;
+          const i = lista.findIndex((e) => e.uid === alvo);
+          if (i < 0 || lista[i].exId === novoExId) return {};
+
+          const atual = lista[i];
+          const feitas = atual.series.filter((x) => x.feita);
+          const pendentes = atual.series.filter((x) => !x.feita);
+          // Exercício todo concluído: o substituto entra com uma série em branco.
+          const molde = pendentes.length ? pendentes : [serieVazia()];
+          const series = molde.map((x) => serieVazia(x.tipo));
+
+          const exercicios = [...lista];
+          if (feitas.length === 0) {
+            exercicios[i] = {
+              uid: atual.uid,
+              exId: novoExId,
+              descanso: atual.descanso,
+              series,
+            };
+          } else {
+            exercicios[i] = { ...atual, series: feitas };
+            exercicios.splice(i + 1, 0, {
+              uid: uid(),
+              exId: novoExId,
+              descanso: atual.descanso,
+              series,
+            });
+          }
+          return { ativa: { ...s.ativa, exercicios } };
         }),
 
       setNota: (alvo, nota) => set((s) => mapAtiva(s, alvo, (e) => ({ ...e, nota }))),

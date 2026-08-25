@@ -14,6 +14,7 @@ import {
 } from '@/components/base';
 import { Demo } from '@/components/demo';
 import { Glifo } from '@/components/glifos';
+import { SecaoVariacoes } from '@/components/variacoes';
 import { POR_ID } from '@/data/exercicios';
 import { familias } from '@/data/familias';
 import { EQUIP_LABEL, GRUPO_LABEL, MEDIDA_LABEL } from '@/data/types';
@@ -33,7 +34,9 @@ import { useTreino } from '@/store/treino';
 export default function DetalheExercicio() {
   const c = usarPaleta();
   const estilos = usarEstilos();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `uid` chega quando a ficha foi aberta a partir de uma linha do treino: é o
+  // que diz QUAL linha uma troca de variação deve substituir.
+  const { id, uid } = useLocalSearchParams<{ id: string; uid?: string }>();
   const ex = POR_ID[id ?? ''];
   const historico = useTreino((s) => s.historico);
   const ativa = useTreino((s) => s.ativa);
@@ -122,6 +125,9 @@ export default function DetalheExercicio() {
           </View>
         </Secao>
       ) : null}
+
+      {/* O que serve no lugar disto — e o botão que faz a troca no treino. */}
+      <SecaoVariacoes ex={ex} uid={uid} />
 
       {/* Recordes: tabela, não grade de cartões. */}
       {rec.totalSeries > 0 ? (

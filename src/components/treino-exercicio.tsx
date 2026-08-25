@@ -7,6 +7,7 @@ import { CabecaColuna, Pressavel, Regua, Rotulo, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { Glifo } from '@/components/glifos';
 import { abrirMenu, type OpcaoMenu } from '@/components/folha';
+import { abrirTrocaExercicio } from '@/components/variacoes';
 import { POR_ID } from '@/data/exercicios';
 import { TECNICAS, tecnicaDe } from '@/data/tecnicas';
 import { MEDIDA_LABEL, type Medida } from '@/data/types';
@@ -54,6 +55,7 @@ function BlocoExercicioBase({
   const addSerie = useTreino((s) => s.addSerie);
   const removerExercicio = useTreino((s) => s.removerExercicio);
   const moverExercicio = useTreino((s) => s.moverExercicio);
+  const substituirExercicio = useTreino((s) => s.substituirExercicio);
   const setDescanso = useTreino((s) => s.setDescanso);
   const setNota = useTreino((s) => s.setNota);
 
@@ -63,9 +65,34 @@ function BlocoExercicioBase({
   // tinta na margem, a marca de "é aqui que você está".
   const indiceAtivo = item.series.findIndex((s) => !s.feita);
 
+  /**
+   * Troca este exercício por uma variação de mesma finalidade.
+   *
+   * O subtítulo diz de saída o que acontece com o que já está preenchido —
+   * substituição que apaga registro sem avisar é substituição que ninguém usa
+   * duas vezes.
+   */
+  function trocar() {
+    if (!ex) return;
+    const feitas = item.series.filter((s) => s.feita).length;
+    abrirTrocaExercicio({
+      ex,
+      subtitulo: feitas
+        ? `As séries em branco vão para o exercício novo. As ${feitas} já marcadas continuam registradas aqui.`
+        : 'Mesmo número de séries e mesmo descanso. A carga entra em branco.',
+      onEscolher: (novoId) => substituirExercicio(item.uid, novoId),
+      verTodos: () => router.push(`/selecionar?trocar=${item.uid}`),
+    });
+  }
+
   function menu() {
     const opcoes: OpcaoMenu[] = [
-      { texto: 'Ver demonstração', glifo: 'play', onPress: () => router.push(`/exercicio/${item.exId}`) },
+      {
+        texto: 'Ver demonstração',
+        glifo: 'play',
+        onPress: () => router.push(`/exercicio/${item.exId}?uid=${item.uid}`),
+      },
+      { texto: 'Trocar exercício', glifo: 'trocar', onPress: trocar },
       {
         texto: item.nota ? 'Editar anotação' : 'Adicionar anotação',
         glifo: 'lista',
@@ -101,7 +128,7 @@ function BlocoExercicioBase({
     <Animated.View layout={LinearTransition.springify().damping(18)} style={estilos.bloco}>
       <View style={estilos.cabecalho}>
         <Pressavel
-          onPress={() => router.push(`/exercicio/${item.exId}`)}
+          onPress={() => router.push(`/exercicio/${item.exId}?uid=${item.uid}`)}
           style={estilos.cabecalhoToque}
           escala={0.995}
         >

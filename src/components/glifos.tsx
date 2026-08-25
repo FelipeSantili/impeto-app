@@ -43,6 +43,7 @@ export type NomeGlifo =
   | 'bluetooth'
   | 'baixar'
   | 'subir'
+  | 'trocar'
   | 'halter';
 
 /** Traçados. Cada entrada é uma lista de `d` de `<Path>`. */
@@ -72,6 +73,8 @@ const TRACOS: Record<NomeGlifo, string[]> = {
   bluetooth: ['M7.5 7.5 L16.5 16.5 L12 20.5 V3.5 L16.5 7.5 L7.5 16.5'],
   baixar: ['M12 3.5 V16', 'M7.5 11.5 L12 16 L16.5 11.5', 'M4.5 20.5 H19.5'],
   subir: ['M12 16 V3.5', 'M7.5 8 L12 3.5 L16.5 8', 'M4.5 20.5 H19.5'],
+  // Duas vias em sentidos opostos: substituir, não repetir.
+  trocar: ['M3.5 8.5 H20.5', 'M17 5 L20.5 8.5 L17 12', 'M20.5 15.5 H3.5', 'M7 12 L3.5 15.5 L7 19'],
   halter: ['M3.5 9 V15', 'M7 6 V18', 'M17 6 V18', 'M20.5 9 V15', 'M7 12 H17'],
 };
 

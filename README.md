@@ -233,6 +233,16 @@ adutora/abdutora, panturrilheira, cardio) além de barra, halteres, cabos, kettl
 peso corporal. Cada um traz demonstração animada, execução passo a passo, o erro mais
 comum, seus recordes e o histórico.
 
+**Variações** — a ficha de cada exercício lista o que serve no lugar dele: primeiro
+quem compartilha a execução (supino reto com barra, halteres, máquina, Smith), depois
+quem serve à mesma finalidade por outro caminho (mergulho, flexão, supino inclinado).
+É a resposta à pergunta que se faz de pé, com a máquina ocupada. Com um treino aberto,
+cada variação vem com botão de **trocar**: a linha do treino passa a ser o exercício
+novo na hora, com o mesmo número de séries e o mesmo descanso. O mesmo botão está no
+menu (⋯) de cada exercício do treino e de cada linha do editor de rotina. Série já
+marcada nunca muda de nome — quando existe alguma, a linha se parte em duas e o que foi
+feito continua registrado no exercício antigo.
+
 **Técnicas de execução** — cada série pode ser marcada como normal, aquecimento, falha,
 drop set, rest-pause, bi-set, cluster, isometria, negativa ou parcial. Toque no número
 da série para escolher. Aquecimento é a única que não entra no volume.
@@ -285,12 +295,14 @@ src/
   components/
     base.tsx      vocabulário do caderno: texto, botões, régua, seção, linha,
                   cabeça de coluna, carimbo, pressionável
-    glifos.tsx    as 26 marcas desenhadas do app (não há biblioteca de ícones)
+    glifos.tsx    as 27 marcas desenhadas do app (não há biblioteca de ícones)
+    variacoes.tsx as variações na ficha e a folha de trocar exercício
     demo · folha · descanso · animado · mapa-muscular · cartao-compartilhar
     corpo-3d.tsx  o modelo anatômico do Z-Anatomy, em tela cheia e embutido
                   no relatório e no treino; receita em MODELO-3D.md
     curva-fc.tsx  a curva de frequência do treino, quando a fonte manda amostras
-  data/           catálogo, modelos prontos, tipos e execução por família de movimento
+  data/           catálogo, modelos prontos, tipos, execução por família de movimento
+                  e variacoes.ts: que exercícios servem à mesma finalidade
   design/
     tokens.ts   contrato de direção, as DUAS paletas, tipografia, marcas
     tema.tsx    TemaProvider, usarPaleta e criarEstilos (folhas por tema)

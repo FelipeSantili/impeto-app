@@ -3,8 +3,13 @@ import { create } from 'zustand';
 interface Estado {
   /** Ids escolhidos no seletor, aguardando quem os pediu. */
   pendentes: string[] | null;
-  entregar: (ids: string[]) => void;
-  consumir: () => string[];
+  /**
+   * Posição a substituir, quando o seletor foi aberto para TROCAR um item em
+   * vez de acrescentar. `null` significa "acrescente ao fim".
+   */
+  alvo: number | null;
+  entregar: (ids: string[], alvo?: number) => void;
+  consumir: () => { ids: string[]; alvo: number | null };
 }
 
 /**
@@ -16,10 +21,12 @@ interface Estado {
  */
 export const useSelecao = create<Estado>((set, get) => ({
   pendentes: null,
-  entregar: (ids) => set({ pendentes: ids }),
+  alvo: null,
+  entregar: (ids, alvo) => set({ pendentes: ids, alvo: alvo ?? null }),
   consumir: () => {
-    const ids = get().pendentes ?? [];
-    if (ids.length) set({ pendentes: null });
-    return ids;
+    const { pendentes, alvo } = get();
+    const ids = pendentes ?? [];
+    if (ids.length) set({ pendentes: null, alvo: null });
+    return { ids, alvo };
   },
 }));

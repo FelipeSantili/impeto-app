@@ -22,6 +22,7 @@ import {
 import { Miniatura } from '@/components/demo';
 import { abrirConfirmacao, abrirMenu } from '@/components/folha';
 import { Glifo } from '@/components/glifos';
+import { abrirTrocaExercicio } from '@/components/variacoes';
 import { POR_ID } from '@/data/exercicios';
 import { criarEstilos, usarPaleta } from '@/design/tema';
 import { margem, radius, sp, traco, type } from '@/design/tokens';
@@ -47,15 +48,17 @@ export default function EditorRotina() {
   const [nome, setNome] = useState(existente?.nome ?? '');
   const [itens, setItens] = useState<Item[]>(existente?.itens ?? []);
 
-  // Recolhe o que o seletor deixou ao voltar para esta tela.
+  // Recolhe o que o seletor deixou ao voltar para esta tela. Com `alvo`, o que
+  // voltou é uma TROCA: substitui a linha daquela posição em vez de somar.
   useFocusEffect(
     useCallback(() => {
-      const ids = consumir();
+      const { ids, alvo } = consumir();
       if (!ids.length) return;
-      setItens((atual) => [
-        ...atual,
-        ...ids.map((exId) => ({ exId, series: 3, descanso: descansoPadrao })),
-      ]);
+      setItens((atual) =>
+        alvo === null
+          ? [...atual, ...ids.map((exId) => ({ exId, series: 3, descanso: descansoPadrao }))]
+          : atual.map((it, i) => (i === alvo ? { ...it, exId: ids[0] } : it)),
+      );
     }, [consumir, descansoPadrao]),
   );
 
@@ -75,11 +78,30 @@ export default function EditorRotina() {
     setItens(copia);
   }
 
+  /** Troca o exercício da linha mantendo séries e descanso da rotina. */
+  function trocarItem(i: number) {
+    const ex = POR_ID[itens[i].exId];
+    if (!ex) return;
+    abrirTrocaExercicio({
+      ex,
+      subtitulo: 'As séries e o descanso desta linha ficam como estão.',
+      onEscolher: (novoId) =>
+        setItens((atual) => atual.map((it, idx) => (idx === i ? { ...it, exId: novoId } : it))),
+      verTodos: () => router.push(`/selecionar?destino=rotina&trocar=${i}`),
+    });
+  }
+
   function menuItem(i: number) {
     const ex = POR_ID[itens[i].exId];
     abrirMenu({
       titulo: ex?.nome ?? 'Exercício',
       opcoes: [
+        {
+          texto: 'Ver demonstração',
+          glifo: 'play',
+          onPress: () => router.push(`/exercicio/${itens[i].exId}`),
+        },
+        { texto: 'Trocar exercício', glifo: 'trocar', onPress: () => trocarItem(i) },
         ...(i > 0
           ? [{ texto: 'Mover para cima', glifo: 'cima' as const, onPress: () => mover(i, -1) }]
           : []),
