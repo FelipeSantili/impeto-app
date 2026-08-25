@@ -355,9 +355,40 @@ function corpoBase(): THREE.BufferGeometry[] {
  * ausente" e para "o loader estourou", e foi ele que escondeu o `TypeError` do
  * `navigator` descrito em `@/lib/gltf`.
  */
+/*
+ * QUAL ARQUIVO ENTRA EM CENA.
+ *
+ * `true` põe `corpo-completo.glb` — o export cru do Blender, com esqueleto e
+ * musculatura completos, SEM passar pelo destilador. É o que existe para
+ * responder ao defeito que o destilado tem: a decimação por grade abre buracos
+ * e farpas no meio do corpo, e nenhuma cor conserta geometria rasgada.
+ *
+ * O preço, medido no arquivo: 861 malhas, 1.665 nós, 1.486.897 triângulos,
+ * 31,9 MB — contra catorze malhas, 57 mil triângulos e 0,6 MB do destilado.
+ * Vinte e cinco vezes mais geometria para o telefone desenhar, e um parse
+ * síncrono na thread de JS que trava a primeira abertura por segundos. Em
+ * aparelho apertado pode faltar memória em vez de abrir; o `catch` de
+ * `carregarAnatomia` cai no écorché de código e a tela avisa a fonte.
+ *
+ * Pintar continua funcionando, e por isso a troca não custa a leitura: os nomes
+ * vêm em latim anatômico e `grupoAnatomico` os classifica com as MESMAS regras
+ * do destilador — 547 malhas acendem nos treze grupos, 1.104 ficam escuras
+ * (esqueleto, fáscia, cabeça, mãos, pés, músculo profundo).
+ *
+ * O enquadramento não sofre: é medido da caixa envolvente, nunca cravado.
+ *
+ * A constante é literal, então o minificador derruba o ramo morto e só o
+ * arquivo escolhido entra no bundle — medido: um `.glb` no manifesto do export.
+ */
+const MODELO_CRU = true;
+
 async function carregarAnatomia(): Promise<THREE.Object3D | null> {
   try {
-    return await carregarGLB(require('@/assets/modelos/corpo.glb'));
+    return await carregarGLB(
+      MODELO_CRU
+        ? require('../../corpo-completo.glb')
+        : require('@/assets/modelos/corpo.glb'),
+    );
   } catch (erro) {
     console.warn('[corpo-3d] a anatomia não carregou; exibindo o esquema:', erro);
     return null;
@@ -388,8 +419,8 @@ async function anatomiaClonada(): Promise<THREE.Object3D | null> {
   return base ? base.clone(true) : null;
 }
 
-/** Nome da malha → grupo. Sufixo depois de `.` ou `_` é ignorado. */
-function grupoDaMalha(nome: string): Grupo | null {
+/** Nome da malha → grupo, no destilado. Sufixo depois de `.` ou `_` é ignorado. */
+function grupoDestilado(nome: string): Grupo | null {
   const chave = nome.toLowerCase().split(/[._\s-]/)[0];
   return (GRUPOS_VALIDOS as readonly string[]).includes(chave) ? (chave as Grupo) : null;
 }
@@ -398,6 +429,69 @@ const GRUPOS_VALIDOS = [
   'peito', 'costas', 'ombros', 'biceps', 'triceps', 'antebraco', 'trapezio',
   'lombar', 'quadriceps', 'posterior', 'gluteos', 'panturrilha', 'abdomen',
 ] as const;
+
+/**
+ * Fáscia, tendão, bainha: veio junto na coleção e não é músculo. Fica escuro
+ * mesmo quando o nome carrega o do músculo vizinho — "Deltoid fascia" não é
+ * ombro, e são 60 nomes assim no arquivo.
+ */
+const NAO_MUSCULO =
+  /fascia|aponeuros|bursa|retinacul|septum|sheath|ligament|\btendon\b|arch\b|raphe|trochlea|annulus|pulley/i;
+
+/**
+ * Nome anatômico do Z-Anatomy → grupo do app.
+ *
+ * As mesmas regras de `ferramentas/destilar-modelo.mjs`, que é o que garante
+ * que o arquivo cru e o destilado pintem a MESMA anatomia com a mesma cor. A
+ * ORDEM importa: a primeira que casa vence, e é por isso que as regras estreitas
+ * vêm antes das largas. As duas armadilhas do MODELO-3D.md estão aqui dentro:
+ * `digitorum longus` é da PERNA (só `superficialis`/`profundus` é antebraço), e
+ * nada `of foot` é membro superior.
+ */
+const ANATOMIA: readonly (readonly [Grupo, RegExp])[] = [
+  ['panturrilha', /gastrocnemius|soleus|plantaris|tibialis|fibularis|peroneus|(flexor|extensor) (digitorum|hallucis) longus/i],
+  ['antebraco', /brachioradialis|(flexor|extensor) carpi|(flexor|extensor) digitorum (superficialis|profundus)|extensor digiti minimi|pronator|supinator|palmaris longus|extensor indicis|(abductor|extensor) pollicis (longus|brevis)/i],
+  ['peito', /pectoralis major/i],
+  ['costas', /latissimus dorsi|teres major|rhomboid/i],
+  ['ombros', /deltoid|supraspinatus|infraspinatus|teres minor|subscapularis/i],
+  ['biceps', /biceps brachii|brachialis|coracobrachialis/i],
+  ['triceps', /triceps brachii|anconeus/i],
+  ['trapezio', /trapezius|levator scapulae/i],
+  ['lombar', /erector spinae|iliocostalis|longissimus|spinalis|quadratus lumborum|multifidus|semispinalis/i],
+  ['quadriceps', /rectus femoris|vastus|sartorius|tensor fasciae latae/i],
+  ['posterior', /biceps femoris|semitendinosus|semimembranosus|adductor magnus/i],
+  ['gluteos', /gluteus|piriformis/i],
+  ['abdomen', /rectus abdominis|abdominal oblique|transversus abdominis|serratus anterior/i],
+];
+
+/**
+ * O GLTFLoader higieniza nome: espaço vira sublinhado e o ponto é REMOVIDO.
+ * Desfazer o sublinhado é obrigatório — sem isso todo padrão de duas palavras
+ * falha em silêncio e o grupo inteiro cai calado no escuro. O ponto comido só
+ * suja o fim do nome ("…muscle.l" → "…musclel"), onde nenhuma regra olha.
+ */
+function grupoAnatomico(nome: string): Grupo | null {
+  const anat = nome.replace(/_/g, ' ');
+  if (NAO_MUSCULO.test(anat)) return null;
+  // Pé é panturrilha ou base, nunca braço.
+  if (/\bof foot\b|\bof toe/i.test(anat)) {
+    return /hallucis longus|digitorum longus/i.test(anat) ? 'panturrilha' : null;
+  }
+  for (const [g, re] of ANATOMIA) if (re.test(anat)) return g;
+  return null;
+}
+
+/**
+ * Os dois vocabulários não se misturam, e não é preciosismo.
+ *
+ * A regra do destilado olha a primeira palavra do nome — e em inglês anatômico
+ * "Posterior cricoarytenoid muscle" começa com `posterior`, que aqui é o
+ * posterior de COXA. A garganta acenderia junto com o treino de perna. Cada
+ * arquivo tem o seu contrato, e quem escolhe o arquivo é a constante lá acima.
+ */
+function grupoDaMalha(nome: string): Grupo | null {
+  return MODELO_CRU ? grupoAnatomico(nome) : grupoDestilado(nome);
+}
 
 /**
  * O nome que aparece ao tocar o músculo.

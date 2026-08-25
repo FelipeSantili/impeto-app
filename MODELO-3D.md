@@ -39,7 +39,34 @@ e nunca é pintado. Os treze são os mesmos de `Grupo` em
 [src/data/types.ts](src/data/types.ts) — se um grupo nascer lá, precisa nascer
 aqui.
 
+### O modo cru — `corpo-completo.glb`
+
+Existe um segundo caminho, ligado pela constante `MODELO_CRU` em
+[src/components/corpo-3d.tsx](src/components/corpo-3d.tsx): o export do Blender
+**sem passar pelo destilador**, com esqueleto e musculatura completos. Ele existe
+porque a decimação por grade abre buracos e farpas no meio do corpo, e nenhuma
+cor conserta geometria rasgada.
+
+Aí os nomes são os do Z-Anatomy, em latim anatômico, e a classificação é feita em
+tempo de execução por `grupoAnatomico` — as **mesmas regras** de
+[ferramentas/destilar-modelo.mjs](ferramentas/destilar-modelo.mjs), para que os
+dois arquivos pintem a mesma anatomia com a mesma cor. Medido no arquivo atual:
+685 malhas acendem nos treze grupos, 1.493 ficam escuras.
+
+Os dois vocabulários **não se misturam**, e a função escolhe um pelo arquivo em
+vez de tentar adivinhar. O motivo é concreto: a regra do destilado olha a
+primeira palavra do nome, e "Posterior cricoarytenoid muscle" — que é garganta —
+começa com `posterior`, que aqui é posterior de coxa. Misturar acenderia o
+pescoço no dia de perna.
+
+O que ele custa, também medido: 2.178 malhas em cena, 2,8 milhões de triângulos
+desenhados (os nós reaproveitam malhas espelhadas, então o desenho conta mais que
+o arquivo), 31,9 MB. São 2.178 chamadas de desenho por quadro contra catorze do
+destilado — é teste de geometria, não configuração para uso diário.
+
 ### Geometria
+
+Os limites abaixo valem para o destilado, que é o que se pretende embarcar.
 
 | exigência | valor | por quê |
 |---|---|---|
