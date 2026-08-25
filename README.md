@@ -296,6 +296,7 @@ src/
     tema.tsx    TemaProvider, usarPaleta e criarEstilos (folhas por tema)
   lib/            metricas, saude (Health Connect), backup, atualizacao, compartilhar
     gltf.ts       carrega .glb no React Native (e a armadilha do navigator)
+  ferramentas/    destilar-modelo.mjs: do atlas Z-Anatomy ao asset do app
     tcx.ts        leitor dos arquivos .tcx do Mi Fitness (as duas formas dele)
     relogio.ts    escolhe os arquivos e casa cada um com o treino do histórico
   store/          estado persistido (zustand + AsyncStorage): treino, cinta,

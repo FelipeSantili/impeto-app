@@ -1,47 +1,32 @@
 # O modelo 3D — receita do Z-Anatomy
 
-<!-- Como trocar o écorché procedural por anatomia de verdade. -->
+<!-- De onde vem a anatomia, como ela vira asset, e as armadilhas do caminho. -->
 
-Hoje o modelo em [src/components/corpo-3d.tsx](src/components/corpo-3d.tsx) é
-gerado em código: cada músculo é um tubo fusiforme varrido ao longo de uma
-curva. Tem origem e inserção certas, mas é um **esquema anatômico**, não
-anatomia. Este documento é o caminho para substituí-lo.
-
-O que trava a qualidade não é o código de renderização — é a malha.
-
-## A fonte
-
-**[Z-Anatomy](https://www.z-anatomy.com)** — atlas 3D aberto do corpo humano,
-derivado do BodyParts3D. É o mais preciso que existe de graça, e cada estrutura
-já é um **objeto separado**, que é exatamente o requisito aqui.
+O corpo em [src/components/corpo-3d.tsx](src/components/corpo-3d.tsx) é
+anatomia real, destilada do **[Z-Anatomy](https://www.z-anatomy.com)** — atlas
+3D aberto derivado do BodyParts3D, e o mais preciso que existe de graça. Cada
+estrutura é um objeto separado, que é exatamente o requisito aqui: sem isso não
+há como pintar um músculo de cada vez.
 
 - Template Blender: <https://github.com/Z-Anatomy/The-blend>
-- Modelos: <https://github.com/Z-Anatomy/Models-of-human-anatomy>
 - Licença: **CC BY-SA 4.0**
 
-### O que a licença exige
+CC BY-SA é *atribuição* mais *compartilha-igual*. A atribuição aparece em
+Ajustes › Sobre — não é cortesia, sem ela o uso fica fora da licença. E o `.glb`
+derivado continua CC BY-SA: vale para o **modelo**, não contamina o código.
 
-CC BY-SA é *atribuição* mais *compartilha-igual*:
+## O que entra no app
 
-- **Atribuição:** o app precisa creditar o Z-Anatomy num lugar visível. Já há
-  um lugar natural para isso: a tela de Ajustes.
-- **Compartilha-igual:** o `.glb` derivado que sair do Blender continua sendo
-  CC BY-SA e precisa ficar disponível sob essa licença. Isso vale para o
-  **modelo**, não contamina o código do app — mas significa que o arquivo
-  derivado não pode ser tratado como asset proprietário.
+Catorze malhas, ~57 mil triângulos, 0,6 MB. Treze grupos de músculo mais
+`corpo`.
 
-Se em algum momento isso incomodar, a alternativa é um écorché comprado
-(Sketchfab / TurboSquid / CGTrader, US$ 20–150) com licença royalty-free, que
-dispensa as duas obrigações. O resto desta receita vale igual.
-
-## O contrato: o que o arquivo precisa entregar
-
-O carregador não adivinha anatomia. Ele lê o **nome de cada malha** e mapeia
-para o grupo muscular. Sem isso, não há como pintar um músculo de cada vez.
+**`corpo` é o RESTO DA MUSCULATURA — não o esqueleto.** Face, pescoço, mãos,
+pés e o que mais os treze grupos não cobrem. É a decisão que resolveu o
+problema mais caro deste modelo, e o motivo está na seção seguinte.
 
 ### Nomes das malhas
 
-Cada malha precisa começar com uma destas chaves, exatamente:
+Cada malha começa com uma destas chaves, exatamente:
 
 ```
 peito        costas       ombros       biceps       triceps
@@ -49,212 +34,157 @@ antebraco    trapezio     lombar       quadriceps   posterior
 gluteos      panturrilha  abdomen
 ```
 
-Sufixo depois de `.` ou `_` é ignorado, então `peito.L`, `peito.R` e
-`peito_001` caem todos em `peito`. Qualquer malha com outro nome (esqueleto,
-crânio, mãos, pés) entra como **corpo** e nunca é pintada — o que é o
-comportamento certo para o que serve de base.
-
-Os treze nomes são os mesmos de `Grupo` em [src/data/types.ts](src/data/types.ts).
-Se um dia um grupo for adicionado lá, ele precisa aparecer aqui também.
+Sufixo depois de `.` ou `_` é ignorado. Qualquer outro nome entra como `corpo`
+e nunca é pintado. Os treze são os mesmos de `Grupo` em
+[src/data/types.ts](src/data/types.ts) — se um grupo nascer lá, precisa nascer
+aqui.
 
 ### Geometria
 
 | exigência | valor | por quê |
 |---|---|---|
-| Formato | `.glb` binário | um arquivo só, sem texturas soltas |
-| Triângulos | **≤ 60 mil no total** | é celular, e são ~26 malhas separadas |
+| Formato | `.glb` binário | um arquivo só |
+| Triângulos | **≤ 60 mil** | é celular, e são catorze malhas |
 | Tamanho | **≤ 8 MB** | entra no APK e no update OTA |
 | Eixo | Y para cima, Z para frente | é o que o carregador assume |
-| Escala | qualquer | o carregador normaliza pela altura |
-| Origem | qualquer | o carregador centraliza pela caixa envolvente |
-| Material | irrelevante | é substituído pela rampa térmica |
-| Texturas | **nenhuma** | só engordam o arquivo; a cor vem do código |
+| Escala e origem | qualquer | o destilador normaliza para 175 |
+| Material e textura | nenhum | a cor vem do código |
 
-Escala e posição são normalizadas de propósito: é a classe de erro mais comum
-("exportei e não apareceu nada") e não custa nada resolver no carregador.
+## Por que o esqueleto saiu
 
-## A receita no Blender
+A primeira versão usava o esqueleto como base sob os músculos. Ficava coberta
+de cacos: manchas de polígono brigando pelo corpo inteiro.
 
-1. **Instale o template.** Baixe `Z-Anatomy_Template.zip`, abra o Blender →
-   ícone do Blender no canto superior esquerdo → *Install Application Template*
-   → selecione o zip. Depois `File > New > Z-Anatomy`.
+Não era z-fighting, não era malha duplicada, e não era o buffer de profundidade
+— foram três hipóteses caras e todas erradas. Era **geometria**: 67% dos
+vértices do esqueleto estavam FORA da camada muscular. O *Decimate* do Blender
+arrebentou as costelas em farpas e empurrou rádio, ulna e tíbia para fora da
+carne. O osso emergia através do músculo.
 
-2. **Isole a musculatura.** Desligue todas as camadas menos os músculos. O
-   esqueleto pode ficar — vira a base `corpo` e ajuda a leitura — mas conte os
-   triângulos dele no orçamento.
+Nenhum ajuste de render conserta isso, porque não é problema de render.
+Encolher o esqueleto ao longo das normais também não: 12 mm limpa o peito e
+destrói mãos e cabeça.
 
-3. **Junte por grupo.** Selecione todos os objetos de um grupo (por exemplo
-   todas as cabeças do quadríceps: reto femoral, vasto lateral, vasto medial,
-   vasto intermédio) e `Ctrl+J`. Renomeie o resultado para `quadriceps`.
-   Repita para os treze.
+A solução foi trocar a base. Com `corpo` sendo o resto da musculatura, tudo
+está na MESMA camada anatômica e não existe nada por baixo para emergir. É um
+écorché de verdade — e a musculatura sozinha já descreve o corpo inteiro, com
+cabeça, mãos e pés, o que era justamente o que o esqueleto estava lá para dar.
 
-   Mantenha esquerda e direita **separadas** se quiser (`quadriceps.L` e
-   `quadriceps.R`) — o carregador aceita as duas formas.
+Os músculos PROFUNDOS também saem. Intercostais, transverso e psoas nunca são
+vistos nem pintados: existem só para furar os superficiais por baixo. O
+destilador corta por distância, não por lista de nomes — o que está colado sob
+um grupo some, e o que está longe de todos eles (face, mãos, pés) fica.
 
-4. **Decimate.** Em cada malha junta, adicione o modificador *Decimate* em modo
-   *Collapse* e baixe o ratio até o grupo ficar em torno de 2–4 mil triângulos.
-   Confira a silhueta girando: o que importa é o contorno, não a superfície.
+## A receita
 
-5. **Limpe.** `Ctrl+A > All Transforms` em tudo, para que as transformações
-   fiquem cravadas na geometria. Remova materiais e UVs.
+### 1. Exportar a musculatura do Blender
 
-6. **Exporte.** `File > Export > glTF 2.0 (.glb)`:
-   - *Format*: **glTF Binary (.glb)**
-   - *Include*: apenas *Selected Objects*, se tiver selecionado só o que quer
-   - *Data > Mesh*: desmarque *UVs*, *Normals* pode ficar
-   - *Data > Material*: **No export**
-   - desmarque *Cameras*, *Punctual Lights*, *Animation*
+Abra o template do Z-Anatomy. No Outliner, botão direito em **`Muscular
+system`** → **Select Objects**. Depois `File > Export > glTF 2.0`:
 
-7. **Confira o resultado** em <https://gltf-viewer.donmccurdy.com> — arraste o
-   `.glb` e veja se as malhas aparecem com os nomes certos no painel lateral.
-   Se os nomes não estiverem lá, o passo 3 não pegou.
+- **Include → Limit to → ✅ Selected Objects** ← *é esta caixa que importa*
+- desmarque *Cameras* e *Punctual Lights*
+- `Data > Material`: **No export**
 
-## Onde o arquivo entra
+> **O olhinho do Outliner não afeta o export.** Esconder no viewport não tira
+> nada do `.glb` — o exportador ignora visibilidade de viewport por padrão.
+> Três exports seguidos "sem esqueleto" saíram byte a byte idênticos ao atlas
+> inteiro por causa disso. A alternativa é a **caixinha** (Exclude from View
+> Layer) em cada outra coleção, mais **Limit to → ✅ Visible Objects**.
 
-O arquivo vive em `assets/modelos/corpo.glb`, e as três peças que o ligam já
-estão no lugar:
+Salve em `modelo-fonte/musculatura-crua.glb` (a pasta é ignorada pelo git e
+pelo EAS — fonte, não asset).
 
-1. **`metro.config.js`** registra `glb` em `assetExts`. Sem isso o `require`
-   resolve como módulo JavaScript e o bundle quebra.
+### 2. Destilar
 
-2. **`expo-asset`** é dependência direta. Ele já vem dentro do `expo` core, mas
-   declará-lo muda o fingerprint — e com `runtimeVersion.policy: fingerprint`
-   isso significa que **um APK novo é obrigatório**. Um aparelho com o APK
-   anterior não recebe esta versão por OTA: continua rodando o código velho, com
-   o esquema procedural, e sem nenhum erro para ver.
+```sh
+node --max-old-space-size=6144 ferramentas/destilar-modelo.mjs \
+  modelo-fonte/musculatura-crua.glb assets/modelos/corpo.glb
+```
 
-3. **O carregador** vive em [src/lib/gltf.ts](src/lib/gltf.ts), separado do
-   componente. Separado porque o difícil ali não é anatomia nem three — é que o
-   GLTFLoader nasceu para o navegador.
+O destilador filtra o que não é músculo, agrupa nos treze, corta os profundos,
+decima dentro do orçamento e normaliza para 175 de altura com os pés em y=0.
+Ele imprime a conta de cada grupo — vale conferir que nenhum saiu com um número
+absurdamente baixo, que é o sintoma de uma regra de nome que não casou.
 
-### A armadilha do `navigator` — leia antes de mexer no carregador
+## As armadilhas
 
-O construtor do `GLTFParser` fareja o navegador para escolher entre
-`ImageBitmapLoader` e `TextureLoader`, e fareja sem defesa:
+Três, todas silenciosas, todas custaram caro.
+
+### `navigator.userAgent` — o GLTFLoader morre antes do primeiro callback
+
+O construtor do `GLTFParser` fareja o navegador sem defesa:
 
 ```js
-if ( typeof navigator !== 'undefined' ) {
-  const userAgent = navigator.userAgent;
-  isSafari = /…safari/i.test( userAgent ) === true;
-  const safariMatch = userAgent.match( /Version\/(\d+)/ );   // ← estoura
+const userAgent = navigator.userAgent;
+const safariMatch = userAgent.match( /Version\/(\d+)/ );   // ← estoura
 ```
 
 O React Native instala `global.navigator = { product: 'ReactNative' }` e nada
-além disso. O `typeof` passa, `userAgent` é `undefined`, o `.test` sobrevive
-(coage para a string `"undefined"`) e o `.match` derruba o construtor com
-`TypeError: Cannot read property 'match' of undefined`.
+mais. `userAgent` é `undefined` e o `.match` derruba o construtor com
+`TypeError`, **de forma síncrona dentro de `parse()`** — nunca chega no
+`onError`. Quem envolve `parse()` num `try/catch` recebe o mesmo sinal de um
+arquivo corrompido, com o `.glb` perfeito no bundle.
 
-Três coisas fazem disso um bug caro:
+A correção está em [src/lib/gltf.ts](src/lib/gltf.ts): dar um `userAgent` antes
+do primeiro `parse()`. Qualquer string serve, desde que não contenha "Safari"
+nem "Firefox".
 
-- acontece **dentro de `parse()`, de forma síncrona**, antes de qualquer
-  callback — nunca chega no `onError`;
-- quem envolve `parse()` num `try/catch` recebe o mesmo sinal que receberia de
-  um arquivo corrompido;
-- e o `.glb` está **perfeito** no bundle, então a investigação começa inteira no
-  lugar errado.
+**Corolário: nunca engula o erro do carregador.** Um `catch {}` vazio esconde
+exatamente a classe de falha mais difícil de achar — a que deixa tudo com cara
+de estar funcionando.
 
-A correção é dar um `userAgent` ao `navigator` antes do primeiro `parse()`.
-Qualquer string serve, desde que não contenha "Safari" nem "Firefox": as duas
-comparações caem no ramo falso e o loader escolhe `TextureLoader`, que é o certo
-aqui — não há textura nenhuma para carregar.
+### O GLTFLoader troca espaço por sublinhado nos nomes
 
-**Corolário:** nunca engula o erro do carregador. `carregarGLB` lança, o
-componente registra no log e avisa a tela por `onFonte`, e a tela diz que está
-exibindo o esquema. Um `catch {}` vazio esconde exatamente a classe de falha
-mais difícil de achar — a que deixa tudo com cara de estar funcionando.
+`pectoralis major` chega como `pectoralis_major`. Todo padrão de duas palavras
+falha **em silêncio**, e o grupo inteiro cai calado na base. Foi o que mandou
+peito e abdômen para o `corpo` e deixou o tríceps só com o ancôneo. O
+destilador normaliza antes de casar.
 
-### A armadilha do buffer de profundidade — 16 bits, e cravados
+### O buffer de profundidade tem 16 bits no Android
 
-O `expo-gl` pede `EGL_DEPTH_SIZE, 16` ao criar o contexto no Android. Está
-escrito em `GLContext.java`, não é configurável, e é a diferença entre um render
-limpo e uma casca estilhaçada cobrindo a figura inteira.
+O `expo-gl` pede `EGL_DEPTH_SIZE, 16` em `GLContext.java`, cravado. A resolução
+à distância `z` é `z²·(far−near)/(2^bits·far·near)`: com `near = 1` / `far =
+1000` e a câmera a 335, isso dá **17 milímetros** num corpo de 175 cm.
 
-A resolução de um buffer de profundidade à distância `z` é
+Não foi a causa do mosaico, mas é uma bomba armada de verdade. Os planos são
+colados no corpo (`near = d − raio`, `far = d + raio`) e refeitos a cada quadro,
+porque o pinçar aproxima a câmera. Resultado: 0,03 mm em todo o zoom.
 
-```
-Δz = z² · (far − near) / (2^bits · far · near)
-```
-
-Com os `near = 1` / `far = 1000` que qualquer exemplo de three sugere, e a
-câmera a 335 unidades do corpo, isso dá **1,7 unidade — dezessete milímetros**
-num corpo de 175 cm. Músculo e osso estão a muito menos que isso um do outro: o
-teste de profundidade empata em toda superfície sobreposta, e o GPU escolhe o
-vencedor pixel a pixel. O resultado parece defeito de malha, e não é.
-
-A correção não envolve geometria nem material — só dois números. Colando os
-planos no corpo (`near = d − raio`, `far = d + raio`, com `d` a distância da
-câmera), os mesmos dezesseis bits dão **0,03 mm**: quinhentas vezes melhor.
-
-Duas consequências que valem lembrar:
-
-- os planos são recalculados **a cada quadro**, porque o pinçar aproxima a
-  câmera — calculados uma vez só, recortariam o corpo ao ampliar;
-- nada disso aparece no desktop. Um navegador dá 24 bits de profundidade, onde
-  o mesmo `near = 1` já resolveria 0,07 mm. O bug só existe no aparelho, que é
-  o pior lugar para descobri-lo.
-
-### O orçamento de luz
-
-A soma das luzes que batem numa superfície virada para a chave fica perto de 1,
-de propósito. Superexpor estoura o âmbar do topo da rampa em branco — ou seja, o
-músculo MAIS trabalhado é o único a perder a cor, que é exatamente o dado que a
-rampa existe para transmitir.
-
-O caminho óbvio para isso seria mapeamento de tons, e é o caminho errado aqui:
-ACES e companhia reescrevem matiz e luminância da imagem inteira, e a promessa
-do modelo é que âmbar aqui é o MESMO âmbar da prancha 2D e das barras de carga.
-Manter a luz no orçamento preserva a rampa; comprimir a imagem depois, não.
-
-Pela mesma razão o corpo não usa `silhueta` cru. Na prancha 2D quem descola a
-silhueta do fundo é o TRAÇO, e em três dimensões não há traço: `silhueta` sobre
-`fundo` dá 1,1:1 de contraste. A cor do corpo é `silhueta` empurrada 16% na
-direção de `tinta` — o extremo oposto do fundo, na mesma paleta —, e a
-rugosidade cai para 0,62 para que a contraluz consiga desenhar a borda. Brilho
-especular não é multiplicado pelo albedo, e é por isso que preto fosco continua
-um buraco por mais luz que se jogue nele.
-
-### Sobre os bytes
-
-`File.bytes()` devolve um `Uint8Array` direto, sem passar por base64 — o que
-evita o único ponto onde carregar GLB em React Native costuma ficar lento. Só
-que `File` lê `file://`, e nem todo asset chega como arquivo local; quando não
-chega, `fetch` é a reserva.
-
-## O que muda no comportamento
-
-Nada, do lado de fora. A rampa térmica, o toque e a órbita continuam iguais: o
-carregador só troca de onde a geometria vem. O `corpoBase()` procedural fica no
-código como **fallback** — se o arquivo faltar, o app volta ao écorché em vez de
-abrir uma tela preta, e diz na tela que foi isso que aconteceu.
-
-O **enquadramento** deixou de ser cravado: a câmera mede a caixa envolvente do
-que entrou em cena. É o que faz o mesmo código enquadrar o `.glb` e o esquema de
-reserva, que têm proporções diferentes — e o que faz um `.glb` regerado com
-outro recorte continuar cabendo no quadro sem ninguém reajustar constante
-nenhuma.
+Nada disso aparece no desktop, onde o navegador dá 24 bits.
 
 ## Onde o corpo aparece
-
-Em três lugares, todos a mesma peça:
 
 | lugar | tamanho | comportamento |
 |---|---|---|
 | `/corpo` (modal) | tela cheia | órbita, pinça, toque identifica o músculo |
-| relatório da sessão | 280 pt | um terço de volta e para; toque abre o modal |
-| cabeçalho do treino | 48 × 80 pt | idem, e esquenta a cada série marcada |
+| relatório da sessão | 280 pt | parado; toque abre o modal |
+| cabeçalho do treino | 48 × 80 pt | parado, e esquenta a cada série marcada |
 
-Os dois embutidos não têm órbita de propósito: vivem dentro de rolagem, e um
-`Pan` ali engoliria o arrastar vertical da página. Também não giram para sempre
-— sem toque que os interrompa, um laço de sessenta quadros por segundo num
-cabeçalho que vive quarenta minutos é bateria queimada para dizer o que meia
-volta já disse.
+Os dois embutidos não têm órbita: vivem dentro de rolagem, e um `Pan` ali
+engoliria o arrastar vertical da página. Também não giram sozinhos — movimento
+é resposta ao toque, e um mostrador girando num cabeçalho compete com o treino
+pela atenção.
 
-O arquivo é lido do disco **uma vez por sessão do app**. Cada contexto GL precisa
-da sua árvore de objetos, mas não do arquivo de novo: `clone()` compartilha a
+O arquivo é lido do disco **uma vez por sessão do app**: `clone()` compartilha a
 `BufferGeometry`, então o segundo e o terceiro corpo custam um punhado de
-objetos em vez de 43 mil triângulos reconstruídos.
+objetos em vez de 57 mil triângulos reconstruídos.
 
-O **cartão de compartilhar** continua com a prancha 2D, e vai continuar: ele é
+O **cartão de compartilhar** continua com a prancha 2D, e vai continuar: é
 capturado como bitmap, e capturar conteúdo de GL é uma corrida entre o carregar
-do modelo e o disparo da captura que ninguém precisa correr para gerar uma
-imagem estática.
+do modelo e o disparo da captura que não vale a pena para gerar imagem estática.
+
+## A cor
+
+Sai de `corDeCalor`, a MESMA rampa da prancha 2D e das barras de carga. Um
+músculo âmbar aqui quer dizer exatamente o que âmbar quer dizer lá.
+
+Duas consequências disso:
+
+- **Sem mapeamento de tons.** ACES e companhia reescrevem matiz e luminância da
+  imagem inteira. A luz fica num orçamento (soma perto de 1 na superfície
+  virada para a chave) em vez de ser comprimida depois — superexpor estourava o
+  âmbar do topo, ou seja, o músculo MAIS trabalhado era o único a perder a cor.
+- **O degrau zero é a cor da carne, não `calor[0]`.** Músculo não trabalhado ao
+  lado de uma base clareada faz de cada costura uma rachadura luminosa, e o
+  corpo em repouso lê como estilhaçado. A rampa só fala do degrau 1 em diante.

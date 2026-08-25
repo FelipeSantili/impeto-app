@@ -428,16 +428,22 @@ const NOME_ANATOMICO: Record<Grupo, string> = {
 const GIRO_INICIAL = 0.35;
 
 /**
- * Quanto o giro de apresentação anda antes de parar, quando não há órbita.
+ * A cor da carne em repouso.
  *
- * No modal ele roda até o primeiro toque, e isso está certo: quem abriu o modal
- * está olhando para ele. Embutido não existe toque que o interrompa — o toque
- * abre o modal — e um laço de sessenta quadros por segundo pendurado no
- * cabeçalho de um treino de quarenta minutos é bateria queimada para dizer uma
- * coisa que meia volta já disse. Trinta e cinco graus bastam para a silhueta
- * mudar e a figura se declarar tridimensional.
+ * A prancha 2D descola a silhueta do fundo com TRAÇO; em três dimensões não há
+ * traço, e `silhueta` sobre `fundo` dá 1,1:1 — o corpo some no vazio. Empurrar
+ * `silhueta` na direção de `tinta` (o extremo oposto do fundo, na mesma paleta)
+ * clareia no tema escuro e escurece no claro, sem inventar cor nenhuma.
+ *
+ * O degrau ZERO da rampa usa exatamente esta cor, e não `calor[0]`. Sem isso,
+ * músculo não trabalhado fica quase preto encostado numa base clareada, e cada
+ * costura entre os dois vira uma rachadura luminosa — um corpo em repouso lê
+ * como estilhaçado. A rampa só passa a falar do degrau 1 em diante, que é onde
+ * ela tem algo a dizer.
  */
-const GIRO_EMBUTIDO = 0.62;
+function corDaCarne(paleta: Paleta): THREE.Color {
+  return new THREE.Color(paleta.silhueta).lerp(new THREE.Color(paleta.tinta), 0.16);
+}
 
 /** De onde veio a geometria que está em cena. */
 export type FonteDoModelo = 'anatomia' | 'reserva';
@@ -454,7 +460,10 @@ export interface CorpoProps {
    * que a anatomia do Z-Anatomy é aquilo.
    */
   onFonte?: (fonte: FonteDoModelo) => void;
-  /** Gira sozinho enquanto ninguém encosta. */
+  /**
+   * Gira sozinho enquanto ninguém encosta. Por padrão acompanha `orbitavel`:
+   * onde não dá para girar com o dedo, a figura também não gira sozinha.
+   */
   girarSozinho?: boolean;
   /**
    * Órbita pelo dedo. Desligada no corpo embutido, que vive dentro de uma
@@ -475,8 +484,12 @@ export function Corpo3D({
   paleta,
   onTocar,
   onFonte,
-  girarSozinho = true,
   orbitavel = true,
+  // Embutido nasce PARADO. Um mostrador que gira sozinho num cabeçalho de
+  // treino compete com o treino pela atenção, e girar até certo ângulo e
+  // congelar no meio lê como travamento, não como apresentação. Movimento aqui
+  // é resposta ao toque: quem abre o modal é quem quer ver a figura girar.
+  girarSozinho = orbitavel,
   fundo,
 }: CorpoProps) {
   const cena = useRef<{
@@ -529,7 +542,7 @@ export function Corpo3D({
       const grupo = m.userData.grupo as Grupo;
       const nivel = nivelDeCalor(intensidade.get(grupo) ?? 0);
       const mat = m.material as THREE.MeshStandardMaterial;
-      mat.color.set(paleta.calor[nivel]);
+      mat.color.set(nivel > 0 ? new THREE.Color(paleta.calor[nivel]) : corDaCarne(paleta));
       // O que foi trabalhado brilha um pouco mais: num écorché escuro, só a
       // matiz não separa o degrau 1 do 2.
       mat.emissive.set(nivel > 0 ? paleta.calor[nivel] : '#000000');
@@ -624,10 +637,10 @@ export function Corpo3D({
        * que NÃO é multiplicado pelo albedo — a contraluz consegue desenhar a
        * borda, que é o trabalho que o traço fazia na prancha.
        */
-      const corDoCorpo = new THREE.Color(paleta.silhueta).lerp(new THREE.Color(paleta.tinta), 0.16);
+      // (a cor vem de `corDaCarne`, compartilhada com o degrau zero da rampa)
       const matBase = new THREE.MeshStandardMaterial({
-        color: corDoCorpo,
-        roughness: 0.62,
+        color: corDaCarne(paleta),
+        roughness: 0.82,
         metalness: 0,
         flatShading: false,
       });
@@ -638,10 +651,13 @@ export function Corpo3D({
       const matMusculo = (grupo: Grupo) => {
         const nivel = nivelDeCalor(intensidade.get(grupo) ?? 0);
         return new THREE.MeshStandardMaterial({
-          color: paleta.calor[nivel],
+          color: nivel > 0 ? new THREE.Color(paleta.calor[nivel]) : corDaCarne(paleta),
           // Músculo é úmido: um pouco de brilho especular é o que dá a
-          // leitura de fibra em vez de massa de modelar fosca.
-          roughness: 0.48,
+          // leitura de fibra em vez de massa de modelar fosca. Mas com
+          // parcimonia: sao 3,6 mil triangulos por grupo, e especular baixo
+          // demais transforma cada faceta num brilho — o corpo passa a parecer
+          // estilhacado quando e so poligono grande.
+          roughness: 0.66,
           metalness: 0,
           emissive: new THREE.Color(nivel > 0 ? paleta.calor[nivel] : 0x000000),
           emissiveIntensity: nivel > 0 ? 0.05 * nivel : 0,
@@ -788,8 +804,7 @@ export function Corpo3D({
       const laco = () => {
         if (!vivo.current) return;
         const o = orbita.current;
-        const apresentando =
-          girarSozinho && !o.mexeu && (orbitavel || o.giroY < GIRO_INICIAL + GIRO_EMBUTIDO);
+        const apresentando = girarSozinho && !o.mexeu;
         if (apresentando) o.giroY += 0.0035;
         render();
         if (apresentando || o.tocando) requestAnimationFrame(laco);
@@ -797,7 +812,7 @@ export function Corpo3D({
       };
       laco();
     },
-    [paleta, intensidade, girarSozinho, orbitavel, fundo],
+    [paleta, intensidade, girarSozinho, fundo],
   );
 
   /** Religa o laço quando o dedo encosta depois de a cena ter parado. */
