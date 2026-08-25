@@ -188,6 +188,19 @@ como artefato da execução.
 Por que no CI e não aqui: o plugin de build local **não roda no Windows** ("macOS or
 Linux is required"). O runner é Ubuntu.
 
+Duas coisas o workflow ajusta por conta própria, escrevendo no `gradle.properties` do
+HOME — que vence o do projeto na precedência do Gradle e é o único que sobrevive ao
+`expo prebuild`:
+
+- **Memória.** O teto do template (`-Xmx2048m`, metaspace 512m) não aguenta o KSP: o
+  daemon do Kotlin estoura o metaspace em `expo-updates` e derruba o build depois de
+  meia hora. Os workers da EAS levantam esse teto por padrão; o runner, não.
+- **ABIs.** O padrão compila quatro arquiteturas, ou seja quatro passagens de CMake em
+  reanimated, screens e worklets. O workflow usa `arm64-v8a` sozinho, o que corta o
+  tempo em três quartos. **O APK sai só para arm64** — serve em qualquer celular
+  moderno, mas não em aparelho 32 bits. Para um universal, escolha a outra opção de
+  `arquiteturas` ao disparar.
+
 O keystore de release continua vindo da conta da Expo, buscado pelo secret `EXPO_TOKEN`
 (criado em expo.dev/settings/access-tokens e gravado com `gh secret set EXPO_TOKEN`).
 É o que garante que o APK instale por cima do que já está no aparelho. Para cortar

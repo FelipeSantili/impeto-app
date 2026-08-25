@@ -21,11 +21,16 @@ on:
         default: apk
         type: choice
         options: [apk, production]
+      arquiteturas:
+        description: ABIs a compilar — arm64 sozinho corta o tempo em três quartos
+        default: arm64-v8a
+        type: choice
+        options: [arm64-v8a, "armeabi-v7a,arm64-v8a,x86,x86_64"]
 
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +52,38 @@ jobs:
         run: sdkmanager "ndk;27.1.12297006" "cmake;3.22.1"
 
       - run: npm ci
+
+      # O `gradle.properties` do HOME vence o do projeto na precedência do
+      # Gradle — e é o único que sobrevive ao `expo prebuild`, que reescreve o
+      # de `android/` a cada build. Daí os limites virem por aqui.
+      #
+      # O teto que o template do Expo escreve (-Xmx2048m, metaspace 512m) não
+      # aguenta o KSP: o daemon do Kotlin estoura o METASPACE processando
+      # expo-updates, e o build morre depois de meia hora de trabalho. Os
+      # workers da EAS levantam esse teto; o runner do GitHub, não.
+      #
+      # As ABIs são a outra metade da conta. Compilar quatro arquiteturas
+      # significa quatro passagens de CMake em reanimated, screens e worklets.
+      # Celular moderno é arm64 — as outras três são tempo jogado fora.
+      - name: Limites do Gradle
+        run: |
+          mkdir -p ~/.gradle
+          {
+            echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g"
+            echo "kotlin.daemon.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g"
+            echo "org.gradle.workers.max=3"
+            echo "reactNativeArchitectures=${{ inputs.arquiteturas }}"
+          } >> ~/.gradle/gradle.properties
+          cat ~/.gradle/gradle.properties
+
+      # Segunda execução em diante aproveita o que já foi baixado e compilado.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('package-lock.json') }}
+          restore-keys: gradle-
 
       - name: Build
         env:
