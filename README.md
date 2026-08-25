@@ -171,6 +171,29 @@ desconhecidas" uma única vez.
 
 Para publicar na Play Store um dia, o perfil `production` gera `.aab` em vez de `.apk`.
 
+### Quando a cota da Expo acaba
+
+O plano free tem um teto mensal de builds Android. Estourado o teto, `eas build` é
+recusado antes de entrar na fila e só volta na virada do mês. A saída não é esperar:
+
+```bash
+gh workflow run apk.yml -f perfil=apk
+```
+
+[.github/workflows/apk.yml](.github/workflows/apk.yml) roda `eas build --local` — a
+mesma receita da nuvem, executada no runner do GitHub, que **não consome a cota**.
+Repositório público tem minutos ilimitados, então sai de graça e sem fila. O APK aparece
+como artefato da execução.
+
+Por que no CI e não aqui: o plugin de build local **não roda no Windows** ("macOS or
+Linux is required"). O runner é Ubuntu.
+
+O keystore de release continua vindo da conta da Expo, buscado pelo secret `EXPO_TOKEN`
+(criado em expo.dev/settings/access-tokens e gravado com `gh secret set EXPO_TOKEN`).
+É o que garante que o APK instale por cima do que já está no aparelho. Para cortar
+também esse laço, o caminho é guardar o `.jks` e as três senhas como secrets e trocar o
+passo do `eas` por `npx expo prebuild` + `gradlew assembleRelease`.
+
 ## Atualizar o app sem reinstalar
 
 O projeto usa **EAS Update**: mudanças de JS e imagens chegam ao celular pelo ar,

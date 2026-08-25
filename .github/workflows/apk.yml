@@ -1,0 +1,67 @@
+# Compila o APK no runner do GitHub, não nos servidores da Expo.
+#
+# O `eas build --local` usa a mesma receita da nuvem, mas roda aqui — então não
+# consome a cota de builds do plano free. Windows não é suportado pelo plugin
+# local; Ubuntu é, e é o que o runner dá. Repositório público tem minutos
+# ilimitados, então isto é gratuito e sem fila.
+#
+# O keystore de release continua vindo da conta da Expo, buscado pelo EXPO_TOKEN
+# — é o que garante que o APK instale por cima do que está no celular, sem
+# desinstalar nada.
+#
+# Um segredo a configurar: EXPO_TOKEN, criado em
+# https://expo.dev/settings/access-tokens
+name: APK Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      perfil:
+        description: Perfil do eas.json (apk gera .apk, production gera .aab)
+        default: apk
+        type: choice
+        options: [apk, production]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      # O NDK vem explícito porque reanimated, screens e worklets compilam
+      # código nativo, e o runner não traz NDK por padrão.
+      - name: NDK
+        run: sdkmanager "ndk;27.1.12297006" "cmake;3.22.1"
+
+      - run: npm ci
+
+      - name: Build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx eas-cli@latest build \
+            --platform android \
+            --profile ${{ inputs.perfil }} \
+            --local \
+            --non-interactive \
+            --output "${{ github.workspace }}/impeto-${{ inputs.perfil }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: impeto-${{ inputs.perfil }}
+          path: impeto-${{ inputs.perfil }}*
+          if-no-files-found: error
+          retention-days: 30
