@@ -1,0 +1,10 @@
+# Sobras de compilação local dentro de node_modules.
+#
+# O @expo/fingerprint já ignora `**/android/build/**` por padrão, mas o
+# react-native-health-connect traz um SEGUNDO projeto Android (`android-expo/`)
+# e esse caminho não está no padrão. Depois de um `expo run:android` local, o
+# Gradle deixa lá dezenas de arquivos que a instalação limpa do EAS não tem —
+# e o build falha com "runtime version mismatch" antes de gerar o APK.
+**/android-expo/build/**/*
+**/android/.cxx/**/*
+**/android/.gradle/**/*

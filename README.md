@@ -200,6 +200,29 @@ o aparelho sozinho. Push real exigiria servidor e token por aparelho.
 estado na nuvem. Ao gerar uma build nova para o mesmo aparelho, suba o
 `android.versionCode` (1 → 2 → 3…), senão o Android recusa a instalação por cima.
 
+### A armadilha do fingerprint
+
+`runtimeVersion: fingerprint` compara o hash da camada nativa calculado **na sua
+máquina** com o calculado **no servidor do EAS**. Se os dois não baterem, o build morre
+antes de gerar o APK com "runtime version mismatch" — e o culpado provável não é o seu
+código, é sobra de compilação dentro de `node_modules`.
+
+Um `expo run:android` local deixa saída do Gradle em `node_modules/<lib>/android/build/`.
+O EAS instala limpo e não tem nada disso. Na maioria das bibliotecas isso é inofensivo,
+porque o `@expo/fingerprint` já ignora `**/android/build/**` por padrão — mas o
+`react-native-health-connect` traz um SEGUNDO projeto Android (`android-expo/`), fora
+do padrão, e é justamente por ele que o hash divergia.
+
+O `.fingerprintignore` na raiz fecha esse caminho (e mais os `.cxx`/`.gradle` das outras
+bibliotecas). Ele não altera o hash — só impede que sobra local entre na conta. Para
+conferir a qualquer momento:
+
+```bash
+node node_modules/expo-updates/bin/cli.js fingerprint:generate --platform android
+```
+
+O `hash` do fim da saída é o que o EAS tem que reproduzir.
+
 ### Imagens dos exercícios
 
 As demonstrações são baixadas da CDN na primeira vez que você abre cada exercício e
