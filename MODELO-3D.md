@@ -111,52 +111,74 @@ Escala e posição são normalizadas de propósito: é a classe de erro mais com
 
 ## Onde o arquivo entra
 
-Coloque em `assets/modelos/corpo.glb`.
+O arquivo vive em `assets/modelos/corpo.glb`, e as três peças que o ligam já
+estão no lugar:
 
-Três coisas precisam ser ligadas quando o arquivo existir — nenhuma delas está
-no código hoje, porque `require` de um arquivo inexistente quebra o bundler:
+1. **`metro.config.js`** registra `glb` em `assetExts`. Sem isso o `require`
+   resolve como módulo JavaScript e o bundle quebra.
 
-1. **`metro.config.js`** (não existe ainda) precisa aceitar `glb` como asset:
+2. **`expo-asset`** é dependência direta. Ele já vem dentro do `expo` core, mas
+   declará-lo muda o fingerprint — e com `runtimeVersion.policy: fingerprint`
+   isso significa que **um APK novo é obrigatório**. Um aparelho com o APK
+   anterior não recebe esta versão por OTA: continua rodando o código velho, com
+   o esquema procedural, e sem nenhum erro para ver.
 
-   ```js
-   const { getDefaultConfig } = require('expo/metro-config');
-   const config = getDefaultConfig(__dirname);
-   config.resolver.assetExts.push('glb');
-   module.exports = config;
-   ```
+3. **O carregador** vive em [src/lib/gltf.ts](src/lib/gltf.ts), separado do
+   componente. Separado porque o difícil ali não é anatomia nem three — é que o
+   GLTFLoader nasceu para o navegador.
 
-2. **`expo-asset`** precisa voltar como dependência direta
-   (`npx expo install expo-asset`). Ele já vem dentro do `expo` core, mas
-   declará-lo muda o fingerprint — **e por isso um APK novo é obrigatório**
-   nesse momento. Foi justamente para não gastar isso antes da hora que ele foi
-   removido.
+### A armadilha do `navigator` — leia antes de mexer no carregador
 
-3. **O carregador**, em `corpo-3d.tsx`. O esqueleto dele:
+O construtor do `GLTFParser` fareja o navegador para escolher entre
+`ImageBitmapLoader` e `TextureLoader`, e fareja sem defesa:
 
-   ```ts
-   import { Asset } from 'expo-asset';
-   import { File } from 'expo-file-system';
-   import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+```js
+if ( typeof navigator !== 'undefined' ) {
+  const userAgent = navigator.userAgent;
+  isSafari = /…safari/i.test( userAgent ) === true;
+  const safariMatch = userAgent.match( /Version\/(\d+)/ );   // ← estoura
+```
 
-   const asset = Asset.fromModule(require('@/assets/modelos/corpo.glb'));
-   await asset.downloadAsync();
-   const bytes = await new File(asset.localUri!).bytes();
+O React Native instala `global.navigator = { product: 'ReactNative' }` e nada
+além disso. O `typeof` passa, `userAgent` é `undefined`, o `.test` sobrevive
+(coage para a string `"undefined"`) e o `.match` derruba o construtor com
+`TypeError: Cannot read property 'match' of undefined`.
 
-   new GLTFLoader().parse(bytes.buffer, '', (gltf) => {
-     // Normaliza altura e centro — resolve escala e origem de uma vez.
-     const caixa = new THREE.Box3().setFromObject(gltf.scene);
-     const tam = caixa.getSize(new THREE.Vector3());
-     gltf.scene.scale.setScalar(ALTURA / tam.y);
-     // ...e então percorre as malhas mapeando nome → Grupo.
-   });
-   ```
+Três coisas fazem disso um bug caro:
 
-   `File.bytes()` devolve um `Uint8Array` direto, sem passar por base64 — o que
-   evita o único ponto onde carregar GLB em React Native costuma ficar lento.
+- acontece **dentro de `parse()`, de forma síncrona**, antes de qualquer
+  callback — nunca chega no `onError`;
+- quem envolve `parse()` num `try/catch` recebe o mesmo sinal que receberia de
+  um arquivo corrompido;
+- e o `.glb` está **perfeito** no bundle, então a investigação começa inteira no
+  lugar errado.
+
+A correção é dar um `userAgent` ao `navigator` antes do primeiro `parse()`.
+Qualquer string serve, desde que não contenha "Safari" nem "Firefox": as duas
+comparações caem no ramo falso e o loader escolhe `TextureLoader`, que é o certo
+aqui — não há textura nenhuma para carregar.
+
+**Corolário:** nunca engula o erro do carregador. `carregarGLB` lança, o
+componente registra no log e avisa a tela por `onFonte`, e a tela diz que está
+exibindo o esquema. Um `catch {}` vazio esconde exatamente a classe de falha
+mais difícil de achar — a que deixa tudo com cara de estar funcionando.
+
+### Sobre os bytes
+
+`File.bytes()` devolve um `Uint8Array` direto, sem passar por base64 — o que
+evita o único ponto onde carregar GLB em React Native costuma ficar lento. Só
+que `File` lê `file://`, e nem todo asset chega como arquivo local; quando não
+chega, `fetch` é a reserva.
 
 ## O que muda no comportamento
 
-Nada, do lado de fora. A rampa térmica, o toque para identificar o músculo, a
-órbita e o enquadramento continuam iguais: o carregador só troca de onde a
-geometria vem. O `corpoBase()` procedural fica no código como **fallback** —
-se o arquivo faltar, o app volta ao écorché em vez de abrir uma tela preta.
+Nada, do lado de fora. A rampa térmica, o toque e a órbita continuam iguais: o
+carregador só troca de onde a geometria vem. O `corpoBase()` procedural fica no
+código como **fallback** — se o arquivo faltar, o app volta ao écorché em vez de
+abrir uma tela preta, e diz na tela que foi isso que aconteceu.
+
+O **enquadramento** deixou de ser cravado: a câmera mede a caixa envolvente do
+que entrou em cena. É o que faz o mesmo código enquadrar o `.glb` e o esquema de
+reserva, que têm proporções diferentes — e o que faz um `.glb` regerado com
+outro recorte continuar cabendo no quadro sem ninguém reajustar constante
+nenhuma.

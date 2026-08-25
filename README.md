@@ -280,18 +280,21 @@ src/
     selecionar.tsx  seletor múltiplo de exercícios
     modelos.tsx · modelo/[id].tsx    vitrine e detalhe dos treinos prontos
     ajustes.tsx   conexões (Health Connect, cinta, .tcx do relógio) e backup
+    corpo.tsx     a musculatura da sessão em três dimensões (modal)
     exercicio/[id].tsx · rotina/[id].tsx · sessao/[id].tsx
   components/
     base.tsx      vocabulário do caderno: texto, botões, régua, seção, linha,
                   cabeça de coluna, carimbo, pressionável
     glifos.tsx    as 26 marcas desenhadas do app (não há biblioteca de ícones)
     demo · folha · descanso · animado · mapa-muscular · cartao-compartilhar
+    corpo-3d.tsx  o modelo anatômico do Z-Anatomy; receita em MODELO-3D.md
     curva-fc.tsx  a curva de frequência do treino, quando a fonte manda amostras
   data/           catálogo, modelos prontos, tipos e execução por família de movimento
   design/
     tokens.ts   contrato de direção, as DUAS paletas, tipografia, marcas
     tema.tsx    TemaProvider, usarPaleta e criarEstilos (folhas por tema)
   lib/            metricas, saude (Health Connect), backup, atualizacao, compartilhar
+    gltf.ts       carrega .glb no React Native (e a armadilha do navigator)
     tcx.ts        leitor dos arquivos .tcx do Mi Fitness (as duas formas dele)
     relogio.ts    escolhe os arquivos e casa cada um com o treino do histórico
   store/          estado persistido (zustand + AsyncStorage): treino, cinta,

@@ -1,14 +1,12 @@
-import { Asset } from 'expo-asset';
-import { File } from 'expo-file-system';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import { useCallback, useEffect, useRef } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Grupo } from '@/data/types';
 import type { Paleta } from '@/design/tokens';
 import { nivelDeCalor } from '@/design/tokens';
+import { carregarGLB } from '@/lib/gltf';
 
 /**
  * MODELO ANATÔMICO EM TRÊS DIMENSÕES
@@ -42,6 +40,12 @@ import { nivelDeCalor } from '@/design/tokens';
  * faltar ou não carregar. Perder o arquivo degrada a fidelidade — não pode
  * apagar a tela.
  *
+ * Mas a reserva agora se ANUNCIA, por `onFonte`, e o erro vai para o log. A
+ * versão anterior trocava em silêncio, e o silêncio custou caro: o `.glb`
+ * chegava perfeito ao aparelho e o GLTFLoader morria num `TypeError` de três
+ * linhas por causa do `navigator` do React Native — está explicado em
+ * `@/lib/gltf`. Uma degradação muda de categoria quando não dá para vê-la.
+ *
  * ─── A regra de sempre ───────────────────────────────────────────────────────
  *
  * A cor sai de `corDeCalor`, a MESMA rampa da prancha 2D e das barras de carga.
@@ -50,9 +54,6 @@ import { nivelDeCalor } from '@/design/tokens';
 
 /** Ponto no espaço do corpo: X à direita, Y para cima, Z à frente. */
 type P3 = [number, number, number];
-
-/** Altura do corpo, do pé (y=0) ao topo da cabeça. Enquadra a câmera. */
-const ALTURA = 175;
 
 /**
  * Estação de um músculo: onde a curva passa e qual é a espessura ali.
@@ -336,33 +337,21 @@ function corpoBase(): THREE.BufferGeometry[] {
  * Carrega a anatomia real, extraída do Z-Anatomy.
  *
  * O arquivo tem catorze malhas nomeadas pelos grupos do app — treze de músculo
- * mais `corpo`, que é o esqueleto e nunca acende. Já sai do processamento com
- * 175 unidades de altura e centrado, então não há normalização a fazer aqui.
+ * mais `corpo`, que é o esqueleto e nunca acende. Sai do processamento com 175
+ * unidades de altura e centrado no eixo, mas o enquadramento não confia nisso:
+ * ele mede a caixa do que entrou.
  *
- * Devolve `null` em qualquer falha, de propósito: perder o arquivo não pode
- * abrir uma tela preta. O écorché procedural continua no código exatamente
- * para esse caso.
+ * Devolve `null` em qualquer falha, para que perder o arquivo degrade a
+ * fidelidade em vez de abrir uma tela preta — mas nunca em silêncio. O
+ * `catch {}` vazio que estava aqui devolvia o mesmo `null` para "arquivo
+ * ausente" e para "o loader estourou", e foi ele que escondeu o `TypeError` do
+ * `navigator` descrito em `@/lib/gltf`.
  */
 async function carregarAnatomia(): Promise<THREE.Object3D | null> {
   try {
-    const asset = Asset.fromModule(require('@/assets/modelos/corpo.glb'));
-    await asset.downloadAsync();
-    const uri = asset.localUri ?? asset.uri;
-    if (!uri) return null;
-
-    // `bytes()` entrega Uint8Array direto. Passar por base64 aqui — que é o
-    // caminho mais divulgado — triplica o tamanho em memória e custa uma
-    // decodificação de alguns megabytes na thread de JS.
-    const dados = await new File(uri).bytes();
-    const buffer = dados.buffer.slice(
-      dados.byteOffset,
-      dados.byteOffset + dados.byteLength,
-    ) as ArrayBuffer;
-
-    return await new Promise((resolver, rejeitar) => {
-      new GLTFLoader().parse(buffer, '', (gltf) => resolver(gltf.scene), rejeitar);
-    });
-  } catch {
+    return await carregarGLB(require('@/assets/modelos/corpo.glb'));
+  } catch (erro) {
+    console.warn('[corpo-3d] a anatomia não carregou; exibindo o esquema:', erro);
     return null;
   }
 }
@@ -403,25 +392,50 @@ const NOME_ANATOMICO: Record<Grupo, string> = {
   cardio: 'Cardio',
 };
 
+/** De onde veio a geometria que está em cena. */
+export type FonteDoModelo = 'anatomia' | 'reserva';
+
 export interface CorpoProps {
   /** Fração de esforço por grupo, 0..1. Ausente = não trabalhado. */
   intensidade: Map<Grupo, number>;
   paleta: Paleta;
   /** Chamado quando o usuário toca um músculo. `null` ao tocar o vazio. */
   onTocar?: (m: { grupo: Grupo; nome: string } | null) => void;
+  /**
+   * Avisa, uma vez, qual geometria acabou entrando em cena. Existe para a tela
+   * poder dizer que está mostrando o esquema em vez de deixar o usuário achar
+   * que a anatomia do Z-Anatomy é aquilo.
+   */
+  onFonte?: (fonte: FonteDoModelo) => void;
   /** Gira sozinho enquanto ninguém encosta. */
   girarSozinho?: boolean;
 }
 
-export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: CorpoProps) {
+export function Corpo3D({
+  intensidade,
+  paleta,
+  onTocar,
+  onFonte,
+  girarSozinho = true,
+}: CorpoProps) {
   const cena = useRef<{
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
     pivo: THREE.Group;
     render: () => void;
     gl: ExpoWebGLRenderingContext;
+    /** Só os músculos: é neles que a rampa térmica pinta. */
     alvos: THREE.Mesh[];
+    /** Tudo que tem corpo, esqueleto incluído. O raio do toque bate nestes. */
+    solidos: THREE.Mesh[];
   } | null>(null);
+
+  // A cena monta uma vez, e o aviso de fonte sai de dentro dessa montagem.
+  // Guardar o callback numa ref é o que impede que trocá-lo remonte tudo.
+  const avisarFonte = useRef(onFonte);
+  useEffect(() => {
+    avisarFonte.current = onFonte;
+  }, [onFonte]);
 
   // Estado da órbita fora do React: o laço de render lê isto 60 vezes por
   // segundo, e passar por estado faria uma re-renderização por quadro.
@@ -522,6 +536,7 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
         flatShading: false,
       });
       const alvos: THREE.Mesh[] = [];
+      const solidos: THREE.Mesh[] = [];
 
       /** Material de um músculo, no degrau da rampa que a intensidade pede. */
       const matMusculo = (grupo: Grupo) => {
@@ -553,12 +568,17 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
           } else {
             malha.material = matBase;
           }
+          solidos.push(malha);
         });
         pivo.add(anatomia);
       } else {
         // Sem o arquivo, o écorché gerado em código. Perder o modelo degrada a
         // fidelidade; não pode apagar a tela.
-        for (const g of corpoBase()) pivo.add(new THREE.Mesh(g, matBase));
+        for (const g of corpoBase()) {
+          const base = new THREE.Mesh(g, matBase);
+          pivo.add(base);
+          solidos.push(base);
+        }
         for (const m of MUSCULOS) {
           const lados: (1 | -1)[] = m.par ? [1, -1] : [1];
           for (const s of lados) {
@@ -569,34 +589,51 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
             mesh.userData = { grupo: m.grupo, nome: m.nome };
             pivo.add(mesh);
             alvos.push(mesh);
+            solidos.push(mesh);
           }
         }
       }
 
+      // A outra metade do conserto do `catch` vazio: o erro foi para o log, e
+      // agora a tela para de afirmar que mostra anatomia quando mostra esquema.
+      avisarFonte.current?.(anatomia ? 'anatomia' : 'reserva');
+
       /*
-       * Centraliza o corpo no pivô: girar tem que ser girar em torno DELE, não
-       * em torno dos pés. O corpo vai de y=0 (pé) a y=173 (topo da cabeça),
-       * então o meio é 86,5 — errar isso faz a figura descrever um círculo em
-       * vez de girar no lugar.
+       * Centro e enquadramento MEDIDOS da caixa envolvente do que entrou em
+       * cena, em vez de cravados.
+       *
+       * Cravar era o erro: 175 de altura e 34 de meia-largura são os números
+       * deste arquivo. A cena monta de duas fontes com proporções diferentes —
+       * o `.glb` e o esquema de reserva — e o `.glb` ainda pode ser regerado
+       * com outro recorte. Uma varredura da caixa resolve os três casos.
+       *
+       * Girar tem que ser girar em torno do MEIO do corpo: com o pivô nos pés a
+       * figura descreve um círculo em vez de girar no lugar.
        */
-      pivo.position.set(0, -ALTURA / 2, 0);
+      const caixa = new THREE.Box3().setFromObject(pivo);
+      // Caixa vazia devolve min=+∞ e max=−∞, e a conta de distância vira NaN —
+      // que é a tela preta que este arquivo inteiro existe para não ter. Não
+      // deveria acontecer, já que os dois ramos acima sempre põem malhas; o
+      // custo de garantir é uma linha.
+      if (caixa.isEmpty()) caixa.set(new THREE.Vector3(-35, 0, -20), new THREE.Vector3(35, 175, 20));
+      const tam = caixa.getSize(new THREE.Vector3());
+      const centro = caixa.getCenter(new THREE.Vector3());
+      pivo.position.set(-centro.x, -centro.y, -centro.z);
+
       const suporte = new THREE.Group();
       suporte.add(pivo);
       scene.add(suporte);
 
       /*
-       * Distância de enquadramento, calculada em vez de chutada.
-       *
-       * A versão anterior tinha a câmera cravada em z=230 com FOV de 32°: cabem
-       * 2·230·tan(16°) ≈ 132 unidades de altura, e o corpo tem 173. A cabeça e
-       * os pés ficavam FORA do quadro, o que é boa parte do "está estranho".
-       *
-       * Aqui a distância sai da altura que se quer enquadrar, com folga — e o
-       * `min` com a razão de aspecto garante que numa tela estreita o corpo não
-       * encoste nas laterais ao girar de perfil.
+       * A distância sai da altura a enquadrar, com folga — e o segundo termo
+       * cuida do perfil. De lado, o que precisa caber não é a largura de frente
+       * e sim a DIAGONAL do plano XZ, porque é o raio que a silhueta varre ao
+       * girar. Sem isso o corpo encosta nas laterais no meio do giro, e primeiro
+       * numa tela estreita.
        */
-      const meiaAltura = (ALTURA * 1.12) / 2;
-      const meiaLargura = 34;
+      const folga = 1.1;
+      const meiaAltura = (tam.y / 2) * folga;
+      const meiaLargura = (Math.hypot(tam.x, tam.z) / 2) * folga;
       const tg = Math.tan((camera.fov * Math.PI) / 360);
       const dist = Math.max(meiaAltura / tg, meiaLargura / (tg * camera.aspect));
 
@@ -613,7 +650,7 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
         gl.endFrameEXP();
       };
 
-      cena.current = { scene, camera, pivo: suporte, render, gl, alvos };
+      cena.current = { scene, camera, pivo: suporte, render, gl, alvos, solidos };
 
       /*
        * O giro de apresentação existe para dizer, sem texto, que a figura é
@@ -658,11 +695,13 @@ export function Corpo3D({ intensidade, paleta, onTocar, girarSozinho = true }: C
       const ponteiro = new THREE.Vector2((x / l) * 2 - 1, -(y / a) * 2 + 1);
       const raio = new THREE.Raycaster();
       raio.setFromCamera(ponteiro, ref.camera);
-      const acertos = raio.intersectObjects(ref.alvos, false);
-      const alvo = acertos[0]?.object;
-      onTocar(
-        alvo ? { grupo: alvo.userData.grupo as Grupo, nome: alvo.userData.nome as string } : null,
-      );
+      // O esqueleto entra no raio como OCLUSOR, não como alvo. Mirando só nos
+      // músculos, um toque que passa raspando o peitoral atravessa o corpo e
+      // acende o dorsal do outro lado — o dedo aponta para a frente e a resposta
+      // vem de trás. Aqui ele bloqueia, mas não tem grupo: a resposta é "nada".
+      const alvo = raio.intersectObjects(ref.solidos, false)[0]?.object;
+      const grupo = alvo?.userData.grupo as Grupo | undefined;
+      onTocar(grupo ? { grupo, nome: alvo!.userData.nome as string } : null);
     },
     [onTocar],
   );

@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BotaoGlifo, Regua, Rotulo, Tx } from '@/components/base';
-import { Corpo3D } from '@/components/corpo-3d';
+import { Corpo3D, type FonteDoModelo } from '@/components/corpo-3d';
 import { GRUPO_LABEL, type Grupo } from '@/data/types';
 import { criarEstilos, usarPaleta } from '@/design/tema';
 import { margem, nivelDeCalor, radius, sp, traco } from '@/design/tokens';
@@ -33,6 +33,9 @@ export default function TelaCorpo() {
   const ativa = useTreino((s) => s.ativa);
 
   const [tocado, setTocado] = useState<{ grupo: Grupo; nome: string } | null>(null);
+  // `null` enquanto o `.glb` não respondeu. O modelo leva um instante para
+  // chegar, e um instante sem nenhuma palavra lê como tela quebrada.
+  const [fonte, setFonte] = useState<FonteDoModelo | null>(null);
 
   const musculos = useMemo(() => {
     const alvo = idSessao ? historico.find((h) => h.id === idSessao) : ativa;
@@ -65,7 +68,12 @@ export default function TelaCorpo() {
       <Regua peso="forte" style={{ marginHorizontal: margem.pagina }} />
 
       <View style={estilos.palco}>
-        <Corpo3D intensidade={intensidade} paleta={c} onTocar={setTocado} />
+        <Corpo3D
+          intensidade={intensidade}
+          paleta={c}
+          onTocar={setTocado}
+          onFonte={setFonte}
+        />
 
         {/* Leitura do toque: fica sobre o modelo porque é resposta ao dedo,
             não conteúdo da página. Some sozinha ao tocar o vazio. */}
@@ -82,6 +90,12 @@ export default function TelaCorpo() {
                   : ' · não trabalhado'}
               </Rotulo>
             </View>
+          ) : fonte === null ? (
+            <Rotulo cor={c.tintaFantasma}>Carregando a anatomia…</Rotulo>
+          ) : fonte === 'reserva' ? (
+            // Degradação visível de propósito: quem está olhando um esquema
+            // precisa saber que é um esquema, e não que a anatomia é aquilo.
+            <Rotulo cor={c.tintaFraca}>Anatomia indisponível · exibindo o esquema</Rotulo>
           ) : (
             <Rotulo cor={c.tintaFantasma}>Arraste para girar · pince para aproximar</Rotulo>
           )}
