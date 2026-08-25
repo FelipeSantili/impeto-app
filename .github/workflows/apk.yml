@@ -85,20 +85,29 @@ jobs:
           key: gradle-${{ hashFiles('package-lock.json') }}
           restore-keys: gradle-
 
+      # A extensão é obrigatória, não cosmética: arquivo sem `.apk` o Android
+      # não abre para instalar, e o artefato do Actions preserva o nome que sai
+      # daqui. O perfil `apk` gera pacote instalável; `production`, bundle de
+      # loja.
       - name: Build
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
+          EXT=apk
+          if [ "${{ inputs.perfil }}" = "production" ]; then EXT=aab; fi
+          VERSAO=$(node -e "console.log(require('./app.json').expo.version)")
           npx eas-cli@latest build \
             --platform android \
             --profile ${{ inputs.perfil }} \
             --local \
             --non-interactive \
-            --output "${{ github.workspace }}/impeto-${{ inputs.perfil }}"
+            --output "${{ github.workspace }}/impeto-$VERSAO.$EXT"
 
       - uses: actions/upload-artifact@v4
         with:
           name: impeto-${{ inputs.perfil }}
-          path: impeto-${{ inputs.perfil }}*
+          path: |
+            impeto-*.apk
+            impeto-*.aab
           if-no-files-found: error
           retention-days: 30
