@@ -95,6 +95,8 @@ function Moldura() {
         />
         <Stack.Screen name="exercicio/[id]" />
         <Stack.Screen name="rotina/[id]" options={{ animation: 'slide_from_bottom' }} />
+        {/* A antessala da rotina: abre por cima do Início e leva ao treino. */}
+        <Stack.Screen name="iniciar/[id]" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="sessao/[id]" />
         {/* O modelo 3D: sobe por cima da prancha que o abriu, e volta pra ela. */}
         <Stack.Screen

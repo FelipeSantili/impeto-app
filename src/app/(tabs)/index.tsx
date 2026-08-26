@@ -39,7 +39,6 @@ export default function Inicio() {
   const historico = useTreino((s) => s.historico);
   const ativa = useTreino((s) => s.ativa);
   const iniciarVazio = useTreino((s) => s.iniciarVazio);
-  const iniciarDeRotina = useTreino((s) => s.iniciarDeRotina);
   const apagarRotina = useTreino((s) => s.apagarRotina);
 
   const semana = resumoDaSemana(historico);
@@ -51,18 +50,16 @@ export default function Inicio() {
     router.push('/treino');
   }
 
+  /**
+   * Abre a rotina — e só abre.
+   *
+   * Aqui se iniciava o treino direto, e era o bug de comportamento mais fácil
+   * de cometer no app inteiro: um toque errado nesta lista abria uma sessão com
+   * o cronômetro correndo. Duração é dado; sessão aberta por engano estraga o
+   * histórico. Quem começa o treino agora é o botão da antessala.
+   */
   function abrirRotina(r: Rotina) {
-    if (ativa) {
-      abrirConfirmacao({
-        titulo: 'Treino em andamento',
-        descricao: 'Finalize ou descarte o treino atual antes de começar outro.',
-        confirmar: 'Ver treino',
-        onConfirmar: () => router.push('/treino'),
-      });
-      return;
-    }
-    iniciarDeRotina(r.id);
-    router.push('/treino');
+    router.push(`/iniciar/${r.id}`);
   }
 
   function opcoesRotina(r: Rotina) {
@@ -70,7 +67,7 @@ export default function Inicio() {
       titulo: r.nome,
       subtitulo: `${r.itens.length} exercícios`,
       opcoes: [
-        { texto: 'Iniciar esta rotina', glifo: 'play', onPress: () => abrirRotina(r) },
+        { texto: 'Abrir rotina', glifo: 'play', onPress: () => abrirRotina(r) },
         { texto: 'Editar', glifo: 'lista', onPress: () => router.push(`/rotina/${r.id}`) },
         {
           texto: 'Apagar rotina',

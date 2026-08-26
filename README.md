@@ -273,7 +273,13 @@ arquivo.
 
 **Início** — a semana como linha pautada de sete células (o dia treinado recebe um bloco
 de tinta, hoje fica emoldurado), um botão para começar e a lista de rotinas. Toque numa
-rotina para iniciá-la já montada; segure para editar ou apagar.
+rotina para **abrir** a antessala dela; segure para editar ou apagar.
+
+**Antessala da rotina** — nenhum treino começa por toque de lista. Tocar numa rotina
+abre uma tela que mostra o que vem no dia: exercícios em ordem, séries e descanso de
+cada um, e quando foi a última vez que ela virou treino. Quem começa o cronômetro é o
+botão **Iniciar treino**, e só ele. Toque num exercício para ler a ficha antes de
+entrar no salão.
 
 **Modelos prontos** — 14 treinos em 5 divisões clássicas: Upper · Lower (A e B),
 Push · Pull · Legs, ABC, Full Body e Primeiras semanas (só máquinas, para quem está
@@ -285,6 +291,13 @@ o original.
 vez, carga, repetições e o ✓. Tocar no ✓ sem digitar nada repete o desempenho anterior
 e dispara o cronômetro de descanso. Tocar no número da série abre o seletor de técnica;
 segurar remove a série.
+
+**Descanso, editável no meio do treino** — o tempo é uma TECLA no cabeçalho de cada
+exercício, não uma legenda: um toque abre as oito opções, e "outro tempo" aceita
+qualquer valor digitado. Com o cronômetro correndo, **−15s** e **+15s** corrigem o
+relógio e o ALVO do exercício ao mesmo tempo — a correção vale para as séries
+seguintes, em vez de morrer no fim daquele descanso. A tira mostra o alvo ao lado do
+tempo restante, para o ajuste ser visível.
 
 **Exercícios** — 299 movimentos em português, cobrindo as máquinas de uma academia
 comum (leg press, hack, extensora, flexora, peck deck, crossover, graviton, Smith,
@@ -350,6 +363,7 @@ src/
     modelos.tsx · modelo/[id].tsx    vitrine e detalhe dos treinos prontos
     ajustes.tsx   conexões (Health Connect, cinta, .tcx do relógio) e backup
     corpo.tsx     a musculatura da sessão em três dimensões (modal)
+    iniciar/[id].tsx  a antessala: o que vem no dia, antes de o relógio correr
     exercicio/[id].tsx · rotina/[id].tsx · sessao/[id].tsx
   components/
     base.tsx      vocabulário do caderno: texto, botões, régua, seção, linha,

@@ -6,7 +6,7 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { CabecaColuna, Pressavel, Regua, Rotulo, Tx } from '@/components/base';
 import { Miniatura } from '@/components/demo';
 import { Glifo } from '@/components/glifos';
-import { abrirMenu, type OpcaoMenu } from '@/components/folha';
+import { abrirMenu, abrirPrompt, type OpcaoMenu } from '@/components/folha';
 import { abrirTrocaExercicio } from '@/components/variacoes';
 import { POR_ID } from '@/data/exercicios';
 import { TECNICAS, tecnicaDe } from '@/data/tecnicas';
@@ -113,14 +113,44 @@ function BlocoExercicioBase({
     abrirMenu({ titulo: ex?.nome ?? 'Exercício', opcoes });
   }
 
+  /**
+   * Tempo de descanso deste exercício.
+   *
+   * O valor atual vem marcado, e "outro tempo" abre o teclado: as oito opções
+   * cobrem o comum, e o que não é comum não pode ficar inalcançável só porque
+   * não estava na lista.
+   */
   function menuDescanso() {
     abrirMenu({
       titulo: 'Descanso entre séries',
-      subtitulo: 'Vale para todas as séries deste exercício.',
-      opcoes: OPCOES_DESCANSO.map((seg) => ({
-        texto: seg === 0 ? 'Sem cronômetro' : fmtDescanso(seg),
-        onPress: () => setDescanso(item.uid, seg),
-      })),
+      subtitulo: 'Vale para as próximas séries deste exercício.',
+      opcoes: [
+        ...OPCOES_DESCANSO.map((seg) => ({
+          texto: seg === 0 ? 'Sem cronômetro' : fmtDescanso(seg),
+          glifo: seg === item.descanso ? ('confere' as const) : undefined,
+          onPress: () => setDescanso(item.uid, seg),
+        })),
+        {
+          texto: 'Outro tempo…',
+          glifo: 'relogio' as const,
+          onPress: () =>
+            abrirPrompt({
+              titulo: 'Descanso entre séries',
+              descricao: 'Em segundos. Zero desliga o cronômetro.',
+              rotulo: 'Segundos',
+              numerico: true,
+              valor: String(item.descanso),
+              placeholder: '90',
+              confirmar: 'Definir',
+              onConfirmar: (v) => {
+                const limpo = v.replace(/[^0-9]/g, '');
+                // Campo vazio é desistência, não zero — zero se escolhe na lista.
+                if (!limpo) return;
+                setDescanso(item.uid, Math.min(1800, Number(limpo)));
+              },
+            }),
+        },
+      ],
     });
   }
 
@@ -133,15 +163,33 @@ function BlocoExercicioBase({
           escala={0.995}
         >
           <Miniatura ex={ex} tamanho={38} />
-          <View style={{ flex: 1, gap: 1 }}>
-            <Tx v="heading" numberOfLines={1}>
+          <View style={{ flex: 1 }}>
+            <Tx v="heading" numberOfLines={2}>
               {ex?.nome ?? 'Exercício'}
-            </Tx>
-            <Tx v="small" cor={c.tintaFraca}>
-              {item.descanso > 0 ? `Descanso ${fmtDescanso(item.descanso)}` : 'Sem cronômetro'}
             </Tx>
           </View>
         </Pressavel>
+
+        {/*
+          O descanso era uma LEGENDA embaixo do nome — informação que não se
+          podia tocar. Virou tecla: mostra o alvo em monoespaçada e abre a lista
+          num toque, no lugar dos três que o menu de reticências pedia.
+        */}
+        <Pressavel
+          haptico="selecao"
+          onPress={menuDescanso}
+          hitSlop={8}
+          accessibilityLabel={`Descanso ${
+            item.descanso > 0 ? fmtDescanso(item.descanso) : 'desligado'
+          }. Toque para mudar.`}
+          style={estilos.descanso}
+        >
+          <Glifo nome="relogio" tamanho={12} cor={c.tintaMid} />
+          <Tx v="numero" tab cor={item.descanso > 0 ? c.tinta : c.tintaFraca}>
+            {item.descanso > 0 ? fmtDescanso(item.descanso) : '—'}
+          </Tx>
+        </Pressavel>
+
         <Pressavel onPress={menu} hitSlop={12} style={estilos.menu} accessibilityLabel="Opções do exercício">
           <Glifo nome="reticencias" tamanho={16} cor={c.tintaMid} />
         </Pressavel>
@@ -258,7 +306,7 @@ function LinhaSerie({
     const virou = alternarFeita(uid, serie.id);
     if (virou) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (descanso > 0) iniciarDescanso(descanso);
+      if (descanso > 0) iniciarDescanso(descanso, uid);
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -398,6 +446,17 @@ const usarEstilos = criarEstilos((c) => ({
   },
   cabecalhoToque: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp.md },
   menu: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  descanso: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 30,
+    paddingHorizontal: sp.sm,
+    marginRight: sp.xs,
+    borderWidth: traco.normal,
+    borderColor: c.reguaMid,
+    borderRadius: radius.sm,
+  },
   nota: {
     ...type.small,
     color: c.acento,

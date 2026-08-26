@@ -8,6 +8,7 @@ import { criarEstilos, usarPaleta } from '@/design/tema';
 import { margem, sp, traco } from '@/design/tokens';
 import { fmtDuracao } from '@/lib/metricas';
 import { useDescanso } from '@/store/descanso';
+import { useTreino } from '@/store/treino';
 
 /**
  * Tira de descanso.
@@ -24,7 +25,8 @@ import { useDescanso } from '@/store/descanso';
 export function TiraDescanso({ bottom }: { bottom: number }) {
   const c = usarPaleta();
   const estilos = usarEstilos();
-  const { alvo, total, somar, parar } = useDescanso();
+  const { alvo, total, origem, somar, parar } = useDescanso();
+  const setDescanso = useTreino((s) => s.setDescanso);
   const [restante, setRestante] = useState(0);
   const avisou = useRef(false);
 
@@ -49,6 +51,20 @@ export function TiraDescanso({ bottom }: { bottom: number }) {
 
   const fracao = total > 0 ? Math.max(0, Math.min(1, restante / (total * 1000))) : 0;
 
+  /**
+   * Corrigir o descanso NO AR, e a correção fica.
+   *
+   * Antes só existia +15 s, e ela morria com o ciclo: quem descobria na terceira
+   * série que 90 s era pouco tinha que reabrir o menu do exercício a cada série,
+   * e o cronômetro parecia cravado. Agora o ajuste vale para as PRÓXIMAS séries
+   * daquele exercício — é o alvo dele que muda, e o cabeçalho mostra o novo
+   * valor no mesmo instante.
+   */
+  function ajustar(segundos: number) {
+    const novoTotal = somar(segundos);
+    if (origem && novoTotal > 0) setDescanso(origem, novoTotal);
+  }
+
   return (
     <Animated.View
       // Aparece e some sem deslocamento: a tira ocupa a largura toda e
@@ -62,13 +78,27 @@ export function TiraDescanso({ bottom }: { bottom: number }) {
       <ReguaProgresso fracao={fracao} altura={2} cor={c.acento} />
       <View style={estilos.corpo}>
         <View style={{ flex: 1 }}>
-          <Rotulo cor={c.tintaFraca}>Descanso</Rotulo>
+          {/* O alvo entra no rótulo: é o retorno visível de que o ajuste ficou. */}
+          <Rotulo cor={c.tintaFraca}>Descanso · alvo {fmtDuracao(total * 1000)}</Rotulo>
           <Tx v="numeroXG" tab style={{ marginTop: -2 }}>
             {fmtDuracao(restante)}
           </Tx>
         </View>
 
-        <Pressavel haptico="leve" onPress={() => somar(15)} style={estilos.acao}>
+        <Pressavel
+          haptico="leve"
+          onPress={() => ajustar(-15)}
+          accessibilityLabel="Descansar 15 segundos menos"
+          style={estilos.acao}
+        >
+          <Rotulo cor={c.tinta}>−15s</Rotulo>
+        </Pressavel>
+        <Pressavel
+          haptico="leve"
+          onPress={() => ajustar(15)}
+          accessibilityLabel="Descansar 15 segundos mais"
+          style={estilos.acao}
+        >
           <Rotulo cor={c.tinta}>+15s</Rotulo>
         </Pressavel>
         <Pressavel haptico="leve" onPress={parar} style={estilos.acao}>
@@ -89,18 +119,20 @@ const usarEstilos = criarEstilos((c) => ({
   corpo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp.sm,
+    gap: sp.xs,
     paddingHorizontal: margem.pagina,
     paddingTop: sp.sm,
     paddingBottom: sp.md,
   },
+  // Três teclas onde antes havia duas: a largura mínima cede para caber sem
+  // apertar o número, que é o que se lê com o celular largado no banco.
   acao: {
-    minWidth: 54,
+    minWidth: 46,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: traco.normal,
     borderColor: c.reguaMid,
-    paddingHorizontal: sp.sm,
+    paddingHorizontal: sp.xs,
   },
 }));

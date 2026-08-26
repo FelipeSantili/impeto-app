@@ -34,6 +34,10 @@ interface ConfigPrompt {
   valor?: string;
   placeholder?: string;
   confirmar?: string;
+  /** Rótulo do campo. "Nome" é o padrão porque é o uso mais comum. */
+  rotulo?: string;
+  /** Teclado numérico, para quando o que se digita é tempo ou contagem. */
+  numerico?: boolean;
   onConfirmar: (valor: string) => void;
 }
 
@@ -212,7 +216,7 @@ function CorpoPrompt({ config, fechar }: { config: ConfigPrompt; fechar: () => v
     <>
       <Titulo titulo={config.titulo} sub={config.descricao} />
       <Rotulo cor={c.tintaFraca} style={{ marginBottom: sp.xs }}>
-        Nome
+        {config.rotulo ?? 'Nome'}
       </Rotulo>
       <TextInput
         value={valor}
@@ -220,6 +224,7 @@ function CorpoPrompt({ config, fechar }: { config: ConfigPrompt; fechar: () => v
         placeholder={config.placeholder}
         placeholderTextColor={c.tintaFantasma}
         style={estilos.campo}
+        keyboardType={config.numerico ? 'number-pad' : 'default'}
         autoFocus
         selectTextOnFocus
         returnKeyType="done"
