@@ -12,8 +12,8 @@ android {
   // com "'android.defaultConfig.versionName' is not defined", que não diz de
   // onde vem. Acompanham a versão do app, só para não mentirem.
   defaultConfig {
-    versionCode 15
-    versionName '1.5.5'
+    versionCode 16
+    versionName '1.5.6'
   }
 }
 

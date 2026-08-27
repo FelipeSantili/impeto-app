@@ -33,12 +33,13 @@ android {
   defaultConfig {
     // Idêntico ao do celular. Ver o comentário acima — isto é o contrato.
     applicationId = "com.impeto.app"
-    // Wear OS 3. O Galaxy Watch 7 é Wear OS 5, mas não há nada aqui que exija
-    // mais que 30, e um piso baixo não custa nada.
+    // Wear OS 3. O aparelho de teste — um Galaxy Watch 7 (SM-L310) — respondeu
+    // API 36, ou seja Wear OS 6; nada aqui exige mais que 30, e um piso baixo
+    // não custa nada.
     minSdk = 30
     targetSdk = 34
-    versionCode = 15
-    versionName = "1.5.5"
+    versionCode = 16
+    versionName = "1.5.6"
   }
 
   signingConfigs {
