@@ -41,7 +41,7 @@ RETRATO que volta.
 
 ```
   relógio  ──  MessageClient  ──▶  celular      comando: marca, edita, inicia
-  relógio  ◀──  DataClient    ──   celular      retrato: a sessão inteira
+  relógio  ◀──  DataClient    ──   celular      retrato: a sessão e as rotinas
 ```
 
 A alternativa — os dois escrevendo no mesmo estado e reconciliando depois —
@@ -60,6 +60,28 @@ Os dois canais do Data Layer fazem coisas diferentes de propósito:
 O retrato ser um `DataItem` é o que faz o app do relógio abrir **já** com o
 treino em curso: o último publicado continua no Data Layer depois de o relógio
 reiniciar, sem o celular precisar republicar.
+
+## O que o retrato carrega
+
+Duas coisas, e a segunda é o que faz o app valer a pena ANTES do treino começar.
+
+**A sessão aberta**, com exercícios e séries. O nome do exercício vai resolvido
+do catálogo: o relógio não carrega o catálogo, e não vai — são milhares de
+linhas para uma tela que mostra um nome por vez.
+
+**As rotinas salvas**, com nome e contagem. Só a contagem, não os exercícios: a
+lista serve para ESCOLHER qual treino começar, e ninguém escolhe lendo dezoito
+nomes numa tela de quatro centímetros. Escolhida, a sessão traz tudo.
+
+Elas viajam no mesmo retrato, e por isso estão certas por construção: rotina
+criada, renomeada ou apagada no celular aparece no relógio na publicação
+seguinte, sem nada para sincronizar à mão.
+
+`lerRetrato` devolve `Retrato?` e não `Sessao?`, e a diferença importa: nulo é
+JSON quebrado; retrato válido com `sessao` nula é "o celular está aqui e não tem
+treino aberto" — que é exatamente o estado em que as rotinas precisam aparecer.
+`Elo.receber` DESCARTA o nulo em vez de propagá-lo: uma leitura ruim não deve
+apagar da tela o último retrato bom.
 
 ## O buraco, e o que tapa ele
 
@@ -98,9 +120,17 @@ transportaria campos avulsos num `DataMap` sem problema, mas aí cada campo novo
 numa série viraria mexida em três arquivos em vez de dois — e o esquecimento
 silencioso de um deles é indistinguível de uma falha de rede.
 
-O nome do exercício vai **resolvido** do catálogo no retrato. O relógio não
-carrega o catálogo, e não vai: são milhares de linhas para uma tela que mostra
-um nome por vez.
+## O celular diz se há relógio
+
+Uma linha em *Ajustes → Conexões*, com o nome do que estiver ao alcance.
+Perguntado por SONDAGEM de oito segundos, não por evento: o Data Layer avisa
+quando um nó entra ou sai, mas assinar isso obriga a manter um ouvinte vivo
+enquanto a tela existe, para uma informação que muda uma vez por dia.
+
+A lista vem vazia por três motivos que a tela não distingue, de propósito — não
+há relógio pareado, há mas está fora de alcance, ou há e está ao alcance sem o
+Ímpeto instalado. Para quem lê "nenhum relógio", os três pedem a mesma coisa: ir
+ver o relógio.
 
 ## Compilar e instalar
 
@@ -127,13 +157,21 @@ Sem esse arquivo o build cai no keystore de debug — compila e instala, mas fic
 
 ### 2. O relógio
 
+A depuração sem fio pede **duas** portas diferentes, e confundi-las custa uma
+hora: a que a tela principal mostra é a de CONEXÃO, e ela recusa quem ainda não
+trocou chave. O pareamento é um passo separado, uma vez só, em *Depuração sem
+fio → Parear novo dispositivo* — outra porta, com um código de seis dígitos.
+
+Se a tela de pareamento estiver aberta, o `adb` acha a porta sozinho:
+
 ```
-adb connect <ip-do-relogio>:<porta>
+adb mdns services          # procure a linha _adb-tls-pairing._tcp
+adb pair <ip>:<porta-de-pareamento> <codigo>
+adb connect <ip>:<porta-de-conexao>
 cd pulso && ./gradlew :app:installDebug
 ```
 
-O IP e a porta saem de *Ajustes → Opções do desenvolvedor → Depuração sem fio*
-no relógio.
+Depois de pareado, só o `connect` é necessário, e ele sobrevive a reinícios.
 
 ### 3. O celular
 
@@ -147,7 +185,8 @@ a chave é a mesma, instala por cima e o histórico continua onde está.
   recebe `descanso` de cada exercício no retrato, e vibração no pulso é melhor
   que apito no bolso.
 - **Adicionar exercício pelo relógio.** Precisaria do catálogo, ou de uma busca
-  que atravesse a ponte. Nenhum dos dois cabe bem numa tela dessas.
+  que atravesse a ponte. Nenhum dos dois cabe bem numa tela dessas — e escolher
+  a ROTINA, que já funciona, cobre quase todo o caso real.
 - **Cardio.** O Galaxy Watch já mede frequência; hoje ela chega ao Ímpeto pelo
   Health Connect, depois do treino. Lê-la ao vivo daqui é possível e é outra
   história.
