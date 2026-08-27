@@ -87,7 +87,8 @@ private fun num(v: Double?): String {
 @Composable
 private fun App() {
   val ctx = LocalContext.current
-  val sessao by Elo.sessao.collectAsStateWithLifecycle()
+  val retrato by Elo.retrato.collectAsStateWithLifecycle()
+  val sessao = retrato?.sessao
   val aoAlcance by Elo.celularAoAlcance.collectAsStateWithLifecycle()
 
   // Qual exercício está aberto, por uid. Nulo = a lista. E qual série está em
@@ -118,7 +119,7 @@ private fun App() {
   ) {
     val aberto = sessao?.exercicios?.firstOrNull { it.uid == exercicioAberto }
     when {
-      sessao == null -> Convite(aoAlcance)
+      sessao == null -> Rotinas(retrato?.rotinas ?: emptyList(), aoAlcance)
       aberto == null -> ListaExercicios(sessao!!) { exercicioAberto = it }
       else -> {
         val serie = aberto.series.firstOrNull { it.id == serieEmEdicao }
@@ -136,62 +137,108 @@ private fun App() {
   }
 }
 
-/** Nada aberto no celular. O único caminho daqui é começar um treino. */
+/**
+ * Nada aberto no celular: as rotinas salvas, para escolher uma.
+ *
+ * É a tela que justifica o app existir antes do treino começar. Sem ela, quem
+ * chega à academia ainda precisa tirar o celular do bolso uma vez — e uma vez
+ * já é o bastante para o hábito não pegar.
+ *
+ * A lista vem do celular no mesmo retrato que traz a sessão, então ela está
+ * certa por construção: rotina criada, renomeada ou apagada lá aparece aqui na
+ * publicação seguinte, sem nada para sincronizar à mão.
+ */
 @Composable
-private fun Convite(aoAlcance: Boolean?) {
+private fun Rotinas(rotinas: List<Rotina>, aoAlcance: Boolean?) {
   val ctx = LocalContext.current
   val escopo = rememberCoroutineScope()
   var mandando by remember { mutableStateOf(false) }
   var falhou by remember { mutableStateOf(false) }
+  val estado = rememberScalingLazyListState()
 
-  Column(
-    modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp),
-    verticalArrangement = Arrangement.Center,
+  fun começar(comando: String) {
+    if (mandando) return
+    mandando = true
+    falhou = false
+    escopo.launch {
+      val ok = Elo.mandar(ctx, comando)
+      mandando = false
+      falhou = !ok
+    }
+  }
+
+  ScalingLazyColumn(
+    state = estado,
+    modifier = Modifier.fillMaxSize(),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    Text(
-      text = "ÍMPETO",
-      color = Cor.tinta,
-      fontFamily = FontFamily.Monospace,
-      fontWeight = FontWeight.Bold,
-      fontSize = 13.sp,
-      letterSpacing = 3.4.sp,
-    )
-    Text(
-      text = if (falhou) "Celular fora de alcance" else "Nenhum treino aberto",
-      color = if (falhou) Cor.rec else Cor.tintaFraca,
-      fontSize = 13.sp,
-      textAlign = TextAlign.Center,
-      modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
-    )
-    Button(
-      onClick = {
-        if (mandando) return@Button
-        mandando = true
-        falhou = false
-        escopo.launch {
-          val ok = Elo.mandar(ctx, Comando.iniciar())
-          mandando = false
-          falhou = !ok
-        }
-      },
-      colors = ButtonDefaults.buttonColors(backgroundColor = Cor.acento),
-      modifier = Modifier.fillMaxWidth().height(46.dp),
-    ) {
-      Text(
-        text = if (mandando) "Abrindo…" else "Começar treino",
-        color = Cor.acentoTexto,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Medium,
+    item {
+      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+          text = "ÍMPETO",
+          color = Cor.tinta,
+          fontFamily = FontFamily.Monospace,
+          fontWeight = FontWeight.Bold,
+          fontSize = 13.sp,
+          letterSpacing = 3.4.sp,
+        )
+        Text(
+          text = when {
+            falhou || aoAlcance == false -> "Celular fora de alcance"
+            mandando -> "Abrindo…"
+            else -> "Escolha o treino"
+          },
+          color = if (falhou || aoAlcance == false) Cor.rec else Cor.tintaFraca,
+          fontSize = 12.sp,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+        )
+      }
+    }
+
+    items(rotinas, key = { it.id }) { rotina ->
+      Chip(
+        onClick = { começar(Comando.iniciarRotina(rotina.id)) },
+        colors = ChipDefaults.chipColors(backgroundColor = Cor.fundoAlto),
+        modifier = Modifier.fillMaxWidth(),
+        label = {
+          Text(
+            text = rotina.nome,
+            color = Cor.tinta,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        },
+        secondaryLabel = {
+          Text(
+            text = "${rotina.exercicios} exercícios · ${rotina.series} séries",
+            color = Cor.tintaFraca,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        },
       )
     }
-    if (aoAlcance == false && !falhou) {
-      Text(
-        text = "celular fora de alcance",
-        color = Cor.tintaFantasma,
-        fontSize = 11.sp,
-        modifier = Modifier.padding(top = 10.dp),
-      )
+
+    // O treino vazio fecha a lista, e não a abre: com rotina salva, começar do
+    // zero é a exceção. Sem nenhuma, ele é a única linha e vira a resposta
+    // óbvia sozinho.
+    item {
+      Button(
+        onClick = { começar(Comando.iniciar()) },
+        colors = ButtonDefaults.buttonColors(backgroundColor = Cor.acento),
+        modifier = Modifier.fillMaxWidth().height(44.dp).padding(top = 4.dp),
+      ) {
+        Text(
+          text = if (rotinas.isEmpty()) "Começar treino" else "Treino vazio",
+          color = Cor.acentoTexto,
+          fontSize = 13.sp,
+          fontWeight = FontWeight.Medium,
+        )
+      }
     }
   }
 }

@@ -26,17 +26,23 @@ import kotlinx.coroutines.tasks.await
 object Elo {
   private const val TAG = "ImpetoPulso"
 
-  private val _sessao = MutableStateFlow<Sessao?>(null)
+  private val _retrato = MutableStateFlow<Retrato?>(null)
 
-  /** O treino aberto no celular, como ele está agora. */
-  val sessao: StateFlow<Sessao?> = _sessao.asStateFlow()
+  /**
+   * O que o celular publicou por último. Nulo enquanto nada chegou — que é
+   * diferente de um retrato com `sessao` nula, e a tela usa os dois: nulo é
+   * "ainda não sei", retrato sem sessão é "sei, e não há treino aberto".
+   */
+  val retrato: StateFlow<Retrato?> = _retrato.asStateFlow()
 
   /** Nulo = ainda não perguntamos. Falso = perguntamos e não há ninguém. */
   private val _celularAoAlcance = MutableStateFlow<Boolean?>(null)
   val celularAoAlcance: StateFlow<Boolean?> = _celularAoAlcance.asStateFlow()
 
-  fun receber(sessao: Sessao?) {
-    _sessao.value = sessao
+  fun receber(retrato: Retrato?) {
+    // Nulo aqui é JSON quebrado, não "nada aberto". Descartar preserva o último
+    // retrato bom em vez de apagar a tela por causa de uma leitura ruim.
+    if (retrato != null) _retrato.value = retrato
   }
 
   /**
@@ -52,9 +58,10 @@ object Elo {
       val itens = Wearable.getDataClient(ctx).dataItems.await()
       try {
         val item = itens.firstOrNull { it.uri.path == CAMINHO_SESSAO }
-        _sessao.value = item
+        item
           ?.let { DataMapItem.fromDataItem(it).dataMap.getString("json") }
           ?.let(::lerRetrato)
+          ?.let { _retrato.value = it }
       } finally {
         // `DataItemBuffer` segura memória nativa. Sem o `release` cada abertura
         // da tela vaza um buffer, e o aviso só aparece no logcat.

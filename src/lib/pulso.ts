@@ -1,13 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   aoReceberComando,
   drenarFila,
   publicarSessao,
   relogioDisponivel,
+  relogiosConectados,
 } from '../../modules/impeto-pulso';
 import { POR_ID } from '@/data/exercicios';
 import type { Grupo, Medida } from '@/data/types';
-import { useTreino, type Sessao, type TipoSerie } from '@/store/treino';
+import { useTreino, type Rotina, type Sessao, type TipoSerie } from '@/store/treino';
 
 /**
  * O ÍMPETO NO PULSO — o contrato entre o celular e o relógio.
@@ -57,6 +58,20 @@ export interface ExercicioRetrato {
   series: SerieRetrato[];
 }
 
+/**
+ * Uma rotina, como o relógio precisa vê-la.
+ *
+ * Só a contagem, não os exercícios: a lista serve para ESCOLHER qual treino
+ * começar, e ninguém escolhe lendo dezoito nomes numa tela de quatro
+ * centímetros. Depois de começado, o retrato da sessão traz tudo.
+ */
+export interface RotinaRetrato {
+  id: string;
+  nome: string;
+  exercicios: number;
+  series: number;
+}
+
 /** O estado inteiro que o relógio desenha. `sessao: null` = nada aberto. */
 export interface Retrato {
   sessao: {
@@ -65,6 +80,8 @@ export interface Retrato {
     inicio: number;
     exercicios: ExercicioRetrato[];
   } | null;
+  /** Os modelos de treino salvos, para começar um sem tocar no celular. */
+  rotinas: RotinaRetrato[];
 }
 
 // ─────────────────────────────  O que volta  ─────────────────────────────
@@ -79,6 +96,7 @@ export interface Retrato {
  */
 export type Comando =
   | { id: string; tipo: 'iniciar'; nome?: string }
+  | { id: string; tipo: 'iniciarRotina'; rotinaId: string }
   | { id: string; tipo: 'marcar'; uid: string; serieId: string }
   | {
       id: string;
@@ -93,10 +111,17 @@ export type Comando =
 
 // ───────────────────────────────  Retrato  ───────────────────────────────
 
-/** Monta o retrato a partir da sessão aberta. */
-export function retratoDe(sessao: Sessao | null): Retrato {
-  if (!sessao) return { sessao: null };
+/** Monta o retrato a partir do estado do treino. */
+export function retratoDe(sessao: Sessao | null, rotinas: Rotina[]): Retrato {
+  const modelos = rotinas.map((r) => ({
+    id: r.id,
+    nome: r.nome,
+    exercicios: r.itens.length,
+    series: r.itens.reduce((t, i) => t + i.series, 0),
+  }));
+  if (!sessao) return { sessao: null, rotinas: modelos };
   return {
+    rotinas: modelos,
     sessao: {
       id: sessao.id,
       nome: sessao.nome,
@@ -159,11 +184,21 @@ export function aplicar(cmd: Comando): void {
   if (jaAplicado(cmd.id)) return;
   const s = useTreino.getState();
 
+  // Os dois jeitos de começar. Já há treino aberto: o relógio provavelmente não
+  // sabia. Manter o que está em curso é sempre a escolha certa — o outro caminho
+  // descarta séries que alguém acabou de fazer.
   if (cmd.tipo === 'iniciar') {
-    // Já há treino aberto: o relógio provavelmente não sabia. Manter o que está
-    // em curso é sempre a escolha certa — o outro caminho descarta séries.
     if (s.ativa) return;
     s.iniciarVazio(cmd.nome);
+    return;
+  }
+
+  if (cmd.tipo === 'iniciarRotina') {
+    if (s.ativa) return;
+    // Rotina apagada no celular entre o retrato e o toque. Silêncio: o próximo
+    // retrato já vai sem ela, e a lista do relógio se conserta sozinha.
+    if (!s.rotinas.some((r) => r.id === cmd.rotinaId)) return;
+    s.iniciarDeRotina(cmd.rotinaId);
     return;
   }
 
@@ -249,7 +284,8 @@ export function usarPulso(): void {
     let ultimo = '';
 
     function publicar() {
-      const json = JSON.stringify(retratoDe(useTreino.getState().ativa));
+      const e = useTreino.getState();
+      const json = JSON.stringify(retratoDe(e.ativa, e.rotinas));
       // O Data Layer já deduplica por conteúdo do outro lado; comparar aqui
       // evita até a travessia da ponte, que é o caro.
       if (json === ultimo) return;
@@ -274,4 +310,44 @@ export function usarPulso(): void {
       desassinar();
     };
   }, []);
+}
+
+/**
+ * Que relógio está ao alcance AGORA, para a tela de ajustes dizer.
+ *
+ * Perguntado por sondagem e não por evento, e é uma escolha: o Data Layer avisa
+ * quando um nó entra ou sai, mas assinar isso obriga a manter um ouvinte vivo
+ * enquanto a tela existe, para uma informação que muda uma vez por dia. Oito
+ * segundos numa tela que ninguém deixa aberta é mais barato que o ouvinte.
+ *
+ * A lista vem vazia por três motivos que a tela não distingue, de propósito:
+ * não há relógio pareado, há mas está fora de alcance, ou há e está ao alcance
+ * mas SEM o Ímpeto instalado. Para quem lê "nenhum relógio", os três pedem a
+ * mesma coisa — ir ver o relógio.
+ */
+export function usarRelogio(): { nomes: string[]; verificando: boolean } {
+  const [nomes, setNomes] = useState<string[]>([]);
+  const [verificando, setVerificando] = useState(true);
+
+  useEffect(() => {
+    if (!relogioDisponivel) {
+      setVerificando(false);
+      return;
+    }
+    let vivo = true;
+    const perguntar = () =>
+      relogiosConectados().then((r) => {
+        if (!vivo) return;
+        setNomes(r);
+        setVerificando(false);
+      });
+    perguntar();
+    const relogio = setInterval(perguntar, 8000);
+    return () => {
+      vivo = false;
+      clearInterval(relogio);
+    };
+  }, []);
+
+  return { nomes, verificando };
 }

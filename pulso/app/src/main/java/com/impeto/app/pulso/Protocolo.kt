@@ -46,16 +46,48 @@ data class Sessao(
 )
 
 /**
+ * Um modelo de treino salvo no celular.
+ *
+ * Só a contagem, não os exercícios: a lista serve para ESCOLHER qual treino
+ * começar, e ninguém escolhe lendo dezoito nomes numa tela de quatro
+ * centímetros. Escolhido, o retrato da sessão traz tudo.
+ */
+data class Rotina(
+  val id: String,
+  val nome: String,
+  val exercicios: Int,
+  val series: Int,
+)
+
+/** O estado inteiro que a tela desenha. */
+data class Retrato(
+  /** O treino em curso, ou nulo quando não há nenhum. */
+  val sessao: Sessao?,
+  val rotinas: List<Rotina>,
+)
+
+/**
  * Lê o retrato publicado pelo celular.
  *
- * Devolve `null` tanto para "não há treino aberto" quanto para JSON quebrado, e
- * de propósito: nos dois casos a tela do relógio faz a mesma coisa — mostra o
- * convite para começar um treino. Distinguir os dois só serviria para escrever
- * uma mensagem de erro que ninguém consegue agir em cima, num pulso.
+ * Devolve `null` só para JSON quebrado — que num pulso não tem o que oferecer
+ * além da mesma tela de "nada aberto". Retrato VÁLIDO com `sessao` nula é outra
+ * coisa: significa que o celular está ali e não tem treino em curso, e é o que
+ * permite a tela mostrar as rotinas para escolher.
  */
-fun lerRetrato(json: String): Sessao? = try {
+fun lerRetrato(json: String): Retrato? = try {
   val raiz = JSONObject(json)
-  if (raiz.isNull("sessao")) null else {
+  val rotinas = raiz.optJSONArray("rotinas")
+  Retrato(
+    rotinas = if (rotinas == null) emptyList() else (0 until rotinas.length()).map { i ->
+      val r = rotinas.getJSONObject(i)
+      Rotina(
+        id = r.getString("id"),
+        nome = r.getString("nome"),
+        exercicios = r.getInt("exercicios"),
+        series = r.getInt("series"),
+      )
+    },
+    sessao = if (raiz.isNull("sessao")) null else {
     val s = raiz.getJSONObject("sessao")
     val exercicios = s.getJSONArray("exercicios")
     Sessao(
@@ -84,7 +116,8 @@ fun lerRetrato(json: String): Sessao? = try {
         )
       },
     )
-  }
+  },
+  )
 } catch (e: Throwable) {
   null
 }
@@ -100,6 +133,9 @@ fun lerRetrato(json: String): Sessao? = try {
 object Comando {
   fun iniciar(nome: String? = null): String =
     monta("iniciar") { if (nome != null) put("nome", nome) }
+
+  fun iniciarRotina(rotinaId: String): String =
+    monta("iniciarRotina") { put("rotinaId", rotinaId) }
 
   fun marcar(uid: String, serieId: String): String =
     monta("marcar") { put("uid", uid); put("serieId", serieId) }

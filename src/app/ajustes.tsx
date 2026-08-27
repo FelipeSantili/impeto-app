@@ -9,6 +9,7 @@ import { Glifo, type NomeGlifo } from '@/components/glifos';
 import { criarEstilos, usarPaleta, usarTema, type Preferencia } from '@/design/tema';
 import { margem, radius, sp, traco } from '@/design/tokens';
 import { exportar, importar } from '@/lib/backup';
+import { usarRelogio } from '@/lib/pulso';
 import { importarDoRelogio } from '@/lib/relogio';
 import {
   abrirAjustesSaude,
@@ -34,6 +35,7 @@ export default function Ajustes() {
   const [ocupado, setOcupado] = useState(false);
 
   const cinta = useCinta();
+  const pulso = usarRelogio();
   const rotinas = useTreino((s) => s.rotinas.length);
   const treinos = useTreino((s) => s.historico.length);
 
@@ -79,6 +81,22 @@ export default function Ajustes() {
    * automático, quem importa precisa saber quantos arquivos acharam par e
    * quantos não — senão a ação parece ter funcionado e não fez nada.
    */
+  /**
+   * O relógio não tem o que configurar aqui — ele se conecta sozinho ou não se
+   * conecta. O que a tela pode fazer é dizer POR QUE não, que é a pergunta que
+   * alguém olhando "nenhum relógio ao alcance" está fazendo.
+   */
+  function explicarPulso() {
+    abrirConfirmacao({
+      titulo: pulso.nomes.length ? 'Relógio conectado' : 'Nenhum relógio',
+      descricao: pulso.nomes.length
+        ? `${pulso.nomes.join(', ')}. Abrir um treino no relógio abre aqui também, e a carga que você marcar lá entra nesta mesma sessão.`
+        : 'Para aparecer aqui, o relógio precisa estar pareado ao celular, ao alcance, e com o Ímpeto instalado — assinado com a mesma chave deste app.',
+      confirmar: 'Entendi',
+      onConfirmar: () => {},
+    });
+  }
+
   async function aoImportarRelogio() {
     setOcupado(true);
     const r = await importarDoRelogio();
@@ -227,6 +245,21 @@ export default function Ajustes() {
                 </View>
               ))
             : null}
+
+          <Linha
+            glifo="pulso"
+            titulo="Ímpeto no pulso"
+            subtitulo={
+              pulso.verificando
+                ? 'Procurando…'
+                : pulso.nomes.length
+                  ? `${pulso.nomes.join(' · ')} · marca série pelo relógio`
+                  : 'Nenhum relógio com o Ímpeto ao alcance'
+            }
+            ativo={pulso.nomes.length > 0}
+            carregando={pulso.verificando}
+            onPress={explicarPulso}
+          />
 
           <Linha
             glifo="relogio"
