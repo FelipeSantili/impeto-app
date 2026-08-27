@@ -479,6 +479,328 @@ export interface CorpoProps {
   fundo?: string;
 }
 
+/**
+ * Estado da órbita, lido a cada quadro.
+ *
+ * Vive fora do React de propósito: o laço de render passa por ele sessenta
+ * vezes por segundo, e um estado do React aqui custaria uma re-renderização por
+ * quadro. Quem gira a figura muda este objeto no lugar.
+ */
+export interface Orbita {
+  giroY: number;
+  giroX: number;
+  zoom: number;
+}
+
+/** Uma cena montada e pronta para desenhar. */
+export interface Cena {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  /**
+   * Exposto para quem precisa desviar o desenho: num contexto headless o
+   * framebuffer da tela tem um pixel de lado, e o gerador de retratos manda o
+   * render para um alvo do tamanho que quer capturar.
+   */
+  renderer: THREE.WebGLRenderer;
+  /** O grupo que a órbita gira. */
+  pivo: THREE.Group;
+  /**
+   * Desenha um quadro. `apresentar: false` deixa o resultado no buffer sem
+   * entregá-lo à tela — é o que a captura de retrato precisa.
+   *
+   * `endFrameEXP` marca o contexto para TROCAR os buffers. Quem desenha para
+   * capturar em seguida não quer isso: a troca acontece antes da leitura, e o
+   * que sai do arquivo é o quadro anterior — preto, no primeiro.
+   */
+  render: (apresentar?: boolean) => void;
+  /** Só os músculos: é neles que a rampa térmica pinta. */
+  alvos: THREE.Mesh[];
+  /** Tudo que tem corpo, esqueleto incluído. O raio do toque bate nestes. */
+  solidos: THREE.Mesh[];
+  /** De onde veio a geometria que entrou em cena. */
+  fonte: FonteDoModelo;
+}
+
+/**
+ * Monta a cena inteira num contexto GL — malha, luz, material e enquadramento.
+ *
+ * Vive fora do componente porque tem DOIS chamadores com necessidades opostas:
+ * a `GLView` visível, que desenha num laço enquanto o dedo mexe, e o gerador de
+ * retratos do cartão de compartilhar, que desenha dois quadros parados e os
+ * captura como PNG. Fora de `render`, os dois querem exatamente a mesma cena —
+ * e é isso que garante que o corpo do cartão seja o MESMO corpo da tela, com a
+ * mesma rampa térmica, e não uma segunda implementação que vai divergir.
+ */
+export async function montarCena(
+  gl: ExpoWebGLRenderingContext,
+  {
+    intensidade,
+    paleta,
+    fundo,
+    orbita,
+    tamanho,
+  }: {
+    /** Fração de esforço por grupo, 0..1. Ausente = não trabalhado. */
+    intensidade: Map<Grupo, number>;
+    paleta: Paleta;
+    /** Cor com que o palco é limpo. Ver `CorpoProps.fundo`. */
+    fundo?: string;
+    /** Lido a cada quadro — quem chama gira mudando este objeto no lugar. */
+    orbita: Orbita;
+    /**
+     * Tamanho do palco em pixels. Ausente = o do buffer de desenho, que é o
+     * certo para uma `GLView` na tela.
+     *
+     * Um contexto headless não tem palco: o expo-gl lhe dá um pbuffer de um
+     * pixel de lado, e `drawingBufferWidth` responde 1. Quem desenha para
+     * framebuffer próprio precisa dizer o tamanho aqui, ou a câmera nasce com
+     * proporção 1:1 e o corpo sai esmagado.
+     */
+    tamanho?: { l: number; a: number };
+  },
+): Promise<Cena> {
+  const l = tamanho?.l ?? gl.drawingBufferWidth;
+  const a = tamanho?.a ?? gl.drawingBufferHeight;
+
+  /*
+   * O three espera um <canvas> do DOM. O expo-gl entrega só o contexto, e
+   * este objeto é o mínimo que o WebGLRenderer toca — sem ele o construtor
+   * quebra antes do primeiro quadro.
+   */
+  const canvas = {
+    width: l,
+    height: a,
+    clientWidth: l,
+    clientHeight: a,
+    style: {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    getContext: () => gl,
+  } as unknown as HTMLCanvasElement;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, context: gl as never, antialias: true });
+  renderer.setSize(l, a);
+  renderer.setClearColor(fundo ?? paleta.fundo, 1);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, l / a, 1, 1000);
+
+  const pivo = new THREE.Group();
+  scene.add(pivo);
+
+  /*
+   * Luz de estúdio de três pontos, não de app — e dentro de um ORÇAMENTO.
+   *
+   * A soma das luzes que batem numa superfície virada para a chave precisa
+   * ficar perto de 1. A versão anterior somava 2,2, e o resultado é o que
+   * qualquer render superexposto faz: o âmbar do degrau mais alto da rampa
+   * estourava em branco justo onde a luz é mais forte — ou seja, o músculo
+   * MAIS trabalhado era o único a perder a cor, que é exatamente o dado que
+   * a rampa existe para transmitir.
+   *
+   * O caminho óbvio para isso seria mapeamento de tons, e é o caminho errado
+   * aqui: ACES e companhia reescrevem matiz e luminância da imagem inteira,
+   * e a promessa deste arquivo é que âmbar aqui é o MESMO âmbar da prancha
+   * 2D e das barras de carga. Manter a luz no orçamento preserva a rampa;
+   * comprimir a imagem depois, não.
+   *
+   * A ambiente segue baixa de propósito: ambiente alta achata tudo, e era o
+   * que fazia os músculos parecerem adesivos colados no corpo.
+   */
+  // A cor de baixo é a do que está atrás da figura: é o chão devolvendo luz,
+  // e cravá-la em preto deixava o tema claro com um corpo sujo por baixo.
+  const hemi = new THREE.HemisphereLight(0xdfe6ea, new THREE.Color(fundo ?? paleta.fundo), 0.42);
+  scene.add(hemi);
+  const chave = new THREE.DirectionalLight(0xfff4e2, 0.86);
+  chave.position.set(55, 90, 80);
+  scene.add(chave);
+  const preenche = new THREE.DirectionalLight(0xcfe0ee, 0.26);
+  preenche.position.set(-70, 20, 55);
+  scene.add(preenche);
+  // A contraluz é a que menos soma com a chave — pega o corpo de raspão, do
+  // outro lado — então pode ser generosa. É ela que desenha o contorno.
+  const contra = new THREE.DirectionalLight(0xffffff, 0.9);
+  contra.position.set(-30, 60, -110);
+  scene.add(contra);
+
+  /*
+   * O corpo precisa de mais separação aqui do que na prancha 2D.
+   *
+   * A prancha desenha a silhueta com PREENCHIMENTO (`silhueta`) mais TRAÇO
+   * (`silhuetaTraco`), e quem a descola do fundo é o traço — os dois tokens
+   * ficam a menos de um degrau de luminância do fundo de propósito. Em três
+   * dimensões não há traço: sobra o preenchimento, e `silhueta` sobre
+   * `fundo` dá 1,1:1. É o corpo sumindo no vazio, e era metade do "está
+   * estranho" que sobrava mesmo depois de a malha certa aparecer.
+   *
+   * Em vez de inventar uma cor fora da paleta, empurra-se `silhueta` na
+   * direção de `tinta` — o extremo oposto do fundo, na mesma paleta. No
+   * tema escuro isso clareia, no claro escurece, e nos dois o corpo ganha
+   * volume sem sair do vocabulário.
+   *
+   * A rugosidade cai junto: preto fosco não reflete nada e continua um
+   * buraco por mais luz que se jogue em cima. Com algum brilho especular —
+   * que NÃO é multiplicado pelo albedo — a contraluz consegue desenhar a
+   * borda, que é o trabalho que o traço fazia na prancha.
+   */
+  // (a cor vem de `corDaCarne`, compartilhada com o degrau zero da rampa)
+  const matBase = new THREE.MeshStandardMaterial({
+    color: corDaCarne(paleta),
+    roughness: 0.82,
+    metalness: 0,
+    flatShading: false,
+  });
+  const alvos: THREE.Mesh[] = [];
+  const solidos: THREE.Mesh[] = [];
+
+  /** Material de um músculo, no degrau da rampa que a intensidade pede. */
+  const matMusculo = (grupo: Grupo) => {
+    const nivel = nivelDeCalor(intensidade.get(grupo) ?? 0);
+    return new THREE.MeshStandardMaterial({
+      color: nivel > 0 ? new THREE.Color(paleta.calor[nivel]) : corDaCarne(paleta),
+      // Músculo é úmido: um pouco de brilho especular é o que dá a
+      // leitura de fibra em vez de massa de modelar fosca. Mas com
+      // parcimonia: sao 3,6 mil triangulos por grupo, e especular baixo
+      // demais transforma cada faceta num brilho — o corpo passa a parecer
+      // estilhacado quando e so poligono grande.
+      roughness: 0.66,
+      metalness: 0,
+      emissive: new THREE.Color(nivel > 0 ? paleta.calor[nivel] : 0x000000),
+      emissiveIntensity: nivel > 0 ? 0.05 * nivel : 0,
+    });
+  };
+
+  const anatomia = await anatomiaClonada();
+
+  if (anatomia) {
+    // Anatomia real: cada malha do arquivo já é um grupo, e o que não casa
+    // com nenhum é o esqueleto — estrutura, nunca acende.
+    anatomia.traverse((o) => {
+      const malha = o as THREE.Mesh;
+      if (!malha.isMesh) return;
+      const grupo = grupoDaMalha(malha.name);
+      if (grupo) {
+        malha.material = matMusculo(grupo);
+        malha.userData = { grupo, nome: NOME_ANATOMICO[grupo] };
+        alvos.push(malha);
+      } else {
+        malha.material = matBase;
+      }
+      solidos.push(malha);
+    });
+    pivo.add(anatomia);
+  } else {
+    // Sem o arquivo, o écorché gerado em código. Perder o modelo degrada a
+    // fidelidade; não pode apagar a tela.
+    for (const g of corpoBase()) {
+      const base = new THREE.Mesh(g, matBase);
+      pivo.add(base);
+      solidos.push(base);
+    }
+    for (const m of MUSCULOS) {
+      const lados: (1 | -1)[] = m.par ? [1, -1] : [1];
+      for (const s of lados) {
+        const via = m.via.map(([x, y, z]) => [x * s, y, z] as P3);
+        const geo = malhaFusiforme(via, m.raios, { segmentos: 30, lados: 18 });
+        if (m.achatar) achatar(geo, m.achatar);
+        const mesh = new THREE.Mesh(geo, matMusculo(m.grupo));
+        mesh.userData = { grupo: m.grupo, nome: m.nome };
+        pivo.add(mesh);
+        alvos.push(mesh);
+        solidos.push(mesh);
+      }
+    }
+  }
+
+  // A outra metade do conserto do `catch` vazio: o erro foi para o log, e
+  // agora quem chamou pode parar de afirmar que mostra anatomia quando mostra
+  // esquema.
+  const fonte: FonteDoModelo = anatomia ? 'anatomia' : 'reserva';
+
+  /*
+   * Centro e enquadramento MEDIDOS da caixa envolvente do que entrou em
+   * cena, em vez de cravados.
+   *
+   * Cravar era o erro: 175 de altura e 34 de meia-largura são os números
+   * deste arquivo. A cena monta de duas fontes com proporções diferentes —
+   * o `.glb` e o esquema de reserva — e o `.glb` ainda pode ser regerado
+   * com outro recorte. Uma varredura da caixa resolve os três casos.
+   *
+   * Girar tem que ser girar em torno do MEIO do corpo: com o pivô nos pés a
+   * figura descreve um círculo em vez de girar no lugar.
+   */
+  const caixa = new THREE.Box3().setFromObject(pivo);
+  // Caixa vazia devolve min=+∞ e max=−∞, e a conta de distância vira NaN —
+  // que é a tela preta que este arquivo inteiro existe para não ter. Não
+  // deveria acontecer, já que os dois ramos acima sempre põem malhas; o
+  // custo de garantir é uma linha.
+  if (caixa.isEmpty()) caixa.set(new THREE.Vector3(-35, 0, -20), new THREE.Vector3(35, 175, 20));
+  const tam = caixa.getSize(new THREE.Vector3());
+  const centro = caixa.getCenter(new THREE.Vector3());
+  pivo.position.set(-centro.x, -centro.y, -centro.z);
+
+  const suporte = new THREE.Group();
+  suporte.add(pivo);
+  scene.add(suporte);
+
+  /*
+   * A distância sai da altura a enquadrar, com folga — e o segundo termo
+   * cuida do perfil. De lado, o que precisa caber não é a largura de frente
+   * e sim a DIAGONAL do plano XZ, porque é o raio que a silhueta varre ao
+   * girar. Sem isso o corpo encosta nas laterais no meio do giro, e primeiro
+   * numa tela estreita.
+   */
+  const folga = 1.1;
+  const meiaAltura = (tam.y / 2) * folga;
+  const meiaLargura = (Math.hypot(tam.x, tam.z) / 2) * folga;
+  const tg = Math.tan((camera.fov * Math.PI) / 360);
+  const dist = Math.max(meiaAltura / tg, meiaLargura / (tg * camera.aspect));
+
+  camera.position.set(0, 0, dist);
+  camera.lookAt(0, 0, 0);
+
+  /*
+   * PLANOS DE RECORTE COLADOS NO CORPO — e refeitos a cada quadro.
+   *
+   * Esta é a correção da casca estilhaçada que cobria a figura inteira, e
+   * ela não tem nada a ver com a malha nem com o material.
+   *
+   * O expo-gl pede `EGL_DEPTH_SIZE 16` no Android — dezesseis bits, cravado
+   * em GLContext.java, sem opção de configurar. A resolução do buffer de
+   * profundidade à distância z é
+   *
+   *     Δz = z² · (far − near) / (2¹⁶ · far · near)
+   *
+   * e com os `near = 1` / `far = 1000` que estavam aqui, a 335 de
+   * distância, isso dá 1,7 unidade: dezessete MILÍMETROS num corpo de
+   * 175 cm. Músculo e osso estão a MUITO menos que isso um do outro — o
+   * teste de profundidade empata em toda superfície sobreposta e o GPU
+   * decide o vencedor pixel a pixel. Daí o mosaico.
+   *
+   * Colados no corpo, os mesmos dezesseis bits dão 0,03 mm: quinhentas
+   * vezes melhor, de graça, mudando dois números.
+   *
+   * Refeitos a cada quadro porque o pinçar aproxima a câmera — planos
+   * calculados uma vez só recortariam o corpo ao ampliar. O piso de
+   * `d · 0,02` existe para o near nunca chegar a zero, que é onde a
+   * projeção perspectiva explode.
+   */
+  const raio = tam.length() / 2;
+  const render = (apresentar = true) => {
+    suporte.rotation.y = orbita.giroY;
+    suporte.rotation.x = orbita.giroX;
+    const d = dist / orbita.zoom;
+    camera.position.z = d;
+    camera.near = Math.max(d - raio, d * 0.02);
+    camera.far = d + raio;
+    camera.updateProjectionMatrix();
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    if (apresentar) gl.endFrameEXP();
+  };
+  return { scene, camera, pivo: suporte, renderer, render, alvos, solidos, fonte };
+}
+
 export function Corpo3D({
   intensidade,
   paleta,
@@ -492,17 +814,7 @@ export function Corpo3D({
   girarSozinho = orbitavel,
   fundo,
 }: CorpoProps) {
-  const cena = useRef<{
-    scene: THREE.Scene;
-    camera: THREE.PerspectiveCamera;
-    pivo: THREE.Group;
-    render: () => void;
-    gl: ExpoWebGLRenderingContext;
-    /** Só os músculos: é neles que a rampa térmica pinta. */
-    alvos: THREE.Mesh[];
-    /** Tudo que tem corpo, esqueleto incluído. O raio do toque bate nestes. */
-    solidos: THREE.Mesh[];
-  } | null>(null);
+  const cena = useRef<(Cena & { gl: ExpoWebGLRenderingContext }) | null>(null);
 
   // A cena monta uma vez, e o aviso de fonte sai de dentro dessa montagem.
   // Guardar o callback numa ref é o que impede que trocá-lo remonte tudo.
@@ -553,247 +865,11 @@ export function Corpo3D({
 
   const aoCriarContexto = useCallback(
     async (gl: ExpoWebGLRenderingContext) => {
-      const l = gl.drawingBufferWidth;
-      const a = gl.drawingBufferHeight;
-
-      /*
-       * O three espera um <canvas> do DOM. O expo-gl entrega só o contexto, e
-       * este objeto é o mínimo que o WebGLRenderer toca — sem ele o construtor
-       * quebra antes do primeiro quadro.
-       */
-      const canvas = {
-        width: l,
-        height: a,
-        clientWidth: l,
-        clientHeight: a,
-        style: {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        getContext: () => gl,
-      } as unknown as HTMLCanvasElement;
-
-      const renderer = new THREE.WebGLRenderer({ canvas, context: gl as never, antialias: true });
-      renderer.setSize(l, a);
-      renderer.setClearColor(fundo ?? paleta.fundo, 1);
-
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(32, l / a, 1, 1000);
-
-      const pivo = new THREE.Group();
-      scene.add(pivo);
-
-      /*
-       * Luz de estúdio de três pontos, não de app — e dentro de um ORÇAMENTO.
-       *
-       * A soma das luzes que batem numa superfície virada para a chave precisa
-       * ficar perto de 1. A versão anterior somava 2,2, e o resultado é o que
-       * qualquer render superexposto faz: o âmbar do degrau mais alto da rampa
-       * estourava em branco justo onde a luz é mais forte — ou seja, o músculo
-       * MAIS trabalhado era o único a perder a cor, que é exatamente o dado que
-       * a rampa existe para transmitir.
-       *
-       * O caminho óbvio para isso seria mapeamento de tons, e é o caminho errado
-       * aqui: ACES e companhia reescrevem matiz e luminância da imagem inteira,
-       * e a promessa deste arquivo é que âmbar aqui é o MESMO âmbar da prancha
-       * 2D e das barras de carga. Manter a luz no orçamento preserva a rampa;
-       * comprimir a imagem depois, não.
-       *
-       * A ambiente segue baixa de propósito: ambiente alta achata tudo, e era o
-       * que fazia os músculos parecerem adesivos colados no corpo.
-       */
-      // A cor de baixo é a do que está atrás da figura: é o chão devolvendo luz,
-      // e cravá-la em preto deixava o tema claro com um corpo sujo por baixo.
-      const hemi = new THREE.HemisphereLight(0xdfe6ea, new THREE.Color(fundo ?? paleta.fundo), 0.42);
-      scene.add(hemi);
-      const chave = new THREE.DirectionalLight(0xfff4e2, 0.86);
-      chave.position.set(55, 90, 80);
-      scene.add(chave);
-      const preenche = new THREE.DirectionalLight(0xcfe0ee, 0.26);
-      preenche.position.set(-70, 20, 55);
-      scene.add(preenche);
-      // A contraluz é a que menos soma com a chave — pega o corpo de raspão, do
-      // outro lado — então pode ser generosa. É ela que desenha o contorno.
-      const contra = new THREE.DirectionalLight(0xffffff, 0.9);
-      contra.position.set(-30, 60, -110);
-      scene.add(contra);
-
-      /*
-       * O corpo precisa de mais separação aqui do que na prancha 2D.
-       *
-       * A prancha desenha a silhueta com PREENCHIMENTO (`silhueta`) mais TRAÇO
-       * (`silhuetaTraco`), e quem a descola do fundo é o traço — os dois tokens
-       * ficam a menos de um degrau de luminância do fundo de propósito. Em três
-       * dimensões não há traço: sobra o preenchimento, e `silhueta` sobre
-       * `fundo` dá 1,1:1. É o corpo sumindo no vazio, e era metade do "está
-       * estranho" que sobrava mesmo depois de a malha certa aparecer.
-       *
-       * Em vez de inventar uma cor fora da paleta, empurra-se `silhueta` na
-       * direção de `tinta` — o extremo oposto do fundo, na mesma paleta. No
-       * tema escuro isso clareia, no claro escurece, e nos dois o corpo ganha
-       * volume sem sair do vocabulário.
-       *
-       * A rugosidade cai junto: preto fosco não reflete nada e continua um
-       * buraco por mais luz que se jogue em cima. Com algum brilho especular —
-       * que NÃO é multiplicado pelo albedo — a contraluz consegue desenhar a
-       * borda, que é o trabalho que o traço fazia na prancha.
-       */
-      // (a cor vem de `corDaCarne`, compartilhada com o degrau zero da rampa)
-      const matBase = new THREE.MeshStandardMaterial({
-        color: corDaCarne(paleta),
-        roughness: 0.82,
-        metalness: 0,
-        flatShading: false,
-      });
-      const alvos: THREE.Mesh[] = [];
-      const solidos: THREE.Mesh[] = [];
-
-      /** Material de um músculo, no degrau da rampa que a intensidade pede. */
-      const matMusculo = (grupo: Grupo) => {
-        const nivel = nivelDeCalor(intensidade.get(grupo) ?? 0);
-        return new THREE.MeshStandardMaterial({
-          color: nivel > 0 ? new THREE.Color(paleta.calor[nivel]) : corDaCarne(paleta),
-          // Músculo é úmido: um pouco de brilho especular é o que dá a
-          // leitura de fibra em vez de massa de modelar fosca. Mas com
-          // parcimonia: sao 3,6 mil triangulos por grupo, e especular baixo
-          // demais transforma cada faceta num brilho — o corpo passa a parecer
-          // estilhacado quando e so poligono grande.
-          roughness: 0.66,
-          metalness: 0,
-          emissive: new THREE.Color(nivel > 0 ? paleta.calor[nivel] : 0x000000),
-          emissiveIntensity: nivel > 0 ? 0.05 * nivel : 0,
-        });
-      };
-
-      const anatomia = await anatomiaClonada();
-
-      if (anatomia) {
-        // Anatomia real: cada malha do arquivo já é um grupo, e o que não casa
-        // com nenhum é o esqueleto — estrutura, nunca acende.
-        anatomia.traverse((o) => {
-          const malha = o as THREE.Mesh;
-          if (!malha.isMesh) return;
-          const grupo = grupoDaMalha(malha.name);
-          if (grupo) {
-            malha.material = matMusculo(grupo);
-            malha.userData = { grupo, nome: NOME_ANATOMICO[grupo] };
-            alvos.push(malha);
-          } else {
-            malha.material = matBase;
-          }
-          solidos.push(malha);
-        });
-        pivo.add(anatomia);
-      } else {
-        // Sem o arquivo, o écorché gerado em código. Perder o modelo degrada a
-        // fidelidade; não pode apagar a tela.
-        for (const g of corpoBase()) {
-          const base = new THREE.Mesh(g, matBase);
-          pivo.add(base);
-          solidos.push(base);
-        }
-        for (const m of MUSCULOS) {
-          const lados: (1 | -1)[] = m.par ? [1, -1] : [1];
-          for (const s of lados) {
-            const via = m.via.map(([x, y, z]) => [x * s, y, z] as P3);
-            const geo = malhaFusiforme(via, m.raios, { segmentos: 30, lados: 18 });
-            if (m.achatar) achatar(geo, m.achatar);
-            const mesh = new THREE.Mesh(geo, matMusculo(m.grupo));
-            mesh.userData = { grupo: m.grupo, nome: m.nome };
-            pivo.add(mesh);
-            alvos.push(mesh);
-            solidos.push(mesh);
-          }
-        }
-      }
-
+      const c = await montarCena(gl, { intensidade, paleta, fundo, orbita: orbita.current });
       // A outra metade do conserto do `catch` vazio: o erro foi para o log, e
       // agora a tela para de afirmar que mostra anatomia quando mostra esquema.
-      avisarFonte.current?.(anatomia ? 'anatomia' : 'reserva');
-
-      /*
-       * Centro e enquadramento MEDIDOS da caixa envolvente do que entrou em
-       * cena, em vez de cravados.
-       *
-       * Cravar era o erro: 175 de altura e 34 de meia-largura são os números
-       * deste arquivo. A cena monta de duas fontes com proporções diferentes —
-       * o `.glb` e o esquema de reserva — e o `.glb` ainda pode ser regerado
-       * com outro recorte. Uma varredura da caixa resolve os três casos.
-       *
-       * Girar tem que ser girar em torno do MEIO do corpo: com o pivô nos pés a
-       * figura descreve um círculo em vez de girar no lugar.
-       */
-      const caixa = new THREE.Box3().setFromObject(pivo);
-      // Caixa vazia devolve min=+∞ e max=−∞, e a conta de distância vira NaN —
-      // que é a tela preta que este arquivo inteiro existe para não ter. Não
-      // deveria acontecer, já que os dois ramos acima sempre põem malhas; o
-      // custo de garantir é uma linha.
-      if (caixa.isEmpty()) caixa.set(new THREE.Vector3(-35, 0, -20), new THREE.Vector3(35, 175, 20));
-      const tam = caixa.getSize(new THREE.Vector3());
-      const centro = caixa.getCenter(new THREE.Vector3());
-      pivo.position.set(-centro.x, -centro.y, -centro.z);
-
-      const suporte = new THREE.Group();
-      suporte.add(pivo);
-      scene.add(suporte);
-
-      /*
-       * A distância sai da altura a enquadrar, com folga — e o segundo termo
-       * cuida do perfil. De lado, o que precisa caber não é a largura de frente
-       * e sim a DIAGONAL do plano XZ, porque é o raio que a silhueta varre ao
-       * girar. Sem isso o corpo encosta nas laterais no meio do giro, e primeiro
-       * numa tela estreita.
-       */
-      const folga = 1.1;
-      const meiaAltura = (tam.y / 2) * folga;
-      const meiaLargura = (Math.hypot(tam.x, tam.z) / 2) * folga;
-      const tg = Math.tan((camera.fov * Math.PI) / 360);
-      const dist = Math.max(meiaAltura / tg, meiaLargura / (tg * camera.aspect));
-
-      camera.position.set(0, 0, dist);
-      camera.lookAt(0, 0, 0);
-
-      /*
-       * PLANOS DE RECORTE COLADOS NO CORPO — e refeitos a cada quadro.
-       *
-       * Esta é a correção da casca estilhaçada que cobria a figura inteira, e
-       * ela não tem nada a ver com a malha nem com o material.
-       *
-       * O expo-gl pede `EGL_DEPTH_SIZE 16` no Android — dezesseis bits, cravado
-       * em GLContext.java, sem opção de configurar. A resolução do buffer de
-       * profundidade à distância z é
-       *
-       *     Δz = z² · (far − near) / (2¹⁶ · far · near)
-       *
-       * e com os `near = 1` / `far = 1000` que estavam aqui, a 335 de
-       * distância, isso dá 1,7 unidade: dezessete MILÍMETROS num corpo de
-       * 175 cm. Músculo e osso estão a MUITO menos que isso um do outro — o
-       * teste de profundidade empata em toda superfície sobreposta e o GPU
-       * decide o vencedor pixel a pixel. Daí o mosaico.
-       *
-       * Colados no corpo, os mesmos dezesseis bits dão 0,03 mm: quinhentas
-       * vezes melhor, de graça, mudando dois números.
-       *
-       * Refeitos a cada quadro porque o pinçar aproxima a câmera — planos
-       * calculados uma vez só recortariam o corpo ao ampliar. O piso de
-       * `d · 0,02` existe para o near nunca chegar a zero, que é onde a
-       * projeção perspectiva explode.
-       */
-      const raio = tam.length() / 2;
-      const render = () => {
-        const o = orbita.current;
-        suporte.rotation.y = o.giroY;
-        suporte.rotation.x = o.giroX;
-        const d = dist / o.zoom;
-        camera.position.z = d;
-        camera.near = Math.max(d - raio, d * 0.02);
-        camera.far = d + raio;
-        camera.updateProjectionMatrix();
-        camera.lookAt(0, 0, 0);
-        renderer.render(scene, camera);
-        gl.endFrameEXP();
-      };
-
-      cena.current = { scene, camera, pivo: suporte, render, gl, alvos, solidos };
+      avisarFonte.current?.(c.fonte);
+      cena.current = { ...c, gl };
 
       /*
        * O giro de apresentação existe para dizer, sem texto, que a figura é
@@ -806,7 +882,7 @@ export function Corpo3D({
         const o = orbita.current;
         const apresentando = girarSozinho && !o.mexeu;
         if (apresentando) o.giroY += 0.0035;
-        render();
+        c.render();
         if (apresentando || o.tocando) requestAnimationFrame(laco);
         else parado.current = true;
       };

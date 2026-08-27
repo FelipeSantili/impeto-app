@@ -43,6 +43,7 @@ import {
   type Recorde,
 } from '@/lib/metricas';
 import { importarParaSessao } from '@/lib/relogio';
+import { usarRetratos } from '@/lib/retrato-corpo';
 import { lerCardio } from '@/lib/saude';
 import { useTreino, type Cardio } from '@/store/treino';
 
@@ -96,6 +97,16 @@ export default function RelatorioSessao() {
   const sessao = historico.find((s) => s.id === id);
 
   const musculos = useMemo(() => (sessao ? musculosDaSessao(sessao) : []), [sessao]);
+
+  // O corpo que vai no cartão: dois PNG do modelo 3D, frente e costas,
+  // desenhados só quando alguém toca em compartilhar. O fundo é o do CARTÃO,
+  // não o da página — o cartão tem borda e margem próprias, e limpar o palco
+  // com outra cor desenharia um retângulo em volta do corpo.
+  const { retratos, aoDesenhar, preparar } = usarRetratos({
+    musculos,
+    paleta: c,
+    fundo: c.fundo,
+  });
   const { recordes, estreias } = useMemo(
     () => (sessao ? conquistasDaSessao(historico, sessao) : { recordes: [], estreias: [] }),
     [historico, sessao],
@@ -161,6 +172,10 @@ export default function RelatorioSessao() {
 
   async function compartilhar() {
     setCompartilhando(true);
+    // Renderiza o corpo e espera o cartão desenhá-lo. É o que impede a imagem
+    // de sair com dois retângulos vazios no lugar do modelo — e o que faz o
+    // botão ficar girando por um instante na primeira vez.
+    await preparar();
     const r = await compartilharView(refCartao);
     setCompartilhando(false);
     if (!r.ok && r.erro) {
@@ -515,7 +530,12 @@ export default function RelatorioSessao() {
         com deslocamento negativo o mantém montado e medido, sem aparecer.
       */}
       <View style={estilos.fora} pointerEvents="none">
-        <CartaoCompartilhar sessao={sessao} refCaptura={refCartao} />
+        <CartaoCompartilhar
+          sessao={sessao}
+          retratos={retratos}
+          aoDesenhar={aoDesenhar}
+          refCaptura={refCartao}
+        />
       </View>
 
       <Entrada atraso={t(1350)} style={[estilos.rodape, { paddingBottom: insets.bottom + sp.md }]}>

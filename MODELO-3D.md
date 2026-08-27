@@ -197,6 +197,7 @@ Nada disso aparece no desktop, onde o navegador dá 24 bits.
 | `/corpo` (modal) | tela cheia | órbita, pinça, toque identifica o músculo |
 | relatório da sessão | 280 pt | parado; toque abre o modal |
 | cabeçalho do treino | 48 × 80 pt | parado, e esquenta a cada série marcada |
+| cartão de compartilhar | 108 pt × 2 | dois PNG parados, frente e costas |
 
 Os dois embutidos não têm órbita: vivem dentro de rolagem, e um `Pan` ali
 engoliria o arrastar vertical da página. Também não giram sozinhos — movimento
@@ -207,9 +208,43 @@ O arquivo é lido do disco **uma vez por sessão do app**: `clone()` compartilha
 `BufferGeometry`, então o segundo e o terceiro corpo custam um punhado de
 objetos em vez de 57 mil triângulos reconstruídos.
 
-O **cartão de compartilhar** continua com a prancha 2D, e vai continuar: é
-capturado como bitmap, e capturar conteúdo de GL é uma corrida entre o carregar
-do modelo e o disparo da captura que não vale a pena para gerar imagem estática.
+### O cartão de compartilhar
+
+Aqui o modelo chega por um caminho diferente dos outros três, e a razão é que o
+cartão **vira bitmap**: ele mora fora da tela, montado só para
+`react-native-view-shot` capturar. Uma `GLView` ali é uma `TextureView` do
+Android que talvez nunca seja desenhada — a textura só nasce na primeira passada
+de desenho da view, e view fora dos limites da tela pode não receber nenhuma.
+Sem textura o corpo sai como um retângulo preto, no arquivo que o usuário posta.
+
+Por isso `src/lib/retrato-corpo.ts` não usa view nenhuma: abre um contexto GL
+**sem palco** (`GLView.createContextAsync`), monta a mesma cena de sempre
+(`montarCena`, compartilhada com a `GLView` visível), desenha num framebuffer
+próprio de 440 × 1120 e lê os dois quadros de volta com `takeSnapshotAsync`. O
+cartão recebe dois arquivos e os mostra com `<Image>`, que a captura sabe
+capturar. A prancha 2D ficou como plano B, para aparelho que não entrega
+contexto GL nenhum.
+
+Três detalhes que não se anunciam:
+
+- **não chamar `endFrameEXP` antes de capturar.** Ele marca o contexto para
+  trocar os buffers, e a leitura pegaria o quadro anterior — preto, no primeiro.
+  Daí o `render(false)`;
+- **passar o framebuffer explicitamente** para `takeSnapshotAsync`. Sem ele a
+  captura usa "o que estiver ligado agora", e esse ramo no iOS do expo-gl faz
+  `defaultFramebuffer || prev` — um OU LÓGICO em C, que devolve 1;
+- **esperar as duas `<Image>` desenharem.** Arquivo local também carrega de
+  forma assíncrona, e capturar antes disso exporta dois retângulos vazios. É o
+  que `usarRetratos` coreografa.
+
+Os 440 × 1120 são superamostragem: `react-native-view-shot` ignora a largura
+pedida e captura na densidade da tela, então os 108 pontos do cartão podem virar
+378 pixels. Um framebuffer próprio não tem multiamostragem — reduzir uma imagem
+grande é o antisserrilhado.
+
+Não sai daqui um GIF do corpo girando, e não é falta de vontade: codificar GIF
+exigiria ler cada quadro pixel a pixel de volta para o JS e quantizar as cores
+na thread de JS, num aparelho. Frente e costas paradas dizem o que o giro diria.
 
 ## A cor
 

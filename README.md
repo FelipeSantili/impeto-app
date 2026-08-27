@@ -323,7 +323,8 @@ da série para escolher. Aquecimento é a única que não entra no volume.
 página** e o resumo se abre: duração, volume e séries subindo de zero, recordes batidos
 marcados a vermelho na margem, frequência cardíaca e a **prancha dos músculos
 trabalhados sobre uma figura humana** (frente e costas), cada região com a densidade de
-tinta proporcional ao esforço. Dá para **compartilhar como imagem**, no estilo Strava. O
+tinta proporcional ao esforço. Dá para **compartilhar como imagem**, no estilo Strava — e
+o que sai é o modelo 3D renderizado de frente e de costas, com a lista do que foi feito. O
 mesmo relatório, sem a encenação, é o que você vê ao abrir um treino pelo histórico.
 
 **Progresso** — total de treinos, volume e tempo, o volume das últimas oito semanas e
@@ -381,6 +382,8 @@ src/
     tema.tsx    TemaProvider, usarPaleta e criarEstilos (folhas por tema)
   lib/            metricas, saude (Health Connect), backup, atualizacao, compartilhar
     gltf.ts       carrega .glb no React Native (e a armadilha do navigator)
+    retrato-corpo.ts  o modelo 3D em dois PNG para o cartão de compartilhar,
+                  renderizado num contexto GL sem palco
   ferramentas/    destilar-modelo.mjs: do atlas Z-Anatomy ao asset do app
     tcx.ts        leitor dos arquivos .tcx do Mi Fitness (as duas formas dele)
     relogio.ts    escolhe os arquivos e casa cada um com o treino do histórico
