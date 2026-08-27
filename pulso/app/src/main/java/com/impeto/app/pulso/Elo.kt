@@ -3,6 +3,7 @@ package com.impeto.app.pulso
 import android.content.Context
 import android.util.Log
 import com.google.android.gms.wearable.CapabilityClient
+import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
@@ -72,6 +73,11 @@ object Elo {
     }
   }
 
+  /** Chamado pelo ouvinte de capacidade quando um nó entra ou sai. */
+  fun marcarAlcance(temCelular: Boolean) {
+    _celularAoAlcance.value = temCelular
+  }
+
   /** Há celular com o Ímpeto ao alcance agora? */
   suspend fun conferirCelular(ctx: Context) {
     _celularAoAlcance.value = try {
@@ -80,6 +86,11 @@ object Elo {
         .await()
         .nodes.isNotEmpty()
     } catch (e: Throwable) {
+      // O log importa mais do que parece: sem ele, "não há celular" e "a
+      // consulta explodiu" viram o MESMO falso, e a tela diz a mesma frase nos
+      // dois casos. Quem for depurar por que o relógio não acha o celular
+      // precisa saber em qual dos dois está.
+      Log.w(TAG, "falha ao consultar a capacidade do celular", e)
       false
     }
   }
@@ -136,6 +147,23 @@ class ServicoCelular : WearableListenerService() {
       val json = DataMapItem.fromDataItem(evento.dataItem).dataMap.getString("json") ?: continue
       Elo.receber(lerRetrato(json))
     }
+  }
+}
+
+/**
+ * Avisa quando o Ímpeto do celular entra ou sai do alcance.
+ *
+ * Sem isto, a tela pergunta uma vez ao abrir e nunca mais. O caso que expõe a
+ * falha é o mais comum de todos na primeira vez: o app é instalado no celular
+ * com a tela do relógio aberta, e o relógio continua dizendo "fora de alcance"
+ * até alguém fechar e reabrir — o que parece exatamente com "não funcionou".
+ */
+class OuvinteCapacidade(private val ctx: Context) : CapabilityClient.OnCapabilityChangedListener {
+  fun ligar() = Wearable.getCapabilityClient(ctx).addListener(this, CAPACIDADE_CELULAR)
+  fun desligar() = Wearable.getCapabilityClient(ctx).removeListener(this, CAPACIDADE_CELULAR)
+
+  override fun onCapabilityChanged(info: CapabilityInfo) {
+    Elo.marcarAlcance(info.nodes.isNotEmpty())
   }
 }
 

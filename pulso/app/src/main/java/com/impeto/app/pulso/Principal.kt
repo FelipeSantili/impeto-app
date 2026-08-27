@@ -107,9 +107,24 @@ private fun App() {
   }
 
   val ouvinte = remember { OuvinteAoVivo(ctx) }
+  val ouvinteCapacidade = remember { OuvinteCapacidade(ctx) }
   DisposableEffect(Unit) {
     ouvinte.ligar()
-    onDispose { ouvinte.desligar() }
+    ouvinteCapacidade.ligar()
+    onDispose {
+      ouvinte.desligar()
+      ouvinteCapacidade.desligar()
+    }
+  }
+
+  // O celular acabou de aparecer: pede o retrato de uma vez.
+  //
+  // Quem instala o app no celular com a tela do relógio aberta cai aqui, e sem
+  // isto veria "fora de alcance" virar "escolha o treino" com a lista VAZIA —
+  // porque a capacidade chega pelo ouvinte, mas o retrato só chega na próxima
+  // publicação, que pode demorar até alguém tocar no celular.
+  LaunchedEffect(aoAlcance) {
+    if (aoAlcance == true) Elo.carregar(ctx)
   }
 
   Scaffold(
