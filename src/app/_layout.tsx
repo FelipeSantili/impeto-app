@@ -20,6 +20,7 @@ import { AvisoAtualizacao } from '@/components/aviso-atualizacao';
 import { Folhas } from '@/components/folha';
 import { TemaProvider, usarPaleta } from '@/design/tema';
 import { useVerificarAtualizacao } from '@/lib/atualizacao';
+import { usarPulso } from '@/lib/pulso';
 import { useTreino } from '@/store/treino';
 
 SplashScreen.preventAutoHideAsync();
@@ -66,6 +67,11 @@ export default function RootLayout() {
  */
 function Moldura() {
   const c = usarPaleta();
+
+  // A ponte com o relógio. Mora aqui, e não numa tela, porque comando que chega
+  // do pulso não pergunta que tela está aberta: marcar série tem que valer com
+  // o app no Início, no histórico ou em segundo plano.
+  usarPulso();
 
   /*
    * Fundo do sistema: é o que o Android pinta atrás da janela durante rotações

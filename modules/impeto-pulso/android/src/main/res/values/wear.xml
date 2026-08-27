@@ -1,0 +1,15 @@
+<resources>
+    <!--
+      A capacidade que o relógio procura para saber que ESTE celular tem o
+      Ímpeto instalado.
+
+      Sem ela o relógio conhece os nós conectados, mas não sabe quais deles
+      rodam o app — e mandar comando para um nó que não escuta é uma mensagem
+      que some sem erro. `CapabilityClient` resolve isso, e é também o que
+      permite a tela do relógio dizer "celular fora de alcance" em vez de
+      simplesmente não reagir ao toque.
+    -->
+    <string-array name="android_wear_capabilities">
+        <item>impeto_celular</item>
+    </string-array>
+</resources>

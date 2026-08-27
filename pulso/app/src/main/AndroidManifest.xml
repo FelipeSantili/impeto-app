@@ -1,0 +1,55 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Declara o binário como app de relógio. Sem isto o Android instala, mas o
+      launcher do Wear não lista o app — ele fica no aparelho e invisível.
+    -->
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <!--
+          `standardVersion` diz ao Play Services que este app fala com um par no
+          celular. É o que faz o relógio aparecer como destino do mesmo app.
+        -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="false" />
+
+        <activity
+            android:name=".pulso.Principal"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Recebe o retrato publicado pelo celular mesmo com o app do relógio
+          fechado. É o que faz abrir o app já mostrando o treino em curso, em
+          vez de uma tela vazia esperando a primeira sincronia.
+        -->
+        <service
+            android:name=".pulso.ServicoCelular"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/impeto" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

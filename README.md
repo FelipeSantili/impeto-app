@@ -330,6 +330,10 @@ mesmo relatório, sem a encenação, é o que você vê ao abrir um treino pelo 
 **Progresso** — total de treinos, volume e tempo, o volume das últimas oito semanas e
 todos os treinos concluídos.
 
+**No pulso** — um app de Wear OS que abre o treino no celular e marca carga e repetição
+na mesma sessão, sem tirar o telefone do bolso. O celular é a fonte da verdade; o relógio
+manda comando e desenha o que volta. Como e por quê, em [PULSO.md](PULSO.md).
+
 ### Como os músculos são contados
 
 Cada exercício credita **série cheia** ao grupo principal e **0,4** a cada assistente.
@@ -389,6 +393,13 @@ src/
     relogio.ts    escolhe os arquivos e casa cada um com o treino do histórico
   store/          estado persistido (zustand + AsyncStorage): treino, cinta,
                   descanso, selecao, atualizacao, tema
+modules/
+  impeto-pulso/   modulo Expo local: a ponte nativa com o relogio (Wear Data
+                  Layer). Mora aqui, e nao em android/, porque o prebuild
+                  regenera android/ a cada build
+pulso/            o app de Wear OS, em Kotlin e Wear Compose. Projeto Gradle
+                  proprio, com o MESMO applicationId e a MESMA chave do app do
+                  celular; receita em PULSO.md
 ```
 
 ## Dados dos exercícios

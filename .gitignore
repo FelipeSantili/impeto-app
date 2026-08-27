@@ -61,3 +61,14 @@ example
 # Export cru do Blender: 30 MB de geometria que o app NÃO embarca. Entrou em
 # teste, foi recusado (MODELO-3D.md diz por quê) e fica na máquina, não no repo.
 /corpo-completo.glb
+
+# App do relógio: artefatos de build e o que é da máquina, não do projeto.
+/pulso/.gradle/
+/pulso/build/
+/pulso/app/build/
+/pulso/local.properties
+/pulso/keystore.properties
+
+# O Gradle compila o módulo local dentro dele mesmo. Só o código é do repo.
+/modules/*/android/build/
+/modules/*/android/.cxx/

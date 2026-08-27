@@ -1,0 +1,30 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!--
+          O serviço que recebe do relógio.
+
+          `exported="true"` é obrigatório e não é descuido: quem se liga a ele é
+          o Google Play Services, um processo de fora. O que impede qualquer app
+          de mandar comando é o Data Layer só rotear entre apps de MESMO
+          applicationId e MESMA assinatura — a barreira é a chave, não o
+          exported.
+
+          O `pathPrefix` filtra na origem: sem ele o serviço acorda a cada
+          evento de Data Layer do sistema, inclusive os que não são nossos.
+        -->
+        <service
+            android:name="expo.modules.impetopulso.ServicoPulso"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/impeto" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

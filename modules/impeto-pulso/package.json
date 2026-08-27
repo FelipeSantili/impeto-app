@@ -1,0 +1,7 @@
+{
+  "name": "impeto-pulso",
+  "version": "1.0.0",
+  "description": "Ponte entre o Ímpeto do celular e o do relógio, pelo Wearable Data Layer.",
+  "main": "index.ts",
+  "private": true
+}

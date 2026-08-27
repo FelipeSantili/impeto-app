@@ -1,0 +1,26 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.impeto.pulso'
+version = '1.0.0'
+
+android {
+  namespace 'expo.modules.impetopulso'
+  // O plugin do Expo exige os dois: sem eles a configuração do projeto quebra
+  // com "'android.defaultConfig.versionName' is not defined", que não diz de
+  // onde vem. Acompanham a versão do app, só para não mentirem.
+  defaultConfig {
+    versionCode 15
+    versionName '1.5.5'
+  }
+}
+
+dependencies {
+  // O canal inteiro entre celular e relógio. Vem do Google Play Services, não
+  // do Bluetooth cru: quem cuida do pareamento, da reconexão e da fila de
+  // entrega é o serviço do sistema, e é por isso que uma mensagem enviada com o
+  // relógio fora de alcance chega quando ele volta.
+  implementation 'com.google.android.gms:play-services-wearable:18.2.0'
+}
