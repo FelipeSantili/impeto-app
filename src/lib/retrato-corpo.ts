@@ -84,6 +84,32 @@ function arquivo(uri: string | Blob | null): string | null {
 }
 
 /**
+ * Obriga os comandos de desenho a EXECUTAR antes de alguém ler o quadro.
+ *
+ * O expo-gl não executa cada chamada de GL na hora: ele as enfileira num lote e
+ * despacha para a thread de GL depois. `takeSnapshotAsync` pede um flush antes
+ * de ler, mas esse flush e o desenho que acabou de ser enfileirado não têm
+ * ordem garantida entre si — e quando perde a corrida, a captura lê o quadro
+ * ANTERIOR, que ainda está no framebuffer.
+ *
+ * É um bug que só aparece a partir da segunda captura, porque a primeira não
+ * tem quadro anterior para pegar por engano. O sintoma foi exato: frente certa,
+ * costas idênticas à frente.
+ *
+ * `readPixels` é síncrona — ela tem que devolver dados, então não há como
+ * responder sem antes executar tudo que está na fila. Um pixel basta; o que
+ * importa aqui não é o valor lido, é a espera.
+ */
+function sincronizar(gl: ExpoWebGLRenderingContext): void {
+  try {
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+  } catch {
+    // Sem sincronia explícita a captura pode sair com o quadro anterior, mas
+    // ainda sai. Não é motivo para derrubar o compartilhamento inteiro.
+  }
+}
+
+/**
  * O corpo chegou mesmo a ser desenhado?
  *
  * Lê de volta um bloco no MEIO do quadro, que é onde o tronco cai em qualquer
@@ -200,10 +226,10 @@ export async function gerarRetratos({
      */
     const bruto = props?.__webglFramebuffer;
     const framebuffer = (Array.isArray(bruto) ? bruto[0] : bruto) ?? undefined;
-    console.warn(
-      `[retrato] framebuffer=${framebuffer ? 'ok' : 'AUSENTE'}` +
-        `${Array.isArray(bruto) ? ' (veio como array)' : ''}`,
-    );
+    // Sem o nome certo, a captura cai no "usa o que estiver ligado agora" — que
+    // funciona por acaso no Android e lê o buffer errado no iOS. Vale um aviso:
+    // é a diferença entre um retrato e um retângulo preto.
+    if (!framebuffer) console.warn('[retrato] o three não deu o framebuffer do alvo');
 
     let desenhou = false;
 
@@ -212,17 +238,12 @@ export async function gerarRetratos({
       // `false`: nada de `endFrameEXP` aqui. Ele marca o contexto para trocar os
       // buffers, e a captura leria o quadro anterior — preto, no primeiro.
       cena.render(false);
-      // Basta conferir uma vez: os dois quadros saem da mesma cena e do mesmo
-      // alvo, e um deles vazio significa os dois vazios.
-      if (!desenhou) {
-        // Quantos triângulos o three DIZ que desenhou, contra o que a leitura
-        // do framebuffer encontra. Os dois juntos separam "a cena está vazia"
-        // de "a cena desenhou e eu estou lendo o buffer errado" — que saem
-        // idênticos na imagem e pedem consertos opostos.
-        const i = cena.renderer.info.render;
-        console.warn(`[retrato] chamadas=${i.calls} triangulos=${i.triangles}`);
-        desenhou = desenhouCorpo(gl!);
-      }
+      // TODA captura precisa desta espera, não só a primeira. Ver `sincronizar`:
+      // sem ela, o segundo retrato sai igual ao primeiro.
+      sincronizar(gl!);
+      // A conferência, essa sim, basta uma vez: os dois quadros saem da mesma
+      // cena e do mesmo alvo, e um deles vazio significa os dois vazios.
+      if (!desenhou) desenhou = desenhouCorpo(gl!);
       const foto = await GLView.takeSnapshotAsync(gl!, {
         format: 'png',
         framebuffer,
