@@ -199,6 +199,24 @@ export async function gerarRetratos({
       depthBuffer: true,
       stencilBuffer: false,
       generateMipmaps: false,
+      /*
+       * O ESPAÇO DE COR — e é aqui que o corpo do cartão ganha a mesma cor do
+       * corpo da tela.
+       *
+       * Desenhando na TELA, o three converte de linear para sRGB na saída. Num
+       * render target ele NÃO faz isso: o código dele força linear para
+       * qualquer alvo que não seja de realidade virtual. O resultado é que tudo
+       * sai escrito em linear e a captura lê esses bytes como se fossem sRGB —
+       * o âmbar escurece e enluma, e `#0A0B0C` vira (1,1,1), preto o bastante
+       * para o retrato aparecer como uma CAIXA dentro do cartão em vez de se
+       * fundir a ele.
+       *
+       * Pedir sRGB aqui não muda o que o shader escreve: muda o FORMATO INTERNO
+       * do buffer para `SRGB8_ALPHA8`, e aí quem converte é a GPU, na escrita.
+       * A diferença importa porque a limpeza do quadro não passa por shader
+       * nenhum — só a conversão no hardware alcança o fundo também.
+       */
+      colorSpace: THREE.SRGBColorSpace,
     });
     cena.renderer.setRenderTarget(alvo);
 
