@@ -4,6 +4,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +20,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -32,6 +41,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * O VOCABULÁRIO DA TELA REDONDA.
@@ -45,6 +58,13 @@ import androidx.wear.compose.material.Text
  * preto continua neutro. Um valor âmbar no pulso significa o mesmo que
  * significa no relatório, e é isso que faz os dois parecerem o mesmo app.
  */
+
+/** Número como o app do celular escreve: vírgula decimal, sem zero à toa. */
+fun fmt(v: Double?): String {
+  if (v == null) return "—"
+  return if (v == v.roundToInt().toDouble()) v.roundToInt().toString()
+  else String.format("%.1f", v).replace('.', ',')
+}
 
 /** Rótulo miúdo em caixa alta — o carimbo do app, na escala do pulso. */
 @Composable
@@ -175,65 +195,79 @@ fun Pilula(
  *
  * Os alvos de toque são as setas E os números vizinhos — a área inteira de cima
  * sobe, a de baixo desce. Num pulso suado, alvo pequeno é alvo errado.
+ *
+ * E há TRÊS velocidades, porque um passo por toque não atravessa a faixa de
+ * carga de um agachamento: toque dá um passo, segurar acelera, e arrastar o
+ * número para cima ou para baixo percorre a faixa inteira num gesto só.
  */
 @Composable
 fun Passo(
-  valor: String,
-  acima: String,
-  abaixo: String,
+  valor: Double,
+  passo: Double,
   rotulo: String,
-  aoSubir: () -> Unit,
-  aoDescer: () -> Unit,
+  aoMudar: (Double) -> Unit,
   modifier: Modifier = Modifier,
   destacado: Boolean = true,
+  sugerido: Boolean = false,
 ) {
   val borda = if (destacado) Cor.acento else Cor.fundoBorda
+  val corValor = when {
+    sugerido -> Cor.tintaMid
+    destacado -> Cor.acento
+    else -> Cor.tinta
+  }
+  fun mover(n: Int) = aoMudar(max(0.0, valor + passo * n))
+
   Column(
     modifier = modifier.width(72.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(8.dp))
-        .clickable(onClick = aoSubir)
-        .padding(vertical = 1.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    ZonaDeRepeticao(aoPassar = { mover(1) }) {
       Text("▲", color = Cor.tintaFantasma, fontSize = 9.sp)
       Text(
-        text = acima,
+        text = fmt(valor + passo),
         color = Cor.tintaFraca,
         fontFamily = FontFamily.Monospace,
         fontSize = 12.sp,
       )
     }
 
+    var acumulado by remember { mutableFloatStateOf(0f) }
     Box(
       modifier = Modifier
         .fillMaxWidth()
         .clip(RoundedCornerShape(10.dp))
         .background(Cor.fundoAlto)
         .border(1.dp, borda, RoundedCornerShape(10.dp))
+        .pointerInput(passo, valor) {
+          val degrau = 13.dp.toPx()
+          detectVerticalDragGestures(
+            onDragEnd = { acumulado = 0f },
+            onDragCancel = { acumulado = 0f },
+            onVerticalDrag = { troca, dy ->
+              troca.consume()
+              // Arrastar para CIMA aumenta: é como todo seletor de roda do mundo
+              // se comporta, e `dy` negativo é para cima.
+              acumulado -= dy
+              var n = 0
+              while (acumulado >= degrau) { acumulado -= degrau; n += 1 }
+              while (acumulado <= -degrau) { acumulado += degrau; n -= 1 }
+              if (n != 0) mover(n)
+            },
+          )
+        }
         .padding(vertical = 5.dp),
       contentAlignment = Alignment.Center,
     ) {
       Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Numero(valor, cor = if (destacado) Cor.acento else Cor.tinta, tamanho = 25f)
+        Numero(fmt(valor), cor = corValor, tamanho = 25f)
         Rotulo(rotulo, cor = Cor.tintaFraca, tamanho = 8f)
       }
     }
 
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(8.dp))
-        .clickable(onClick = aoDescer)
-        .padding(vertical = 1.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    ZonaDeRepeticao(aoPassar = { mover(-1) }) {
       Text(
-        text = abaixo,
+        text = fmt(max(0.0, valor - passo)),
         color = Cor.tintaFraca,
         fontFamily = FontFamily.Monospace,
         fontSize = 12.sp,
@@ -241,6 +275,49 @@ fun Passo(
       Text("▼", color = Cor.tintaFantasma, fontSize = 9.sp)
     }
   }
+}
+
+/**
+ * Uma metade do seletor: um toque dá um passo, segurar dá muitos.
+ *
+ * Sem o segurar, sair de zero a cinquenta quilos custava vinte toques — e vinte
+ * toques não é ajuste, é digitação lenta com um dedo só. O intervalo ENCOLHE
+ * enquanto o dedo fica: quem segura quer chegar longe, e um passo por décimo de
+ * segundo levaria meio minuto para atravessar a faixa de carga de um
+ * agachamento.
+ */
+@Composable
+private fun ZonaDeRepeticao(
+  aoPassar: () -> Unit,
+  conteudo: @Composable ColumnScope.() -> Unit,
+) {
+  val escopo = rememberCoroutineScope()
+  Column(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(8.dp))
+      .pointerInput(Unit) {
+        detectTapGestures(
+          onPress = {
+            aoPassar()
+            val repetir = escopo.launch {
+              delay(420)
+              var intervalo = 110L
+              while (true) {
+                aoPassar()
+                delay(intervalo)
+                intervalo = max(45L, intervalo - 7)
+              }
+            }
+            tryAwaitRelease()
+            repetir.cancel()
+          },
+        )
+      }
+      .padding(vertical = 2.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    content = conteudo,
+  )
 }
 
 /**

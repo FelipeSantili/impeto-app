@@ -2,6 +2,7 @@ package com.impeto.app.pulso
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -83,13 +84,6 @@ private fun rotulos(medida: String): Pair<String, String> = when (medida) {
   else -> "kg" to "reps"
 }
 
-/** Número como o app do celular escreve: vírgula decimal, sem zero à toa. */
-private fun num(v: Double?): String {
-  if (v == null) return "—"
-  return if (v == v.roundToInt().toDouble()) v.roundToInt().toString()
-  else String.format("%.1f", v).replace('.', ',')
-}
-
 /** Volume como o celular escreve: tonelada acima de mil quilos. */
 private fun volume(kg: Double): String =
   if (kg >= 1000) String.format("%.1f", kg / 1000).replace('.', ',') + "t"
@@ -119,6 +113,27 @@ private fun App() {
   LaunchedEffect(Unit) {
     Elo.carregar(ctx)
     Elo.conferirCelular(ctx)
+  }
+
+  /*
+   * O VOLTAR.
+   *
+   * No Wear OS, tanto o botão físico quanto o arrastar da borda chegam como
+   * "voltar" — e sem ninguém para atendê-los, o sistema faz a única coisa que
+   * sabe: fecha o app. Era o que acontecia ao sair da lista de exercícios ou do
+   * descanso, e fechar o app no meio de um treino é o pior desfecho possível
+   * para um gesto que a pessoa fez esperando dar um passo atrás.
+   *
+   * Habilitado SÓ quando há para onde voltar. Na raiz ele fica desligado de
+   * propósito: aí o gesto volta a significar "sair", que é o que a plataforma
+   * promete e o que o usuário espera de um app na primeira tela.
+   */
+  BackHandler(enabled = listando || descansoAte > 0L || mostrandoFim) {
+    when {
+      listando -> listando = false
+      descansoAte > 0L -> descansoAte = 0L
+      mostrandoFim -> mostrandoFim = false
+    }
   }
 
   val ouvinte = remember { OuvinteAoVivo(ctx) }
@@ -201,12 +216,8 @@ private fun App() {
           indiceSerie = indiceSerie.coerceIn(0, max(0, exercicio.series.lastIndex)),
           aoAbrirLista = { listando = true },
           aoEscolherSerie = { indiceSerie = it },
-          aoAjustar = { campo, passo ->
-            if (serie != null) {
-              val atual = if (campo == "peso") serie.peso else serie.reps
-              val novo = max(0.0, (atual ?: 0.0) + passo)
-              mandar(Comando.editar(exercicio.uid, serie.id, campo, novo))
-            }
+          aoDefinir = { campo, valor ->
+            if (serie != null) mandar(Comando.editar(exercicio.uid, serie.id, campo, valor))
           },
           aoMarcar = {
             if (serie != null) {
@@ -471,7 +482,7 @@ private fun TelaTreino(
   indiceSerie: Int,
   aoAbrirLista: () -> Unit,
   aoEscolherSerie: (Int) -> Unit,
-  aoAjustar: (String, Double) -> Unit,
+  aoDefinir: (String, Double) -> Unit,
   aoMarcar: () -> Unit,
   aoAdicionar: () -> Unit,
   aoFinalizar: () -> Unit,
@@ -479,8 +490,39 @@ private fun TelaTreino(
   val (rotuloA, rotuloB) = rotulos(exercicio.medida)
   val serie = exercicio.series.getOrNull(indiceSerie)
   val ordem = sessao.exercicios.indexOfFirst { it.uid == exercicio.uid } + 1
-  val peso = serie?.peso ?: 0.0
-  val reps = serie?.reps ?: 0.0
+
+  /*
+   * O VALOR NA TELA responde ao dedo na hora, e só depois viaja.
+   *
+   * Sem isto, cada passo do seletor era uma mensagem de Bluetooth, e o número
+   * só mudava quando o celular respondia — segurar o botão viraria uma enxurrada
+   * de mensagens e uma tela que treme. Agora o local manda enquanto o dedo
+   * mexe, e uma mensagem só sai por RAJADA, quando ele para.
+   *
+   * A base de uma série ainda vazia é a série ANTERIOR — o mesmo palpite que o
+   * celular usa ao criar uma série nova, e o que faz sair de zero a cinquenta
+   * quilos deixar de custar vinte toques quando a série de cima já tem
+   * cinquenta.
+   */
+  val idSerie = serie?.id
+  var pesoLocal by remember(idSerie) { mutableStateOf<Double?>(null) }
+  var repsLocal by remember(idSerie) { mutableStateOf<Double?>(null) }
+  val anterior = exercicio.series.getOrNull(indiceSerie - 1)
+  val peso = pesoLocal ?: serie?.peso ?: anterior?.peso ?: 0.0
+  val reps = repsLocal ?: serie?.reps ?: anterior?.reps ?: 0.0
+
+  LaunchedEffect(pesoLocal, idSerie) {
+    val v = pesoLocal
+    if (v == null || idSerie == null) return@LaunchedEffect
+    delay(350)
+    aoDefinir("peso", v)
+  }
+  LaunchedEffect(repsLocal, idSerie) {
+    val v = repsLocal
+    if (v == null || idSerie == null) return@LaunchedEffect
+    delay(350)
+    aoDefinir("reps", v)
+  }
   val tudoFeito = sessao.exercicios.all { it.series.isNotEmpty() && it.feitas == it.series.size }
 
   Column(
@@ -518,13 +560,12 @@ private fun TelaTreino(
 
     Row(verticalAlignment = Alignment.CenterVertically) {
       Passo(
-        valor = num(peso),
-        acima = num(peso + PASSO_PESO),
-        abaixo = num(max(0.0, peso - PASSO_PESO)),
+        valor = peso,
+        passo = PASSO_PESO,
         rotulo = rotuloA,
-        aoSubir = { aoAjustar("peso", PASSO_PESO) },
-        aoDescer = { aoAjustar("peso", -PASSO_PESO) },
+        aoMudar = { pesoLocal = it },
         destacado = serie?.feita != true,
+        sugerido = serie?.peso == null && pesoLocal == null && peso > 0,
       )
       Text(
         "×",
@@ -534,13 +575,12 @@ private fun TelaTreino(
         textAlign = TextAlign.Center,
       )
       Passo(
-        valor = num(reps),
-        acima = num(reps + PASSO_REPS),
-        abaixo = num(max(0.0, reps - PASSO_REPS)),
+        valor = reps,
+        passo = PASSO_REPS,
         rotulo = rotuloB,
-        aoSubir = { aoAjustar("reps", PASSO_REPS) },
-        aoDescer = { aoAjustar("reps", -PASSO_REPS) },
+        aoMudar = { repsLocal = it },
         destacado = serie?.feita != true,
+        sugerido = serie?.reps == null && repsLocal == null && reps > 0,
       )
     }
 
@@ -562,7 +602,15 @@ private fun TelaTreino(
     } else {
       Pilula(
         texto = if (serie?.feita == true) "✓ FEITA" else "✔",
-        aoTocar = aoMarcar,
+        aoTocar = {
+          // O que está na tela é o que fica gravado. Uma série vazia mostrando a
+          // carga herdada precisa COMMITAR essa carga antes de ser marcada, ou o
+          // treino guardaria vazio o que a pessoa acabou de ler como cinquenta
+          // quilos. O mesmo vale para o que o dedo mexeu e ainda não viajou.
+          if (peso > 0 && (pesoLocal != null || serie?.peso == null)) aoDefinir("peso", peso)
+          if (reps > 0 && (repsLocal != null || serie?.reps == null)) aoDefinir("reps", reps)
+          aoMarcar()
+        },
         modifier = Modifier.width(if (serie?.feita == true) 104.dp else 74.dp),
         cheia = serie?.feita != true,
         altura = 34.dp,
@@ -722,7 +770,7 @@ private fun TelaFim(fim: Fim?, aoVoltar: () -> Unit) {
         )
         Barra(m.fracao.toFloat(), modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
         Text(
-          text = num(m.series),
+          text = fmt(m.series),
           color = Cor.tintaFraca,
           fontFamily = FontFamily.Monospace,
           fontSize = 9.sp,
