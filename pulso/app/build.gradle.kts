@@ -38,8 +38,8 @@ android {
     // não custa nada.
     minSdk = 30
     targetSdk = 34
-    versionCode = 16
-    versionName = "1.5.6"
+    versionCode = 17
+    versionName = "1.5.7"
   }
 
   signingConfigs {
@@ -85,6 +85,10 @@ dependencies {
 
   implementation(platform("androidx.compose:compose-bom:2024.12.01"))
   implementation("androidx.compose.ui:ui")
+  // Canvas, clickable e o HorizontalPager das telas que deslizam. O Wear
+  // Compose nao os traz: ele acrescenta o que a tela redonda pede, nao
+  // substitui a fundacao.
+  implementation("androidx.compose.foundation:foundation")
   implementation("androidx.compose.ui:ui-tooling-preview")
   debugImplementation("androidx.compose.ui:ui-tooling")
 

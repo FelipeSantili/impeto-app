@@ -1,5 +1,6 @@
 package com.impeto.app.pulso
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
@@ -14,6 +15,11 @@ import java.util.UUID
  * problema, mas aí cada campo novo numa série viraria mexida em três arquivos
  * em vez de dois, e o esquecimento silencioso de um deles é indistinguível de
  * uma falha de rede.
+ *
+ * Tudo que chega já vem MASTIGADO: nome do exercício resolvido do catálogo,
+ * fração do músculo calculada, volume somado. O relógio não faz conta — ele
+ * desenha. É o que permite a tela abrir instantânea num aparelho que tem uma
+ * fração da CPU do celular.
  */
 
 const val CAMINHO_COMANDO = "/impeto/comando"
@@ -34,9 +40,19 @@ data class Exercicio(
   val grupo: String,
   /** `peso_rep`, `rep`, `tempo`, `dist_tempo`, `peso_tempo`. Muda os rótulos. */
   val medida: String,
+  /** Descanso alvo em segundos. Zero desliga o cronômetro. */
   val descanso: Int,
   val series: List<Serie>,
-)
+) {
+  val feitas: Int get() = series.count { it.feita }
+  /**
+   * A série em que o dedo deve cair ao abrir o exercício: a primeira não feita.
+   * Todas feitas, a última — quem volta a um exercício terminado quer ver o que
+   * fez, não uma tela vazia.
+   */
+  val proxima: Int
+    get() = series.indexOfFirst { !it.feita }.let { if (it < 0) series.lastIndex else it }
+}
 
 data class Sessao(
   val id: String,
@@ -59,11 +75,87 @@ data class Rotina(
   val series: Int,
 )
 
+/** Quanto um grupo levou, para as barras da tela de fim. */
+data class Musculo(val nome: String, val series: Double, val fracao: Double)
+
+/** O treino que acabou de fechar. */
+data class Fim(
+  val nome: String,
+  val volume: Double,
+  val series: Int,
+  val musculos: List<Musculo>,
+)
+
+/** O mês corrente em números. */
+data class Progresso(
+  val treinos: Int,
+  val volume: Double,
+  val series: Int,
+  val minutos: Int,
+  /** Volume das últimas seis semanas, da mais velha para a corrente. */
+  val semanas: List<Double>,
+)
+
 /** O estado inteiro que a tela desenha. */
 data class Retrato(
   /** O treino em curso, ou nulo quando não há nenhum. */
   val sessao: Sessao?,
   val rotinas: List<Rotina>,
+  /** Segunda a domingo: houve treino naquele dia? Sempre sete posições. */
+  val semana: List<Boolean>,
+  val progresso: Progresso,
+  val ultimo: Fim?,
+)
+
+/** Itera um array do JSON sem repetir o `for` de índice em todo lugar. */
+private inline fun <T> JSONArray.mapear(f: (JSONObject) -> T): List<T> =
+  (0 until length()).map { f(getJSONObject(it)) }
+
+private fun lerSerie(x: JSONObject) = Serie(
+  id = x.getString("id"),
+  peso = if (x.isNull("peso")) null else x.getDouble("peso"),
+  reps = if (x.isNull("reps")) null else x.getDouble("reps"),
+  feita = x.getBoolean("feita"),
+  tipo = x.optString("tipo", "normal"),
+)
+
+private fun lerExercicio(e: JSONObject) = Exercicio(
+  uid = e.getString("uid"),
+  nome = e.getString("nome"),
+  grupo = e.getString("grupo"),
+  medida = e.getString("medida"),
+  descanso = e.getInt("descanso"),
+  series = e.getJSONArray("series").mapear(::lerSerie),
+)
+
+private fun lerSessao(s: JSONObject) = Sessao(
+  id = s.getString("id"),
+  nome = s.getString("nome"),
+  inicio = s.getLong("inicio"),
+  exercicios = s.getJSONArray("exercicios").mapear(::lerExercicio),
+)
+
+private fun lerProgresso(p: JSONObject?) = Progresso(
+  treinos = p?.optInt("treinos") ?: 0,
+  volume = p?.optDouble("volume", 0.0) ?: 0.0,
+  series = p?.optInt("series") ?: 0,
+  minutos = p?.optInt("minutos") ?: 0,
+  semanas = p?.optJSONArray("semanas")?.let { a ->
+    (0 until a.length()).map { a.optDouble(it, 0.0) }
+  } ?: emptyList(),
+)
+
+private fun lerFim(f: JSONObject) = Fim(
+  nome = f.getString("nome"),
+  volume = f.optDouble("volume", 0.0),
+  series = f.optInt("series"),
+  musculos = f.optJSONArray("musculos")?.mapear { m ->
+    Musculo(
+      nome = m.getString("nome"),
+      series = m.optDouble("series", 0.0),
+      fracao = m.optDouble("fracao", 0.0),
+    )
+  } ?: emptyList(),
 )
 
 /**
@@ -73,50 +165,29 @@ data class Retrato(
  * além da mesma tela de "nada aberto". Retrato VÁLIDO com `sessao` nula é outra
  * coisa: significa que o celular está ali e não tem treino em curso, e é o que
  * permite a tela mostrar as rotinas para escolher.
+ *
+ * Todo campo NOVO é lido com `opt`, e isso é deliberado: relógio e celular são
+ * dois binários que se atualizam em momentos diferentes, e um retrato de uma
+ * versão antiga tem que continuar desenhando o que dá em vez de virar tela
+ * preta. O que falta vira zero, e zero é desenhável.
  */
 fun lerRetrato(json: String): Retrato? = try {
   val raiz = JSONObject(json)
-  val rotinas = raiz.optJSONArray("rotinas")
   Retrato(
-    rotinas = if (rotinas == null) emptyList() else (0 until rotinas.length()).map { i ->
-      val r = rotinas.getJSONObject(i)
+    sessao = if (raiz.isNull("sessao")) null else lerSessao(raiz.getJSONObject("sessao")),
+    rotinas = raiz.optJSONArray("rotinas")?.mapear { r ->
       Rotina(
         id = r.getString("id"),
         nome = r.getString("nome"),
         exercicios = r.getInt("exercicios"),
         series = r.getInt("series"),
       )
-    },
-    sessao = if (raiz.isNull("sessao")) null else {
-    val s = raiz.getJSONObject("sessao")
-    val exercicios = s.getJSONArray("exercicios")
-    Sessao(
-      id = s.getString("id"),
-      nome = s.getString("nome"),
-      inicio = s.getLong("inicio"),
-      exercicios = (0 until exercicios.length()).map { i ->
-        val e = exercicios.getJSONObject(i)
-        val series = e.getJSONArray("series")
-        Exercicio(
-          uid = e.getString("uid"),
-          nome = e.getString("nome"),
-          grupo = e.getString("grupo"),
-          medida = e.getString("medida"),
-          descanso = e.getInt("descanso"),
-          series = (0 until series.length()).map { j ->
-            val x = series.getJSONObject(j)
-            Serie(
-              id = x.getString("id"),
-              peso = if (x.isNull("peso")) null else x.getDouble("peso"),
-              reps = if (x.isNull("reps")) null else x.getDouble("reps"),
-              feita = x.getBoolean("feita"),
-              tipo = x.optString("tipo", "normal"),
-            )
-          },
-        )
-      },
-    )
-  },
+    } ?: emptyList(),
+    semana = raiz.optJSONArray("semana")?.let { a ->
+      (0 until a.length()).map { a.optBoolean(it) }
+    } ?: List(7) { false },
+    progresso = lerProgresso(raiz.optJSONObject("progresso")),
+    ultimo = raiz.optJSONObject("ultimo")?.let(::lerFim),
   )
 } catch (e: Throwable) {
   null

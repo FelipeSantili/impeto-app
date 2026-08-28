@@ -7,7 +7,15 @@ import {
   relogiosConectados,
 } from '../../modules/impeto-pulso';
 import { POR_ID } from '@/data/exercicios';
-import type { Grupo, Medida } from '@/data/types';
+import { GRUPO_LABEL, type Grupo, type Medida } from '@/data/types';
+import {
+  duracaoMs,
+  musculosDaSessao,
+  resumoDaSemana,
+  seriesFeitas,
+  volumePorSemana,
+  volumeSessao,
+} from '@/lib/metricas';
 import { useTreino, type Rotina, type Sessao, type TipoSerie } from '@/store/treino';
 
 /**
@@ -72,6 +80,39 @@ export interface RotinaRetrato {
   series: number;
 }
 
+/** Quanto um grupo levou numa sessão, para as barras da tela de fim. */
+export interface MusculoRetrato {
+  nome: string;
+  series: number;
+  /** Participação no total da sessão, 0..1 — é o comprimento da barra. */
+  fracao: number;
+}
+
+/**
+ * O treino que acabou de fechar.
+ *
+ * Vem do histórico, não de memória do relógio. A tela de "concluído" precisa
+ * existir depois de a sessão virar nula, e guardar o último retrato no pulso
+ * para isso significaria estado no lado que não tem dono — e uma tela que mente
+ * quando o treino é finalizado pelo celular em vez do relógio.
+ */
+export interface FimRetrato {
+  nome: string;
+  volume: number;
+  series: number;
+  musculos: MusculoRetrato[];
+}
+
+/** O mês corrente em números, para a tela de progresso. */
+export interface ProgressoRetrato {
+  treinos: number;
+  volume: number;
+  series: number;
+  minutos: number;
+  /** Volume das últimas seis semanas, da mais velha para a corrente. */
+  semanas: number[];
+}
+
 /** O estado inteiro que o relógio desenha. `sessao: null` = nada aberto. */
 export interface Retrato {
   sessao: {
@@ -82,6 +123,11 @@ export interface Retrato {
   } | null;
   /** Os modelos de treino salvos, para começar um sem tocar no celular. */
   rotinas: RotinaRetrato[];
+  /** Segunda a domingo: houve treino naquele dia? Sempre sete posições. */
+  semana: boolean[];
+  progresso: ProgressoRetrato;
+  /** O último treino concluído. Nulo em histórico vazio. */
+  ultimo: FimRetrato | null;
 }
 
 // ─────────────────────────────  O que volta  ─────────────────────────────
@@ -111,17 +157,63 @@ export type Comando =
 
 // ───────────────────────────────  Retrato  ───────────────────────────────
 
+/** O mês corrente em números. O relógio não recalcula nada — só desenha. */
+function progressoDoMes(historico: Sessao[], agora: number): ProgressoRetrato {
+  const d = new Date(agora);
+  const mes = d.getMonth();
+  const ano = d.getFullYear();
+  const doMes = historico.filter((s) => {
+    const q = new Date(s.fim ?? s.inicio);
+    return q.getMonth() === mes && q.getFullYear() === ano;
+  });
+  return {
+    treinos: doMes.length,
+    volume: doMes.reduce((t, s) => t + volumeSessao(s), 0),
+    series: doMes.reduce((t, s) => t + seriesFeitas(s), 0),
+    minutos: Math.round(doMes.reduce((t, s) => t + duracaoMs(s), 0) / 60000),
+    semanas: volumePorSemana(historico, 6, agora).map((s) => s.volume),
+  };
+}
+
+/** O treino mais recente do histórico, com a divisão por grupo. */
+function fimDoUltimo(historico: Sessao[]): FimRetrato | null {
+  // O histórico já chega do mais novo para o mais velho; o store o mantém assim.
+  const s = historico[0];
+  if (!s) return null;
+  return {
+    nome: s.nome,
+    volume: volumeSessao(s),
+    series: seriesFeitas(s),
+    // Três barras é o que cabe na tela do relógio, e as três maiores são as
+    // que descrevem o treino — a quarta em diante é ruído de auxiliar.
+    musculos: musculosDaSessao(s)
+      .slice(0, 3)
+      .map((m) => ({ nome: GRUPO_LABEL[m.grupo], series: m.series, fracao: m.fracao })),
+  };
+}
+
 /** Monta o retrato a partir do estado do treino. */
-export function retratoDe(sessao: Sessao | null, rotinas: Rotina[]): Retrato {
+export function retratoDe(
+  sessao: Sessao | null,
+  rotinas: Rotina[],
+  historico: Sessao[],
+  agora = Date.now(),
+): Retrato {
   const modelos = rotinas.map((r) => ({
     id: r.id,
     nome: r.nome,
     exercicios: r.itens.length,
     series: r.itens.reduce((t, i) => t + i.series, 0),
   }));
-  if (!sessao) return { sessao: null, rotinas: modelos };
-  return {
+  const comum = {
     rotinas: modelos,
+    semana: resumoDaSemana(historico, agora).dias,
+    progresso: progressoDoMes(historico, agora),
+    ultimo: fimDoUltimo(historico),
+  };
+  if (!sessao) return { ...comum, sessao: null };
+  return {
+    ...comum,
     sessao: {
       id: sessao.id,
       nome: sessao.nome,
@@ -285,7 +377,7 @@ export function usarPulso(): void {
 
     function publicar() {
       const e = useTreino.getState();
-      const json = JSON.stringify(retratoDe(e.ativa, e.rotinas));
+      const json = JSON.stringify(retratoDe(e.ativa, e.rotinas, e.historico));
       // O Data Layer já deduplica por conteúdo do outro lado; comparar aqui
       // evita até a travessia da ponte, que é o caro.
       if (json === ultimo) return;
