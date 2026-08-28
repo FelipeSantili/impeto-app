@@ -84,6 +84,59 @@ function arquivo(uri: string | Blob | null): string | null {
 }
 
 /**
+ * O corpo chegou mesmo a ser desenhado?
+ *
+ * Lê de volta um bloco no MEIO do quadro, que é onde o tronco cai em qualquer
+ * enquadramento que faça sentido, e pergunta se há VARIAÇÃO ali. Fundo liso não
+ * varia; corpo iluminado varia sempre, porque a luz de três pontos não deixa
+ * dois pixels vizinhos iguais numa superfície curva.
+ *
+ * Existe porque a falha que este arquivo produz é muda: um quadro vazio vira um
+ * PNG válido, de tamanho certo, que o cartão desenha sem reclamar — e o usuário
+ * descobre o problema num retângulo preto dentro da imagem que acabou de postar.
+ *
+ * A leitura custa uma sincronia com a GPU. É uma por compartilhamento; o
+ * silêncio custava mais.
+ */
+function desenhouCorpo(gl: ExpoWebGLRenderingContext): boolean {
+  try {
+    const lado = 8;
+    const px = new Uint8Array(lado * lado * 4);
+    gl.readPixels(
+      Math.floor(PX.l / 2) - lado / 2,
+      Math.floor(PX.a / 2) - lado / 2,
+      lado,
+      lado,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      px,
+    );
+    let variou = false;
+    for (let i = 4; i < px.length; i += 4) {
+      if (px[i] !== px[0] || px[i + 1] !== px[1] || px[i + 2] !== px[2]) {
+        variou = true;
+        break;
+      }
+    }
+    if (!variou) {
+      // A amostra distingue os dois modos de falha que saem IGUAIS na tela:
+      // preto puro significa framebuffer errado — lemos um buffer que ninguém
+      // limpou; a cor de fundo exata significa que limpou mas não desenhou
+      // geometria nenhuma. São consertos diferentes.
+      const a = `rgba(${px[0]},${px[1]},${px[2]},${px[3]})`;
+      console.warn(`[retrato] quadro sem corpo no centro — amostra ${a}`);
+    }
+    return variou;
+  } catch (e) {
+    // Sem leitura não dá para afirmar que falhou. Na dúvida deixa passar: um
+    // retrato bom descartado é pior que um ruim publicado, já que o plano B
+    // existe justamente para o caso ruim.
+    console.warn('[retrato] não deu para conferir o quadro:', e);
+    return true;
+  }
+}
+
+/**
  * Desenha o corpo de frente e de costas e devolve os dois PNG.
  *
  * `null` quando qualquer parte falha — sem contexto GL, sem framebuffer, sem
@@ -138,11 +191,16 @@ export async function gerarRetratos({
       | undefined;
     const framebuffer = props?.__webglFramebuffer ?? undefined;
 
+    let desenhou = false;
+
     const capturar = async (giro: number) => {
       orbita.giroY = giro;
       // `false`: nada de `endFrameEXP` aqui. Ele marca o contexto para trocar os
       // buffers, e a captura leria o quadro anterior — preto, no primeiro.
       cena.render(false);
+      // Basta conferir uma vez: os dois quadros saem da mesma cena e do mesmo
+      // alvo, e um deles vazio significa os dois vazios.
+      if (!desenhou) desenhou = desenhouCorpo(gl!);
       const foto = await GLView.takeSnapshotAsync(gl!, {
         format: 'png',
         framebuffer,
@@ -156,6 +214,11 @@ export async function gerarRetratos({
 
     alvo.dispose();
     cena.renderer.dispose();
+
+    // Quadro vazio: o cartão volta para a prancha 2D. Ela é a peça velha, mas
+    // desenha um corpo — e é a única das duas que não sai como um buraco preto
+    // na imagem que vai para fora do app.
+    if (!desenhou) return null;
 
     return frente && costas ? { frente, costas } : null;
   } catch (e) {
