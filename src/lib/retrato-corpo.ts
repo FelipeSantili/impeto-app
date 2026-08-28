@@ -187,9 +187,23 @@ export async function gerarRetratos({
      * dois.
      */
     const props = cena.renderer.properties.get(alvo) as
-      | { __webglFramebuffer?: WebGLFramebuffer }
+      | { __webglFramebuffer?: WebGLFramebuffer | WebGLFramebuffer[] }
       | undefined;
-    const framebuffer = props?.__webglFramebuffer ?? undefined;
+    /*
+     * O three guarda isto de DUAS formas, e a escolha é dele, não nossa: um
+     * framebuffer só, ou um array indexado por nível de mipmap. O próprio
+     * `setRenderTarget` testa `Array.isArray` antes de usar.
+     *
+     * Passar o array adiante seria pior que não passar nada: o lado nativo
+     * espera um objeto com `id`, e um array vira uma lista que estoura na
+     * primeira leitura de chave — trocando um quadro preto por uma exceção.
+     */
+    const bruto = props?.__webglFramebuffer;
+    const framebuffer = (Array.isArray(bruto) ? bruto[0] : bruto) ?? undefined;
+    console.warn(
+      `[retrato] framebuffer=${framebuffer ? 'ok' : 'AUSENTE'}` +
+        `${Array.isArray(bruto) ? ' (veio como array)' : ''}`,
+    );
 
     let desenhou = false;
 
@@ -200,7 +214,15 @@ export async function gerarRetratos({
       cena.render(false);
       // Basta conferir uma vez: os dois quadros saem da mesma cena e do mesmo
       // alvo, e um deles vazio significa os dois vazios.
-      if (!desenhou) desenhou = desenhouCorpo(gl!);
+      if (!desenhou) {
+        // Quantos triângulos o three DIZ que desenhou, contra o que a leitura
+        // do framebuffer encontra. Os dois juntos separam "a cena está vazia"
+        // de "a cena desenhou e eu estou lendo o buffer errado" — que saem
+        // idênticos na imagem e pedem consertos opostos.
+        const i = cena.renderer.info.render;
+        console.warn(`[retrato] chamadas=${i.calls} triangulos=${i.triangles}`);
+        desenhou = desenhouCorpo(gl!);
+      }
       const foto = await GLView.takeSnapshotAsync(gl!, {
         format: 'png',
         framebuffer,
